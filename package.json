@@ -1,0 +1,86 @@
+{
+  "name": "mtr-schedule-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Система управления расписанием для сервера Minecraft Transit Railway (GeoRail)",
+  "author": "GeoRail",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "node server.js",
+    "electron": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux",
+    "dist:mac": "electron-builder --mac",
+    "release": "electron-builder --publish always"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "electron-updater": "^6.3.9"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "eu.georail.schedule",
+    "productName": "GeoRail",
+    "copyright": "GeoRail",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "src/**/*",
+      "public/**/*",
+      "server.js",
+      "config.js",
+      "package.json",
+      "!**/*.map",
+      "!data/**",
+      "!dist/**",
+      "!diagnose-missing-route.js"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "public/**"
+    ],
+    "win": {
+      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "icon": "build/icon.ico",
+      "artifactName": "GeoRail-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "GeoRail",
+      "runAfterFinish": true
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "build/icon.png",
+      "category": "Utility",
+      "artifactName": "GeoRail-${version}.${ext}"
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "build/icon.png",
+      "category": "public.app-category.utilities",
+      "artifactName": "GeoRail-${version}.${ext}"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kk-prod-dev",
+        "repo": "MTR-Schedule-manager"
+      }
+    ]
+  }
+}
