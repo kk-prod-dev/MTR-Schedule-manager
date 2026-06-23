@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MTR Schedule Manager — GeoRail</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1 data-i18n="appTitle">Расписание GeoRail (MTR)</h1>
+    <div id="statusBadge" class="status-badge">Подключение...</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="schedule" data-i18n="tabSchedule">Расписание по станции</button>
+    <button class="tab-btn" data-tab="graph" data-i18n="tabGraph">График движения</button>
+    <button class="tab-btn" data-tab="routes" data-i18n="tabRoutes">Маршруты</button>
+    <button class="tab-btn" data-tab="problems" data-i18n="problemsTabTitle">Проблемные места</button>
+    <button class="tab-btn" data-tab="instructions" data-i18n="tabInstructions">Инструкции</button>
+    <button class="tab-btn" data-tab="settings" data-i18n="tabSettings">Настройки</button>
+  </nav>
+
+  <main>
+    <!-- ===== Расписание по станции ===== -->
+    <section id="tab-schedule" class="tab-panel active">
+      <div class="controls">
+        <div class="autocomplete" id="stationAC">
+          <input type="text" id="stationInput" data-i18n-placeholder="stationPlaceholder" placeholder="Начните вводить название станции..." autocomplete="off">
+          <div class="autocomplete-list" id="stationACList"></div>
+        </div>
+        <span id="scheduleLiveDot" class="live-dot" title="Автообновление активно"></span>
+        <button id="toggleFavoriteStationBtn" class="icon-btn" title="" style="font-size:16px;">☆</button>
+        <button id="newDraftBtnSchedule" data-i18n="newDraftBtn">+ Создать пробный маршрут</button>
+      </div>
+      <div id="favoritesBar" class="favorites-bar" style="display:none;"></div>
+      <p class="hint" id="scheduleMeta"></p>
+
+      <div class="layout-with-sidebar">
+        <aside class="sidebar" id="dashboardSidebar">
+          <div class="sidebar-section">
+            <h4 data-i18n="zoomLabel">Масштаб</h4>
+            <div class="zoom-row">
+              <button class="icon-btn" id="dashZoomOut">−</button>
+              <span class="hint small" id="dashZoomValue" style="margin:0;"></span>
+              <button class="icon-btn" id="dashZoomIn">+</button>
+            </div>
+            <div class="hint small" data-i18n="zoomWheelHint">Ctrl+колесо мыши над графиком — тоже масштабирует.</div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4 data-i18n="minIntervalLabel">Мин. интервал для конфликта</h4>
+            <input type="range" id="minIntervalSlider" min="0" max="5" step="0.5" value="3">
+            <div class="hint small" id="minIntervalValue"></div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4 data-i18n="platformsFilterLabel">Платформы</h4>
+            <div class="sidebar-actions-row">
+              <button class="link-btn" id="platformsSelectAll" data-i18n="selectAll">Все</button>
+              <button class="link-btn" id="platformsSelectNone" data-i18n="selectNone">Ничего</button>
+            </div>
+            <div id="platformFilterList" class="checkbox-list"></div>
+          </div>
+
+          <div class="sidebar-section">
+            <button class="full-btn secondary-btn" id="resetDashFiltersBtn" data-i18n="resetFilters">Сбросить фильтры</button>
+          </div>
+
+          <div class="sidebar-section">
+            <button class="full-btn" id="resetDashOverridesBtn" data-i18n="resetEdits">Сбросить ручные правки</button>
+          </div>
+
+          <div class="sidebar-section hint small" data-i18n="dragHint">
+            Перетащите блок поезда по горизонтали мышкой, чтобы вручную сдвинуть его время — изменённый рейс станет пунктирным.
+          </div>
+        </aside>
+
+        <div class="main-area">
+          <div class="dashboard-wrap" id="dashboardWrap">
+            <div class="dashboard-empty" id="dashboardEmpty" data-i18n="dashboardEmptyDefault">Выберите станцию, чтобы увидеть дашборд прибытий по платформам</div>
+            <div class="dashboard" id="dashboard" style="display:none;">
+              <div class="dashboard-corner" data-i18n="platformHeader">Платформа</div>
+              <div class="dashboard-ruler-scroll" id="rulerScroll">
+                <div class="dashboard-ruler" id="dashboardRuler"></div>
+              </div>
+              <div class="dashboard-platforms" id="dashboardPlatforms"></div>
+              <div class="dashboard-grid-scroll" id="gridScroll">
+                <div class="dashboard-grid" id="dashboardGrid"></div>
+              </div>
+            </div>
+          </div>
+          <!-- Табло ближайших прибытий — под графиком дашборда -->
+          <div id="nearestTrainSection" style="display:none;" class="nearest-board-wrap">
+            <div class="nearest-board-title" data-i18n="nearestTrainLabel">Ближайшие прибытия</div>
+            <table class="nearest-board-table" id="nearestTrainList"></table>
+          </div>
+        </div>
+      </div>
+      <div id="entryTooltip" class="entry-tooltip" style="display:none;"></div>
+    </section>
+
+    <!-- ===== График движения ===== -->
+    <section id="tab-graph" class="tab-panel">
+      <p class="hint" data-i18n="graphHint">Выберите две граничные станции — система найдёт все маршруты, проходящие через обе, и построит график движения (станции по вертикали — на реальном расстоянии друг от друга, время по горизонтали; наклон линии = скорость поезда).</p>
+      <div class="controls">
+        <div class="autocomplete" id="graphFromAC">
+          <input type="text" id="graphFromInput" data-i18n-placeholder="graphFromPlaceholder" placeholder="Станция А..." autocomplete="off">
+          <div class="autocomplete-list" id="graphFromACList"></div>
+        </div>
+        <button id="swapStationsBtn" class="icon-btn" type="button" title="Поменять местами А и Б">⇄</button>
+        <div class="autocomplete" id="graphToAC">
+          <input type="text" id="graphToInput" data-i18n-placeholder="graphToPlaceholder" placeholder="Станция Б..." autocomplete="off">
+          <div class="autocomplete-list" id="graphToACList"></div>
+        </div>
+        <button id="buildGraphBtn" data-i18n="buildGraphBtn">Построить график</button>
+        <button id="newDraftBtnGraph" data-i18n="newDraftBtn">+ Создать пробный маршрут</button>
+      </div>
+
+      <div class="layout-with-sidebar">
+        <aside class="sidebar" id="graphSidebar">
+          <div class="sidebar-section">
+            <label class="switch-row">
+              <input type="checkbox" id="showReverseToggle">
+              <span data-i18n="showReverseLabel">Показывать обратные рейсы</span>
+            </label>
+          </div>
+
+          <div class="sidebar-section">
+            <h4 data-i18n="zoomLabel">Масштаб</h4>
+            <div class="zoom-row">
+              <button class="icon-btn" id="graphZoomOut">−</button>
+              <span class="hint small" id="graphZoomValue" style="margin:0;"></span>
+              <button class="icon-btn" id="graphZoomIn">+</button>
+            </div>
+            <div class="hint small" data-i18n="zoomWheelHint">Ctrl+колесо мыши над графиком — тоже масштабирует.</div>
+          </div>
+
+          <div class="sidebar-section">
+            <h4 data-i18n="stationsFilterLabel">Станции на графике</h4>
+            <div class="sidebar-actions-row">
+              <button class="link-btn" id="graphStationsSelectAll" data-i18n="selectAll">Все</button>
+              <button class="link-btn" id="graphStationsSelectNone" data-i18n="selectNone">Ничего</button>
+            </div>
+            <div id="graphStationFilterList" class="checkbox-list"></div>
+          </div>
+
+          <div class="sidebar-section">
+            <button class="full-btn secondary-btn" id="resetGraphFiltersBtn" data-i18n="resetFilters">Сбросить фильтры</button>
+          </div>
+
+          <div class="sidebar-section">
+            <button class="full-btn" id="resetGraphOverridesBtn" data-i18n="resetEdits">Сбросить ручные правки</button>
+          </div>
+
+          <div class="sidebar-section hint small" data-i18n="dragHintGraph">
+            Перетащите линию поезда по горизонтали мышкой, чтобы вручную сдвинуть её время — изменённый рейс станет пунктирным.
+          </div>
+        </aside>
+
+        <div class="main-area">
+          <div id="graphLegend" class="graph-legend"></div>
+          <div class="graph-outer-wrap">
+            <div class="graph-y-panel" id="graphYPanel">
+              <!-- Подписи станций — отдельная фиксированная колонка слева -->
+            </div>
+            <div class="graph-wrap" id="graphWrap">
+              <div class="dashboard-empty" id="graphEmpty" data-i18n="graphEmptyDefault">Выберите обе станции и нажмите «Построить график»</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Маршруты (включая создание пробных) ===== -->
+    <section id="tab-routes" class="tab-panel">
+      <p class="hint" data-i18n="routesAnalyticsHint">Список маршрутов вместе со статистикой опозданий (столбцы справа), накопленной локально с момента запуска приложения.</p>
+      <div class="controls">
+        <input type="text" id="routeSearch" data-i18n-placeholder="routeSearchPlaceholder" placeholder="Поиск маршрута..." autocomplete="off">
+        <select id="routeTypeFilter"></select>
+        <select id="routeSourceFilter">
+          <option value="all" data-i18n="sourceFilterAll">Все маршруты</option>
+          <option value="real" data-i18n="sourceFilterReal">Только настоящие</option>
+          <option value="draft" data-i18n="sourceFilterDraft">Только пробные</option>
+        </select>
+        <button id="newDraftBtn" data-i18n="newDraftBtn">+ Создать пробный маршрут</button>
+      </div>
+      <table class="route-table">
+        <thead>
+          <tr>
+            <th class="sortable-th" data-sort-key="name" data-i18n="colLine">Линия</th>
+            <th class="sortable-th" data-sort-key="number" data-i18n="colNumber">№</th>
+            <th class="sortable-th" data-sort-key="type" data-i18n="colType">Тип</th>
+            <th class="sortable-th" data-sort-key="stopCount" data-i18n="colStops">Остановок</th>
+            <th class="sortable-th col-sep" data-sort-key="sampleCount" data-i18n="colSamples">Образцов</th>
+            <th class="sortable-th" data-sort-key="avgDeviationMs" data-i18n="colAvgDev">Среднее отклонение</th>
+            <th class="sortable-th" data-sort-key="maxDeviationMs" data-i18n="colMaxDev">Макс. опоздание</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="routeListBody">
+          <tr><td colspan="8" class="empty">...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ===== Проблемные места ===== -->
+    <section id="tab-problems" class="tab-panel">
+      <p class="hint" data-i18n="problemsHint">Маршруты и станции с наибольшим числом конфликтов или опозданий.</p>
+      <div id="problemsContent"><p class="hint">...</p></div>
+    </section>
+
+    <!-- ===== Инструкции ===== -->
+    <section id="tab-instructions" class="tab-panel">
+      <p class="hint" data-i18n="instructionsHint">Список всех возможностей приложения — кликни по пункту, чтобы раскрыть подробное описание.</p>
+      <div id="instructionsList" class="instructions-list"></div>
+    </section>
+
+    <!-- ===== Настройки ===== -->
+    <section id="tab-settings" class="tab-panel">
+      <div class="settings-block">
+        <label data-i18n="languageLabel">Язык интерфейса</label>
+        <select id="languageSelect">
+          <option value="auto" data-i18n="autoOption">Авто (по настройкам системы)</option>
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+          <option value="de">Deutsch</option>
+          <option value="fr">Français</option>
+          <option value="pl">Polski</option>
+          <option value="pt">Português</option>
+          <option value="cs">Čeština</option>
+        </select>
+      </div>
+      <div class="settings-block">
+        <label data-i18n="timezoneLabel">Часовой пояс</label>
+        <select id="timezoneSelect"></select>
+        <p class="hint small" id="tzDetectedHint"></p>
+      </div>
+      <div class="settings-block">
+        <p class="hint small" data-i18n="settingsNote">Все времена в приложении (расписания, графики, аналитика) автоматически пересчитываются под выбранный часовой пояс. Исходные данные сервер всегда хранит в UTC.</p>
+      </div>
+      <div class="settings-block">
+        <label data-i18n="notifSettingsTitle">Уведомления</label>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+            <input type="checkbox" id="notifConflictToggle">
+            <span data-i18n="notifConflict">Уведомлять о новых конфликтах платформ</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+            <input type="checkbox" id="notifOnlyFavToggle">
+            <span data-i18n="notifOnlyFav">Уведомлять только по избранному</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+            <input type="checkbox" id="notifDelayToggle">
+            <span data-i18n="notifBigDelay">Уведомлять о больших опозданиях</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+            <span data-i18n="notifThreshold">Порог опоздания (мин)</span>
+            <input type="number" id="notifDelayThreshold" min="1" max="30" value="5" style="width:54px;margin-left:4px;">
+          </label>
+        </div>
+        <p class="hint small" id="notifPermissionNote"></p>
+        <button class="secondary-btn" id="requestNotifPermissionBtn" style="margin-top:6px;display:none;" data-i18n="notifAllow">Разрешить уведомления</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== Модальное окно маршрута ===== -->
+  <div id="routeModalOverlay" class="modal-overlay" style="display:none;">
+    <div class="modal" id="routeModal">
+      <button class="modal-close" id="routeModalClose">&times;</button>
+      <div id="routeModalBody"></div>
+    </div>
+  </div>
+
+  <!-- ===== Модальное окно создания/редактирования пробного маршрута ===== -->
+  <div id="draftModalOverlay" class="modal-overlay" style="display:none;">
+    <div class="modal" id="draftModal">
+      <button class="modal-close" id="draftModalClose">&times;</button>
+      <div id="draftFormPanel" class="draft-form-panel">
+        <h3 id="draftFormTitle" data-i18n="newDraftBtn">+ Создать пробный маршрут</h3>
+        <div class="draft-form-grid">
+          <label data-i18n="draftNameLabel">Название</label><input id="draftName" type="text">
+          <label data-i18n="draftNumberLabel">Номер</label><input id="draftNumber" type="text">
+          <label data-i18n="draftColorLabel">Цвет</label><input id="draftColor" type="color" value="#9ca3af">
+          <label data-i18n="draftTypeLabel">Тип</label>
+          <select id="draftType">
+            <option value="train_normal">train_normal</option>
+            <option value="train_light_rail">train_light_rail</option>
+            <option value="train_high_speed">train_high_speed</option>
+          </select>
+          <label data-i18n="draftDepotLabel">Депо (необязательно)</label><input id="draftDepot" type="text">
+          <label data-i18n="draftDepartureLabel">Время отправления с первой станции</label><input id="draftDeparture" type="time">
+          <label data-i18n="draftIntervalLabel">Интервал (ЧЧ:ММ:СС, необязательно)</label><input id="draftInterval" type="text" placeholder="02:00:00" maxlength="8" pattern="^[0-9]{1,2}:[0-5][0-9]:[0-5][0-9]$">
+          <span class="hint small" style="grid-column:2;margin:-4px 0 0;" data-i18n="draftIntervalHint">Если указать — на весь день автоматически создадутся дополнительные отправления с этим шагом (начиная с указанного выше времени). Дальше можно будет добавлять/убирать отдельные отправления прямо в карточке маршрута.</span>
+        </div>
+
+        <h4 data-i18n="draftStopsLabel">Остановки</h4>
+        <div id="draftStopsList"></div>
+        <div class="controls">
+          <div class="autocomplete" id="draftStationAC">
+            <input type="text" id="draftStationInput" data-i18n-placeholder="stationPlaceholder" placeholder="Начните вводить название станции...">
+            <div class="autocomplete-list" id="draftStationACList"></div>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="saveDraftBtn" data-i18n="saveBtn">Сохранить</button>
+          <button id="cancelDraftBtn" class="secondary-btn" data-i18n="cancelBtn">Отмена</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script src="i18n-extra.js"></script>
+</body>
+</html>
