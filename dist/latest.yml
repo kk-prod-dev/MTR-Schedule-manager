@@ -1,8 +1,8 @@
-version: 1.0.0
+version: 1.1.0
 files:
-  - url: GeoRail-Setup-1.0.0.exe
-    sha512: cToYBH3/098JYszItnLhTyT7cxhEKs6Vgdog3AUACUz5Fh7NGccmPREhu53/nAtmwUQ4eh1//fQV5iwSH3C1TA==
-    size: 78900852
-path: GeoRail-Setup-1.0.0.exe
-sha512: cToYBH3/098JYszItnLhTyT7cxhEKs6Vgdog3AUACUz5Fh7NGccmPREhu53/nAtmwUQ4eh1//fQV5iwSH3C1TA==
-releaseDate: '2026-06-23T19:40:02.357Z'
+  - url: MTRScheduleManager-Setup-1.1.0.exe
+    sha512: ggEQFnUPZ1vJTQbJlI3wx/p9fLY152bukO8nKRhVahfswD/ntQ3XyR1ulMIglGCRyQMFQnYs/S4ovK+LTrRDMw==
+    size: 78907002
+path: MTRScheduleManager-Setup-1.1.0.exe
+sha512: ggEQFnUPZ1vJTQbJlI3wx/p9fLY152bukO8nKRhVahfswD/ntQ3XyR1ulMIglGCRyQMFQnYs/S4ovK+LTrRDMw==
+releaseDate: '2026-06-25T19:39:53.358Z'

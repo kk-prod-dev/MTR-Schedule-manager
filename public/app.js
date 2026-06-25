@@ -173,6 +173,26 @@ const I18N = {
     notifConflict: "Уведомлять о новых конфликтах платформ",
     notifBigDelay: "Уведомлять о больших опозданиях (>5 мин)",
     notifThreshold: "Порог опоздания (мин)",
+    'instr_title_schedule-basics': 'Расписание по станции',
+    'instr_body_schedule-basics': '<p>Начните вводить название станции в поле поиска — появится список подсказок, кликните по нужной. Дашборд покажет все платформы станции и прибытия поездов на временной шкале. Рядом с полем поиска — значок ☆: кликните, чтобы добавить станцию в <b>Избранное</b> (появится быстрая панель доступа снизу).</p><p>Жёлтая рамка вокруг блока — отклонение от графика более минуты. Янтарный «!» — конфликт: два поезда слишком близко на одной платформе. <b>Виджет «Ближайшие прибытия»</b> в сайдбаре показывает 6 ближайших поездов и обновляется каждые 30 секунд.</p>',
+    'instr_title_drag-edit': 'Ручное редактирование (перетаскивание)',
+    'instr_body_drag-edit': '<p>Перетащите блок поезда (на дашборде) или линию поезда (на графике движения) по горизонтали — время сдвинется, рейс станет пунктирным.</p><p><code>Shift</code> + перетаскивание — сдвигает <b>все</b> рейсы маршрута сразу. <code>Alt</code> + вертикальное перетаскивание (≥ полная высота строки) — переносит поезд на другую платформу.</p><p><code>Ctrl+Z</code> — отменить, <code>Ctrl+Y</code> — вернуть.</p><p>Кнопка «Сбросить ручные правки» в сайдбаре — сбрасывает все сдвиги. В карточке маршрута — «Сбросить правки этого маршрута» (появляется только при наличии изменений).</p>',
+    'instr_title_favorites': 'Избранное',
+    'instr_body_favorites': '<p><b>Станции</b> — кнопка ☆ рядом с полем поиска. <b>Маршруты</b> — кнопка ☆ в карточке маршрута или в строке таблицы маршрутов.</p><p>Панель быстрого доступа появляется снизу: клик по станции открывает расписание, клик по маршруту — карточку.</p><p>В таблице маршрутов кнопка ☆ в панели управления оставляет только избранные. Уведомления тоже можно ограничить только избранными (см. Настройки).</p>',
+    'instr_title_filters-zoom': 'Фильтры и масштаб',
+    'instr_body_filters-zoom': '<p>В сайдбаре слева — фильтр платформ, слайдер минимального интервала для конфликтов (по умолчанию 3 мин), масштаб времени.</p><p>Масштаб: кнопки +/− или <code>Ctrl</code>+колесо мыши над графиком.</p><p>В таблице маршрутов — фильтр по типу, источнику (настоящие/пробные), избранным, и поиск. Заголовки столбцов кликабельны для сортировки.</p>',
+    'instr_title_train-graph': 'График движения поездов',
+    'instr_body_train-graph': '<p>Выберите станцию А и Б — приложение строит граф: станции по вертикали на реальном расстоянии, время по горизонтали, наклон = скорость.</p><p>Кнопка ⇄ меняет А и Б местами. Тумблер «Показывать обратные рейсы» добавляет маршруты Б→А. Каждый маршрут в легенде включается/выключается кликом. Значок ⓘ открывает карточку маршрута.</p><p>Маршруты, пересекающие полночь, показывают продолжение на противоположной стороне графика.</p>',
+    'instr_title_route-card': 'Карточка маршрута',
+    'instr_body_route-card': '<p>Клик по маршруту открывает карточку: метаданные, список остановок с координатами (⧉ копирует в буфер), таблица расписания на весь день. Шапка и первый столбец закреплены при прокрутке.</p><p>Ячейки с жёлтым «!» — конфликт платформы. Пунктирная рамка — ячейка изменена вручную.</p><p>Для пробных маршрутов — секция «Формула расписания» (D+X*I) для вставки в игру.</p>',
+    'instr_title_drafts': 'Пробные маршруты',
+    'instr_body_drafts': '<p>«+ Создать пробный маршрут» открывает форму: название, остановки через поиск станций, время стоянки и перегона (подбираются автоматически), время отправления и интервал.</p><p>Если указать <b>интервал (ЧЧ:ММ:СС)</b>, на весь день автоматически создадутся отправления с этим шагом. В карточке маршрута можно добавлять/удалять отдельные рейсы.</p><p>Кнопка «Создать пробный маршрут на основе этого» в карточке настоящего маршрута копирует все остановки и перегоны.</p>',
+    'instr_title_problems': 'Проблемные места',
+    'instr_body_problems': '<p>Вкладка «Проблемные места» показывает три секции: конфликты по станциям, конфликты по маршрутам, и маршруты с наибольшим средним опозданием. Избранные элементы показываются первыми со значком ★.</p><p>Клик по станции → расписание по станции. Клик по маршруту → карточка маршрута.</p>',
+    'instr_title_notifications': 'Уведомления',
+    'instr_body_notifications': '<p>В разделе «Настройки» можно включить браузерные уведомления о новых конфликтах платформ и/или больших опозданиях (порог в минутах задаётся отдельно). Галочка «Только избранные» ограничивает уведомления маршрутами из избранного.</p>',
+    'instr_title_settings': 'Настройки',
+    'instr_body_settings': '<p>Язык и часовой пояс определяются автоматически, но переключаются вручную — все времена пересчитываются мгновенно. Поддерживаемые языки: RU, EN, DE, FR, PL, PT, CS.</p><p><b>Часовой пояс сервера MTR</b> — если поезда показываются со сдвигом, выберите здесь пояс вашего MTR-сервера. Настройки и избранное сохраняются автоматически между запусками.</p><p>Текущая вкладка + выбранная станция сохраняются в URL (#tab=…).</p>',
   },
   en: {
     appTitle: "MTR Schedule Manager",
@@ -344,6 +364,26 @@ const I18N = {
     notifConflict: "Notify on new conflicts",
     notifBigDelay: "Notify on large delays (>5 min)",
     notifThreshold: "Delay threshold (min)",
+    'instr_title_schedule-basics': 'Station schedule',
+    'instr_body_schedule-basics': '<p>Start typing a station name in the search field — a list of suggestions appears, click the one you need. The dashboard shows all platforms and train arrivals on a timeline. The ☆ button next to the search adds the station to <b>Favorites</b> (a quick-access bar appears below).</p><p>A bright border = deviation over 1 min. Amber "!" = conflict: two trains too close on the same platform. The <b>"Upcoming arrivals"</b> sidebar widget shows the 6 nearest trains and refreshes every 30 seconds.</p>',
+    'instr_title_drag-edit': 'Manual editing (drag)',
+    'instr_body_drag-edit': '<p>Drag a train block (dashboard) or line (graph) horizontally — its time shifts and the trip becomes dashed.</p><p><code>Shift</code>+drag shifts <b>all</b> trips of that route at once. <code>Alt</code>+vertical drag moves the train to another platform.</p><p><code>Ctrl+Z</code> — undo, <code>Ctrl+Y</code> — redo.</p><p>The "Reset manual edits" sidebar button clears all shifts. In the route card, "Reset edits for this route" appears if the route has changes.</p>',
+    'instr_title_favorites': 'Favorites',
+    'instr_body_favorites': '<p><b>Stations</b> — ☆ next to the search field. <b>Routes</b> — ☆ in the route card or table row.</p><p>A quick-access bar appears below the search: clicking a station opens its schedule, clicking a route opens its card.</p><p>In the routes table, ☆ in the toolbar filters to favorites only. Notifications can also be limited to favorites (see Settings).</p>',
+    'instr_title_filters-zoom': 'Filters and zoom',
+    'instr_body_filters-zoom': '<p>The left sidebar has a platform filter, a minimum-interval slider for conflicts (default 3 min), and zoom controls.</p><p>Zoom: +/− buttons or <code>Ctrl</code>+mouse wheel over the chart.</p><p>In the routes table — filters for type, source (real/draft), favorites, and a search box. Column headers are sortable.</p>',
+    'instr_title_train-graph': 'Train graph',
+    'instr_body_train-graph': '<p>Pick station A and B — the app builds a graph: stations on the vertical axis spaced by real distance, time on horizontal, slope = speed.</p><p>⇄ swaps A and B. "Show reverse trips" adds B→A routes to the legend. Each legend item toggles by clicking. ⓘ opens the route card.</p><p>Routes crossing midnight show their continuation on the opposite side of the chart.</p>',
+    'instr_title_route-card': 'Route card',
+    'instr_body_route-card': '<p>Clicking a route opens the card: metadata, stop list with coordinates (⧉ copies), and a full-day timetable. Header and first column are sticky.</p><p>Yellow "!" = platform conflict. Dashed border = manually edited cell.</p><p>For draft routes — a "Schedule formula" (D+X*I) section for pasting into the game.</p>',
+    'instr_title_drafts': 'Draft routes',
+    'instr_body_drafts': '<p>"+ New draft route" opens a form: name, stops via station search, dwell/leg times (auto-suggested), departure time, and interval.</p><p>Setting an <b>interval (HH:MM:SS)</b> auto-generates departures for the whole day. In the route card you can add/remove individual trips.</p><p>"Create draft route based on this" in a real route\'s card copies all stops and leg times as a starting point.</p>',
+    'instr_title_problems': 'Problem areas',
+    'instr_body_problems': '<p>The "Problem areas" tab shows three sections: conflicts by station, conflicts by route, and routes with the largest average delay. Favorites appear first with a ★.</p><p>Clicking a station → opens its schedule. Clicking a route → opens its card.</p>',
+    'instr_title_notifications': 'Notifications',
+    'instr_body_notifications': '<p>In Settings you can enable browser notifications for new platform conflicts and/or large delays (threshold in minutes is configurable). The "Favorites only" toggle limits notifications to favorite routes.</p>',
+    'instr_title_settings': 'Settings',
+    'instr_body_settings': "<p>Language and timezone default to auto-detected values but can be switched manually — all times recalculate instantly. Supported languages: RU, EN, DE, FR, PL, PT, CS.</p><p><b>MTR server timezone</b> — if trains appear shifted, select your MTR server's timezone here. Settings and favorites persist across restarts.</p><p>The current tab + selected station are saved in the URL (#tab=…).</p>",
   },
 };
 
@@ -3042,106 +3082,21 @@ function refreshAllViews() {
 // Инструкции
 // ============================================================
 const INSTRUCTIONS = [
-  {
-    id: "schedule-basics",
-    titleRu: "Расписание по станции", titleEn: "Station schedule",
-    bodyRu: `<p>Начните вводить название станции в поле поиска — появится список подсказок, кликните по нужной. Дашборд покажет все платформы станции и прибытия поездов на временной шкале. Рядом с полем поиска — значок ☆: кликните, чтобы добавить станцию в <b>Избранное</b> (появится быстрая панель доступа снизу).</p>
-      <p>Жёлтая рамка вокруг блока — отклонение от графика более минуты. Янтарный «!» — конфликт: два поезда слишком близко на одной платформе. <b>Виджет «Ближайшие прибытия»</b> в сайдбаре показывает 6 ближайших поездов и автоматически обновляется каждые 30 секунд.</p>`,
-    bodyEn: `<p>Start typing a station name in the search field — a list of suggestions appears, click the one you need. The dashboard shows all platforms and train arrivals on a timeline. The ☆ button next to the search field adds the station to <b>Favorites</b> (a quick-access bar appears below).</p>
-      <p>A bright border means a schedule deviation of more than a minute. An amber "!" icon means a conflict: two trains too close on the same platform. The <b>"Upcoming arrivals"</b> sidebar widget shows the 6 nearest trains and refreshes every 30 seconds.</p>`,
-  },
-  {
-    id: "drag-edit",
-    titleRu: "Ручное редактирование (перетаскивание)", titleEn: "Manual editing (drag)",
-    bodyRu: `<p>Перетащите блок поезда (на дашборде) или линию поезда (на графике движения) по горизонтали — время сдвинется, рейс станет пунктирным.</p>
-      <p><code>Shift</code> + перетаскивание — сдвигает <b>все</b> рейсы маршрута сразу. <code>Alt</code> + вертикальное перетаскивание (≥ полная высота строки) — переносит поезд на другую платформу.</p>
-      <p><code>Ctrl+Z</code> — отменить, <code>Ctrl+Y</code> — вернуть.</p>
-      <p>Кнопка «Сбросить ручные правки» в сайдбаре — сбрасывает все сдвиги. В карточке маршрута — кнопка «Сбросить правки этого маршрута» (появляется только при наличии изменений).</p>`,
-    bodyEn: `<p>Drag a train block (dashboard) or line (graph) horizontally — its time shifts and the trip becomes dashed.</p>
-      <p><code>Shift</code>+drag shifts <b>all</b> trips of that route at once. <code>Alt</code>+vertical drag (≥ full row height) moves the train to another platform.</p>
-      <p><code>Ctrl+Z</code> — undo, <code>Ctrl+Y</code> — redo.</p>
-      <p>The "Reset manual edits" sidebar button clears all shifts. In the route card, a "Reset edits for this route" button appears if that route has been changed.</p>`,
-  },
-  {
-    id: "favorites",
-    titleRu: "Избранное", titleEn: "Favorites",
-    bodyRu: `<p><b>Станции</b> — кнопка ☆ рядом с полем поиска. <b>Маршруты</b> — кнопка ☆ в карточке маршрута, в строке таблицы маршрутов, или везде, где рядом с маршрутом есть этот значок.</p>
-      <p>В нижней части поиска станций появляется панель быстрого доступа: клик по станции сразу открывает её расписание, клик по маршруту — карточку маршрута.</p>
-      <p>В таблице маршрутов — кнопка ☆ в панели управления фильтрует список, оставляя только избранные. Уведомления тоже можно ограничить только избранными маршрутами (настройка в разделе «Настройки»).</p>`,
-    bodyEn: `<p><b>Stations</b> — the ☆ button next to the search field. <b>Routes</b> — the ☆ button in the route card, in the routes table row, or anywhere the icon appears next to a route.</p>
-      <p>A quick-access bar appears below the station search: clicking a station opens its schedule, clicking a route opens the route card.</p>
-      <p>In the routes table, the ☆ button in the toolbar filters the list to favorites only. Notifications can also be limited to favorite routes only (see Settings).</p>`,
-  },
-  {
-    id: "filters-zoom",
-    titleRu: "Фильтры и масштаб", titleEn: "Filters and zoom",
-    bodyRu: `<p>В сайдбаре слева — фильтр платформ, слайдер минимального интервала для конфликтов (по умолчанию 3 мин), масштаб времени.</p>
-      <p>Масштаб: кнопки +/− или <code>Ctrl</code>+колесо мыши над графиком. При увеличении деления шкалы мельчают вплоть до минут.</p>
-      <p>В таблице маршрутов — фильтр по типу, источнику (настоящие/пробные), избранным, и поиск. Заголовки столбцов кликабельны для сортировки.</p>`,
-    bodyEn: `<p>The left sidebar has a platform filter, a minimum-interval slider for conflicts (default 3 min), and zoom.</p>
-      <p>Zoom: +/− buttons or <code>Ctrl</code>+mouse wheel over the chart. As you zoom in, the time axis gets finer down to minutes.</p>
-      <p>In the routes table — filters for type, source (real/draft), favorites, and search. Column headers are clickable to sort.</p>`,
-  },
-  {
-    id: "train-graph",
-    titleRu: "График движения поездов", titleEn: "Train graph",
-    bodyRu: `<p>Выберите станцию А и Б — приложение строит граф: станции по вертикали на реальном расстоянии, время по горизонтали, наклон = скорость.</p>
-      <p>Кнопка ⇄ меняет А и Б местами. Тумблер «Показывать обратные рейсы» добавляет маршруты Б→А в легенду — по умолчанию они скрыты. Каждый маршрут в легенде включается/выключается кликом по нему. Значок ⓘ открывает карточку маршрута.</p>
-      <p>Маршруты, пересекающие полночь, показывают продолжение/начало на противоположной стороне графика (обрезанные хвосты).</p>`,
-    bodyEn: `<p>Pick station A and B — the app builds a graph: stations on the vertical axis spaced by real distance, time on horizontal axis, slope = train speed.</p>
-      <p>The ⇄ button swaps A and B. "Show reverse trips" adds B→A routes to the legend — hidden by default. Each legend item can be toggled individually by clicking. The ⓘ icon opens the route card.</p>
-      <p>Routes crossing midnight show their continuation/beginning on the opposite side of the chart.</p>`,
-  },
-  {
-    id: "route-card",
-    titleRu: "Карточка маршрута", titleEn: "Route card",
-    bodyRu: `<p>Клик по маршруту в любой вкладке открывает карточку: метаданные, список остановок с координатами (иконка ⧉ копирует в буфер), таблица расписания на весь день. Шапка и первый столбец таблицы закреплены при прокрутке.</p>
-      <p>Ячейки с жёлтым «!» — конфликт платформы в это время (если станция с конфликтом открыта на дашборде). Пунктирная рамка — ячейка изменена вручную.</p>
-      <p>Для пробных маршрутов — секция «Формула расписания» (D+X*I) для вставки в игру. Если конкретный рейс сдвинут вручную, он выпадает из формулы в отдельную строку.</p>`,
-    bodyEn: `<p>Clicking a route anywhere opens the card: metadata, stop list with coordinates (⧉ copies to clipboard), and a full-day timetable. The header and first column are sticky when scrolling.</p>
-      <p>Cells with a yellow "!" indicate a platform conflict at that time (if a conflicting station is open on the dashboard). Dashed border = manually edited.</p>
-      <p>For draft routes — a "Schedule formula" (D+X*I) section for pasting into the game. Manually shifted trips are shown as separate lines.</p>`,
-  },
-  {
-    id: "drafts",
-    titleRu: "Пробные маршруты", titleEn: "Draft routes",
-    bodyRu: `<p>«+ Создать пробный маршрут» открывает форму: название, остановки через поиск станций, время стоянки и перегона (подбираются автоматически на основе реальных данных похожих маршрутов), время отправления и интервал.</p>
-      <p>Если указать <b>интервал (ЧЧ:ММ:СС)</b>, на весь день автоматически создадутся отправления с этим шагом. В карточке маршрута можно добавлять/удалять отдельные рейсы — при удалении из группы с интервалом группа корректно разбивается на 1-2 подгруппы.</p>
-      <p>Кнопка «Создать пробный маршрут на основе этого» в карточке настоящего маршрута копирует все остановки и перегоны как стартовую точку.</p>`,
-    bodyEn: `<p>"+ New draft route" opens a form: name, stops via station search, dwell/leg times (auto-suggested from similar real routes), departure time, and interval.</p>
-      <p>If you set an <b>interval (HH:MM:SS)</b>, departures are auto-generated for the whole day at that interval. In the route card you can add/remove individual trips — removing one from an interval group correctly splits it into 1-2 sub-groups.</p>
-      <p>The "Create draft route based on this" button in a real route's card copies all stops and leg times as a starting point.</p>`,
-  },
-  {
-    id: "problems",
-    titleRu: "Проблемные места", titleEn: "Problem areas",
-    bodyRu: `<p>Вкладка «Проблемные места» показывает три коллапсируемые секции: конфликты по станциям, конфликты по маршрутам, и маршруты с наибольшим средним опозданием. Избранные элементы показываются первыми со значком ★.</p>
-      <p>Клик по станции → переходит в «Расписание по станции». Клик по маршруту → открывает карточку маршрута.</p>`,
-    bodyEn: `<p>The "Problem areas" tab shows three collapsible sections: conflicts by station, conflicts by route, and routes with the largest average delay. Favorites appear first with a ★ icon.</p>
-      <p>Clicking a station → opens Station schedule. Clicking a route → opens its route card.</p>`,
-  },
-  {
-    id: "notifications",
-    titleRu: "Уведомления", titleEn: "Notifications",
-    bodyRu: `<p>В разделе «Настройки» можно включить браузерные уведомления о новых конфликтах платформ и/или больших опозданиях (порог в минутах задаётся отдельно). Галочка «Только избранные» ограничивает уведомления маршрутами из избранного.</p>`,
-    bodyEn: `<p>In Settings you can enable browser notifications for new platform conflicts and/or large delays (threshold in minutes is configurable separately). The "Favorites only" toggle limits notifications to favorite routes.</p>`,
-  },
-  {
-    id: "settings",
-    titleRu: "Настройки и permalink", titleEn: "Settings and permalink",
-    bodyRu: `<p>Язык и часовой пояс пользователя определяются автоматически, но переключаются вручную — все времена пересчитываются мгновенно. Поддерживаемые языки: RU, EN, DE, FR, PL, PT, CS.</p>
-      <p><b>Часовой пояс сервера MTR</b> — если времена поездов отображаются со сдвигом (например, сервер работает в UTC+6, а поезда показываются на 6 часов позже), выберите здесь пояс вашего MTR-сервера. Настройка и избранное сохраняются автоматически между запусками.</p>
-      <p>Текущая вкладка + выбранная станция/пара станций сохраняются в URL-адресе страницы (#tab=…).</p>`,
-    bodyEn: `<p>Language and timezone default to auto-detected values but can be switched manually — all times recalculate instantly. Supported languages: RU, EN, DE, FR, PL, PT, CS.</p>
-      <p><b>MTR server timezone</b> — if train times appear shifted (e.g. server runs in UTC+6 and trains show 6 hours late), select your MTR server's timezone here. All settings and favorites persist across restarts.</p>
-      <p>The current tab + selected station/station pair are saved in the page URL (#tab=…).</p>`,
-  },
+  { id: "schedule-basics" },
+  { id: "drag-edit" },
+  { id: "favorites" },
+  { id: "filters-zoom" },
+  { id: "train-graph" },
+  { id: "route-card" },
+  { id: "drafts" },
+  { id: "problems" },
+  { id: "notifications" },
+  { id: "settings" },
 ];
 
 function renderInstructions() {
   const container = document.getElementById("instructionsList");
   if (!container) return;
-  const lang = currentLang();
   const openIds = new Set(
     Array.from(container.querySelectorAll(".instruction-item.open")).map((el) => el.dataset.id)
   );
@@ -3149,10 +3104,10 @@ function renderInstructions() {
     (item) => `
     <div class="instruction-item ${openIds.has(item.id) ? "open" : ""}" data-id="${item.id}">
       <div class="instruction-header">
-        <span>${escapeHtml(lang === "ru" ? item.titleRu : item.titleEn)}</span>
+        <span>${escapeHtml(t("instr_title_" + item.id))}</span>
         <span class="chevron">▶</span>
       </div>
-      <div class="instruction-body">${lang === "ru" ? item.bodyRu : item.bodyEn}</div>
+      <div class="instruction-body">${t("instr_body_" + item.id)}</div>
     </div>`
   ).join("");
   container.querySelectorAll(".instruction-header").forEach((header) => {
@@ -3166,6 +3121,9 @@ function renderInstructions() {
 // Инициализация
 // ============================================================
 (async function init() {
+  // Сначала загружаем сохранённые настройки (язык, часовой пояс и т.д.),
+  // затем применяем i18n — иначе язык сбрасывается на системный при каждом запуске.
+  await loadPrefsFromServer();
   try { applyI18n(); } catch (e) { console.error("applyI18n failed:", e); }
   try { initSettingsUI(); } catch (e) { console.error("initSettingsUI failed:", e); }
   try { initNotifSettings(); } catch (e) { console.warn("initNotifSettings failed (non-critical):", e); }
@@ -3174,7 +3132,6 @@ function renderInstructions() {
     document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
   } catch (e) {}
   await refreshStatus();
-  await loadPrefsFromServer();
   await loadStations();
   try { await restoreFromUrlHash(); } catch (e) { console.error("restoreFromUrlHash failed:", e); }
 
