@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MTR Schedule Manager — GeoRail</title>
+<title>MTR Schedule Manager</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="topbar">
-    <h1 data-i18n="appTitle">Расписание GeoRail (MTR)</h1>
+    <h1 data-i18n="appTitle">MTR Schedule Manager</h1>
     <div id="statusBadge" class="status-badge">Подключение...</div>
   </header>
 
@@ -235,6 +235,10 @@
         <label data-i18n="timezoneLabel">Часовой пояс</label>
         <select id="timezoneSelect"></select>
         <p class="hint small" id="tzDetectedHint"></p>
+
+        <label class="sidebar-label" data-i18n="serverTzLabel">MTR server timezone</label>
+        <select id="serverTimezoneSelect" class="sidebar-select"></select>
+        <p class="hint small" id="serverTzHint" data-i18n="serverTzHint"></p>
       </div>
       <div class="settings-block">
         <p class="hint small" data-i18n="settingsNote">Все времена в приложении (расписания, графики, аналитика) автоматически пересчитываются под выбранный часовой пояс. Исходные данные сервер всегда хранит в UTC.</p>

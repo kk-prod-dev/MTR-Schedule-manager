@@ -1,8 +1,8 @@
 {
   "name": "mtr-schedule-manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Система управления расписанием для сервера Minecraft Transit Railway (GeoRail)",
+  "description": "MTR Schedule Manager — система управления расписанием Minecraft Transit Railway",
   "author": "GeoRail",
   "main": "electron/main.js",
   "scripts": {
@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "eu.georail.schedule",
-    "productName": "GeoRail",
+    "productName": "MTR Schedule Manager",
     "copyright": "GeoRail",
     "directories": {
       "output": "dist",
@@ -50,9 +50,16 @@
       "public/**"
     ],
     "win": {
-      "target": [{ "target": "nsis", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "icon": "build/icon.ico",
-      "artifactName": "GeoRail-Setup-${version}.${ext}"
+      "artifactName": "MTRScheduleManager-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -60,26 +67,30 @@
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "GeoRail",
+      "shortcutName": "MTR Schedule Manager",
       "runAfterFinish": true
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "icon": "build/icon.png",
       "category": "Utility",
-      "artifactName": "GeoRail-${version}.${ext}"
+      "artifactName": "MTRScheduleManager-${version}.${ext}"
     },
     "mac": {
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "build/icon.png",
       "category": "public.app-category.utilities",
-      "artifactName": "GeoRail-${version}.${ext}"
+      "artifactName": "MTRScheduleManager-${version}.${ext}"
     },
     "publish": [
       {
         "provider": "github",
-        "owner": "kk-prod-dev",
-        "repo": "MTR-Schedule-manager"
+        "owner": "ЗАМЕНИ_НА_СВОЙ_GITHUB_ЛОГИН",
+        "repo": "georail-schedule"
       }
     ]
   }

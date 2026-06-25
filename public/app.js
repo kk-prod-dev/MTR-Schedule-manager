@@ -5,7 +5,7 @@ const MS_PER_DAY = 86400000;
 // ============================================================
 const I18N = {
   ru: {
-    appTitle: "Расписание GeoRail (MTR)",
+    appTitle: "MTR Schedule Manager",
     statusConnecting: "Подключение...",
     statusSynced: "Синхронизировано: {st} ст., {rt} маршр.",
     statusErrorConn: "Ошибка подключения к серверу MTR",
@@ -149,6 +149,8 @@ const I18N = {
     copiedOverrideMsg: "Сдвиг скопирован",
     notifAllow: "Разрешить уведомления",
     notifOnlyFav: "Уведомлять только по избранному",
+    serverTzLabel: "Часовой пояс сервера MTR",
+    serverTzHint: "Если времена поездов отображаются со сдвигом — выберите часовой пояс сервера.",
     favStationHint: "Избранная станция — кликни для быстрого перехода",
     favRouteHint: "Избранный маршрут — кликни для открытия карточки",
     conflictSuggestTitle: "Найден конфликт — предложение:",
@@ -173,7 +175,7 @@ const I18N = {
     notifThreshold: "Порог опоздания (мин)",
   },
   en: {
-    appTitle: "GeoRail Schedule (MTR)",
+    appTitle: "MTR Schedule Manager",
     statusConnecting: "Connecting...",
     statusSynced: "Synced: {st} stations, {rt} routes",
     statusErrorConn: "Failed to connect to the MTR server",
@@ -317,6 +319,8 @@ const I18N = {
     copiedOverrideMsg: "Time shift copied",
     notifAllow: "Allow notifications",
     notifOnlyFav: "Notify only about favorites",
+    serverTzLabel: "MTR server timezone",
+    serverTzHint: "If train times appear shifted — select the server's timezone.",
     favStationHint: "Favorite station — click to open",
     favRouteHint: "Favorite route — click to open card",
     conflictSuggestTitle: "Conflict found — suggested fix:",
@@ -365,8 +369,9 @@ function detectSystemTzName() {
 }
 
 const settings = {
-  langMode: localStorage.getItem("mtr_lang_mode") || "auto",
-  tzMode: localStorage.getItem("mtr_tz_mode") || "auto",
+  langMode: "auto",
+  tzMode: "auto",
+  serverTzOffsetMin: 0, // часовой пояс сервера MTR (вычитается из времён API)
 };
 function currentLang() {
   return settings.langMode === "auto" ? detectSystemLang() : settings.langMode;
@@ -401,8 +406,13 @@ function normalizeMs(ms) {
   return m < 0 ? m + MS_PER_DAY : m;
 }
 function formatLocal(msUtc, withSeconds) {
+  // msUtc здесь — время от MTR API, которое на самом деле в локальном
+  // времени сервера (serverTzOffsetMin). Вычитаем его, чтобы получить
+  // настоящий UTC, потом прибавляем выбранный пользователем пояс.
+  const serverOffset = (typeof settings !== "undefined") ? (settings.serverTzOffsetMin || 0) : 0;
+  const msUtc_real = normalizeMs(msUtc - serverOffset * 60000);
   const offsetMin = currentTzOffsetMin();
-  const total = normalizeMs(Math.round(msUtc) + offsetMin * 60000);
+  const total = normalizeMs(Math.round(msUtc_real) + offsetMin * 60000);
   const totalSec = Math.floor(total / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
@@ -583,7 +593,7 @@ function clearOverrides() {
   persistOverrides();
 }
 function persistOverrides() {
-  localStorage.setItem("mtr_overrides_v2", JSON.stringify(overridesList));
+  savePrefsToServer();
 }
 
 // Отдельный слой: сдвиг ВСЕГО маршрута целиком (Shift+перетаскивание).
@@ -592,15 +602,15 @@ let routeOverridesMap = JSON.parse(localStorage.getItem("mtr_route_overrides") |
 function getRouteOverride(routeId) { return routeOverridesMap[routeId] || 0; }
 function bumpRouteOverride(routeId, deltaMs) {
   routeOverridesMap[routeId] = getRouteOverride(routeId) + deltaMs;
-  localStorage.setItem("mtr_route_overrides", JSON.stringify(routeOverridesMap));
+  // persisted via savePrefsToServer
 }
 function clearAllOverrides() {
   overridesList = [];
   routeOverridesMap = {};
   platformOverridesMap = {};
   persistOverrides();
-  localStorage.setItem("mtr_route_overrides", JSON.stringify(routeOverridesMap));
-  localStorage.setItem("mtr_platform_overrides", JSON.stringify(platformOverridesMap));
+  // persisted via savePrefsToServer
+  // persisted via savePrefsToServer
 }
 /** Очищает правки только одного маршрута, не трогая остальные. */
 function clearOverridesForRoute(routeId) {
@@ -608,8 +618,8 @@ function clearOverridesForRoute(routeId) {
   overridesList = overridesList.filter((o) => o.routeId !== routeId);
   delete routeOverridesMap[routeId];
   persistOverrides();
-  localStorage.setItem("mtr_route_overrides", JSON.stringify(routeOverridesMap));
-  localStorage.setItem("mtr_platform_overrides", JSON.stringify(platformOverridesMap));
+  // persisted via savePrefsToServer
+  // persisted via savePrefsToServer
   renderDashboardFromCache();
   renderGraphFromCache();
 }
@@ -622,7 +632,7 @@ function getPlatformOverride(routeId, tripOriginMs) {
 }
 function setPlatformOverride(routeId, tripOriginMs, platformName) {
   platformOverridesMap[`${routeId}:${tripOriginMs}`] = platformName;
-  localStorage.setItem("mtr_platform_overrides", JSON.stringify(platformOverridesMap));
+  // persisted via savePrefsToServer
 }
 
 // ============================================================
@@ -650,8 +660,8 @@ function applyOverridesSnapshot(snap) {
   routeOverridesMap = snap.routeOverridesMap;
   platformOverridesMap = snap.platformOverridesMap || {};
   persistOverrides();
-  localStorage.setItem("mtr_route_overrides", JSON.stringify(routeOverridesMap));
-  localStorage.setItem("mtr_platform_overrides", JSON.stringify(platformOverridesMap));
+  // persisted via savePrefsToServer
+  // persisted via savePrefsToServer
   renderDashboardFromCache();
   renderGraphFromCache();
 }
@@ -1125,6 +1135,7 @@ const minIntervalSlider = document.getElementById("minIntervalSlider");
 minIntervalSlider.addEventListener("input", () => {
   state.minIntervalMin = Number(minIntervalSlider.value);
   document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
+  savePrefsToServer();
   renderDashboardFromCache();
 });
 
@@ -2983,18 +2994,31 @@ function initSettingsUI() {
     buildTzOptions().map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
   tzSelect.value = settings.tzMode;
 
+  // Server timezone select
+  const serverTzSelect = document.getElementById("serverTimezoneSelect");
+  if (serverTzSelect) {
+    serverTzSelect.innerHTML =
+      buildTzOptions().map((o) => `<option value="${o.value}">${o.label}</option>`).join("");
+    serverTzSelect.value = String(settings.serverTzOffsetMin || 0);
+    serverTzSelect.addEventListener("change", () => {
+      settings.serverTzOffsetMin = Number(serverTzSelect.value);
+      savePrefsToServer();
+      refreshAllViews();
+    });
+  }
+
   document.getElementById("tzDetectedHint").textContent = t("tzDetected", {
     tz: `${detectSystemTzName()} (UTC${detectSystemTzOffsetMin() >= 0 ? "+" : ""}${(detectSystemTzOffsetMin() / 60).toFixed(1).replace(".0", "")})`,
   });
 
   langSelect.addEventListener("change", () => {
     settings.langMode = langSelect.value;
-    localStorage.setItem("mtr_lang_mode", settings.langMode);
+    savePrefsToServer();
     refreshAllViews();
   });
   tzSelect.addEventListener("change", () => {
     settings.tzMode = tzSelect.value;
-    localStorage.setItem("mtr_tz_mode", settings.tzMode);
+    savePrefsToServer();
     refreshAllViews();
   });
 }
@@ -3031,11 +3055,11 @@ const INSTRUCTIONS = [
     titleRu: "Ручное редактирование (перетаскивание)", titleEn: "Manual editing (drag)",
     bodyRu: `<p>Перетащите блок поезда (на дашборде) или линию поезда (на графике движения) по горизонтали — время сдвинется, рейс станет пунктирным.</p>
       <p><code>Shift</code> + перетаскивание — сдвигает <b>все</b> рейсы маршрута сразу. <code>Alt</code> + вертикальное перетаскивание (≥ полная высота строки) — переносит поезд на другую платформу.</p>
-      <p><code>Ctrl+Z</code> — отменить, <code>Ctrl+Y</code> — вернуть. <code>Ctrl+C</code> по блоку — скопировать сдвиг, <code>Ctrl+V</code> — применить его к выбранному маршруту.</p>
+      <p><code>Ctrl+Z</code> — отменить, <code>Ctrl+Y</code> — вернуть.</p>
       <p>Кнопка «Сбросить ручные правки» в сайдбаре — сбрасывает все сдвиги. В карточке маршрута — кнопка «Сбросить правки этого маршрута» (появляется только при наличии изменений).</p>`,
     bodyEn: `<p>Drag a train block (dashboard) or line (graph) horizontally — its time shifts and the trip becomes dashed.</p>
       <p><code>Shift</code>+drag shifts <b>all</b> trips of that route at once. <code>Alt</code>+vertical drag (≥ full row height) moves the train to another platform.</p>
-      <p><code>Ctrl+Z</code> — undo, <code>Ctrl+Y</code> — redo. <code>Ctrl+C</code> on a block copies the time offset, <code>Ctrl+V</code> pastes it onto the selected route.</p>
+      <p><code>Ctrl+Z</code> — undo, <code>Ctrl+Y</code> — redo.</p>
       <p>The "Reset manual edits" sidebar button clears all shifts. In the route card, a "Reset edits for this route" button appears if that route has been changed.</p>`,
   },
   {
@@ -3105,10 +3129,12 @@ const INSTRUCTIONS = [
   {
     id: "settings",
     titleRu: "Настройки и permalink", titleEn: "Settings and permalink",
-    bodyRu: `<p>Язык и часовой пояс определяются автоматически, но переключаются вручную — все времена пересчитываются мгновенно. Поддерживаемые языки: RU, EN, DE, FR, PL, PT, CS.</p>
-      <p>Текущая вкладка + выбранная станция/пара станций сохраняются в URL-адресе страницы (#tab=…). Вы можете скопировать ссылку из адресной строки и поделиться ей — получатель откроется сразу на нужном виде.</p>`,
+    bodyRu: `<p>Язык и часовой пояс пользователя определяются автоматически, но переключаются вручную — все времена пересчитываются мгновенно. Поддерживаемые языки: RU, EN, DE, FR, PL, PT, CS.</p>
+      <p><b>Часовой пояс сервера MTR</b> — если времена поездов отображаются со сдвигом (например, сервер работает в UTC+6, а поезда показываются на 6 часов позже), выберите здесь пояс вашего MTR-сервера. Настройка и избранное сохраняются автоматически между запусками.</p>
+      <p>Текущая вкладка + выбранная станция/пара станций сохраняются в URL-адресе страницы (#tab=…).</p>`,
     bodyEn: `<p>Language and timezone default to auto-detected values but can be switched manually — all times recalculate instantly. Supported languages: RU, EN, DE, FR, PL, PT, CS.</p>
-      <p>The current tab + selected station/station pair are saved in the page URL (#tab=…). Copy the URL from the address bar and share it — the recipient will open directly to the same view.</p>`,
+      <p><b>MTR server timezone</b> — if train times appear shifted (e.g. server runs in UTC+6 and trains show 6 hours late), select your MTR server's timezone here. All settings and favorites persist across restarts.</p>
+      <p>The current tab + selected station/station pair are saved in the page URL (#tab=…).</p>`,
   },
 ];
 
@@ -3148,6 +3174,7 @@ function renderInstructions() {
     document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
   } catch (e) {}
   await refreshStatus();
+  await loadPrefsFromServer();
   await loadStations();
   try { await restoreFromUrlHash(); } catch (e) { console.error("restoreFromUrlHash failed:", e); }
 
@@ -3230,12 +3257,50 @@ document.addEventListener("click", (e) => {
 // ============================================================
 // Избранное: станции И маршруты, раздельные уведомления
 // ============================================================
-let favorites = JSON.parse(localStorage.getItem("mtr_favorites") || "[]");
-let favoriteRoutes = JSON.parse(localStorage.getItem("mtr_favorite_routes") || "[]");
+let favorites = [];
+let favoriteRoutes = [];
+
+// Сохраняем все пользовательские настройки на сервер (файл prefs.json в DATA_DIR)
+// чтобы они переживали перезапуск Electron-приложения.
+async function savePrefsToServer() {
+  try {
+    await fetch("/api/prefs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        favorites,
+        favoriteRoutes,
+        langMode: settings.langMode,
+        tzMode: settings.tzMode,
+        serverTzOffsetMin: settings.serverTzOffsetMin,
+        minIntervalMin: state.minIntervalMin,
+        overridesV2: overridesList,
+        routeOverrides: routeOverridesMap,
+        platformOverrides: platformOverridesMap,
+      }),
+    });
+  } catch (e) { console.warn("savePrefsToServer failed:", e.message); }
+}
+async function loadPrefsFromServer() {
+  try {
+    const res = await fetch("/api/prefs");
+    if (!res.ok) return;
+    const p = await res.json();
+    if (Array.isArray(p.favorites)) favorites = p.favorites;
+    if (Array.isArray(p.favoriteRoutes)) favoriteRoutes = p.favoriteRoutes;
+    if (p.langMode) settings.langMode = p.langMode;
+    if (p.tzMode !== undefined) settings.tzMode = p.tzMode;
+    if (p.serverTzOffsetMin !== undefined) settings.serverTzOffsetMin = Number(p.serverTzOffsetMin);
+    if (Number.isFinite(p.minIntervalMin)) state.minIntervalMin = p.minIntervalMin;
+    if (Array.isArray(p.overridesV2)) { overridesList = p.overridesV2; rebuildOverridesIndex(); }
+    if (p.routeOverrides) routeOverridesMap = p.routeOverrides;
+    if (p.platformOverrides) platformOverridesMap = p.platformOverrides;
+  } catch (e) { console.warn("loadPrefsFromServer failed:", e.message); }
+}
 
 function saveFavorites() {
-  localStorage.setItem("mtr_favorites", JSON.stringify(favorites));
-  localStorage.setItem("mtr_favorite_routes", JSON.stringify(favoriteRoutes));
+  // Persist to server so favorites survive Electron restarts
+  savePrefsToServer();
 }
 
 // ---- Станции ----
@@ -3445,7 +3510,7 @@ setInterval(renderNearestTrains, 30000);
       { divider: true },
       { label: `${isFav ? "★ " + t("removeFavorite") : "☆ " + t("addFavorite")}`, action: "toggleFav" },
       { label: `ⓘ  ${t("ctxRouteInfo")}`, action: "openCard" },
-      { label: `📋  ${copyLabel}`, action: "copyShift" },
+      // copyShift removed
     ];
 
     if (conflicts.length) {

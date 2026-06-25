@@ -202,6 +202,26 @@ app.put("/api/drafts/:id", (req, res) => {
   }
 });
 
+
+// ── Пользовательские настройки (избранное, язык, часовой пояс, overrides) ──
+// Хранятся в DATA_DIR/prefs.json, переживают перезапуск Electron.
+const PREFS_FILE = path.join(config.DATA_DIR, "prefs.json");
+function loadPrefs() {
+  try {
+    if (fs.existsSync(PREFS_FILE)) return JSON.parse(fs.readFileSync(PREFS_FILE, "utf8"));
+  } catch {}
+  return {};
+}
+function savePrefs(data) {
+  fs.mkdirSync(config.DATA_DIR, { recursive: true });
+  fs.writeFileSync(PREFS_FILE, JSON.stringify(data, null, 2));
+}
+app.get("/api/prefs", (req, res) => res.json(loadPrefs()));
+app.post("/api/prefs", (req, res) => {
+  try { savePrefs(req.body); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.delete("/api/drafts/:id", (req, res) => {
   const ok = drafts.remove(req.params.id);
   if (!ok) return res.status(404).json({ error: "Пробный маршрут не найден." });

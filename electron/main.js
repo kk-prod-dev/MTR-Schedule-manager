@@ -44,7 +44,7 @@ if (!gotLock) {
 // Запуск
 // ---------------------------------------------------------------------------
 function onReady() {
-  buildMenu();
+  Menu.setApplicationMenu(null); // убрано по запросу (пункт 3)
   createWindow();
   startServer();
   if (!isDev) {
@@ -62,7 +62,7 @@ function createWindow() {
     backgroundColor: "#0f1419",
     show: false,
     icon: resolveIcon(),
-    title: "GeoRail — управление расписанием",
+    title: "MTR Schedule Manager",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
