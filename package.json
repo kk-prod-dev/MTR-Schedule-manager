@@ -90,8 +90,12 @@
       {
         "provider": "github",
         "owner": "kk-prod-dev",
-        "repo": "MTR-Schedule-Manager"
+        "repo": "MTR-Schedule-manager"
       }
     ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kk-prod-dev/MTR-Schedule-manager"
   }
 }
