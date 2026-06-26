@@ -49,5 +49,5 @@ mac:
 publish:
   - provider: github
     owner: kk-prod-dev
-    repo: MTR-Schedule-Manager
+    repo: MTR-Schedule-manager
 electronVersion: 31.7.7
