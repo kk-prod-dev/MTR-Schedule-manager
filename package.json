@@ -89,8 +89,8 @@
     "publish": [
       {
         "provider": "github",
-        "owner": "ЗАМЕНИ_НА_СВОЙ_GITHUB_ЛОГИН",
-        "repo": "georail-schedule"
+        "owner": "kk-prod-dev",
+        "repo": "MTR-Schedule-Manager"
       }
     ]
   }

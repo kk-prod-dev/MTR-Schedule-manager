@@ -71,10 +71,6 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
-  // Временно: открыть DevTools по F12
-  mainWindow.webContents.on("before-input-event", (event, input) => {
-  if (input.key === "F12") mainWindow.webContents.openDevTools();
-  });
 
   // Пока сервер поднимается — показываем заставку.
   mainWindow.loadFile(path.join(__dirname, "loading.html"));
@@ -157,14 +153,39 @@ function initAutoUpdate() {
   }
 
   autoUpdater.autoDownload = true;
+
+  // Конвертируем HTML releaseNotes из GitHub в простой текст
+  function parseReleaseNotes(notes) {
+    if (!notes) return null;
+    const raw = Array.isArray(notes)
+      ? notes.map(n => n.note || "").join("\n")
+      : String(notes);
+    return raw
+      .replace(/<li>/gi, "• ").replace(/<\/li>/gi, "\n")
+      .replace(/<h[1-6][^>]*>/gi, "\n").replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<br\s*\/?>|<p>/gi, "\n").replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+      .replace(/\n{3,}/g, "\n\n").trim();
+  }
+
   autoUpdater.on("update-downloaded", (info) => {
+    const notes = parseReleaseNotes(info.releaseNotes);
+    // Сохраняем для показа после перезапуска
+    try {
+      const pendingFile = require("path").join(require("electron").app.getPath("userData"), "pending-changelog.json");
+      if (notes) fs.writeFileSync(pendingFile, JSON.stringify({ version: info.version, notes }), "utf8");
+    } catch {}
+    const detail = notes
+      ? notes + "\n\nRestart now to install?"
+      : "Restart the app to install the update.";
     const res = dialog.showMessageBoxSync(mainWindow, {
       type: "info",
-      buttons: ["Перезапустить сейчас", "Позже"],
+      buttons: ["Restart now", "Later"],
       defaultId: 0,
-      title: "Доступно обновление",
-      message: `Загружена новая версия ${info.version}.`,
-      detail: "Перезапустите приложение, чтобы установить обновление.",
+      title: `Update v${info.version} ready`,
+      message: `What's new in v${info.version}:`,
+      detail,
     });
     if (res === 0) autoUpdater.quitAndInstall();
   });
@@ -176,6 +197,38 @@ function initAutoUpdate() {
   autoUpdater.checkForUpdatesAndNotify().catch((err) => {
     console.warn("[updater] check failed:", err.message);
   });
+
+  // Показываем changelog если только что обновились
+  const fs = require("fs");
+  const path = require("path");
+  const { app: electronApp } = require("electron");
+  const versionFile = path.join(electronApp.getPath("userData"), "last-version.txt");
+  const currentVersion = electronApp.getVersion();
+  let lastSeenVersion = null;
+  try { lastSeenVersion = fs.readFileSync(versionFile, "utf8").trim(); } catch {}
+  if (lastSeenVersion && lastSeenVersion !== currentVersion) {
+    let pendingNotes = null;
+    try {
+      const pendingFile = path.join(electronApp.getPath("userData"), "pending-changelog.json");
+      const pending = JSON.parse(fs.readFileSync(pendingFile, "utf8"));
+      if (pending.version === currentVersion) pendingNotes = pending.notes;
+      fs.unlinkSync(pendingFile);
+    } catch {}
+    if (pendingNotes) {
+      mainWindow.once("ready-to-show", () => {
+        setTimeout(() => {
+          dialog.showMessageBoxSync(mainWindow, {
+            type: "info",
+            buttons: ["OK"],
+            title: `Updated to v${currentVersion}`,
+            message: `What's new in v${currentVersion}:`,
+            detail: pendingNotes,
+          });
+        }, 2000);
+      });
+    }
+  }
+  try { fs.writeFileSync(versionFile, currentVersion, "utf8"); } catch {}
 }
 
 // ---------------------------------------------------------------------------
