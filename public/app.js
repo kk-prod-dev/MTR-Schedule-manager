@@ -168,6 +168,8 @@ const I18N = {
     delayReplayTimeLabel: "Время",
     delayReplaySpeed: "Скорость",
     resetRouteEdits: "Сбросить правки этого маршрута",
+    ctxResetTrip: "↩ Сбросить правки этого рейса",
+    ctxResetRoute: "↩ Сбросить правки маршрута",
     notifPermissionDenied: "Уведомления заблокированы в вашем браузере. Разрешите их в настройках браузера.",
     notifSettingsTitle: "Уведомления",
     notifConflict: "Уведомлять о новых конфликтах платформ",
@@ -358,6 +360,8 @@ const I18N = {
     delayReplayTimeLabel: "Time",
     delayReplaySpeed: "Speed",
     resetRouteEdits: "Reset edits for this route",
+    ctxResetTrip: "↩ Reset this trip\'s edits",
+    ctxResetRoute: "↩ Reset route edits",
     sourceFilterAll: "All routes", sourceFilterReal: "Real only", sourceFilterDraft: "Drafts only",
     notifPermissionDenied: "Notifications are blocked in your browser. Allow them in browser settings.",
     notifSettingsTitle: "Notifications",
@@ -631,6 +635,23 @@ function setOverride(routeId, tripOriginMs, deltaMs) {
 function clearOverrides() {
   overridesList = [];
   persistOverrides();
+}
+// Сброс правки конкретного рейса
+function removeOverride(routeId, tripOriginMs) {
+  const idx = findOverrideIndex(routeId, tripOriginMs);
+  if (idx !== -1) overridesList.splice(idx, 1);
+  persistOverrides();
+}
+// Сброс правок всего маршрута (routeOverridesMap + все рейсы)
+function removeRouteOverride(routeId) {
+  overridesList = overridesList.filter(o => o.routeId !== routeId);
+  delete routeOverridesMap[routeId];
+  persistOverrides();
+}
+// Есть ли какие-то правки для маршрута
+function hasRouteOverride(routeId) {
+  return routeOverridesMap[routeId] !== undefined ||
+    overridesList.some(o => o.routeId === routeId);
 }
 function persistOverrides() {
   savePrefsToServer();
@@ -923,7 +944,14 @@ function switchToTab(tabName) {
   document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add("active");
   document.getElementById(`tab-${tabName}`).classList.add("active");
   if (tabName === "routes") loadRoutes();
-  if (tabName === "problems") renderProblems();
+  if (tabName === "problems") {
+    // Если маршруты ещё не загружены — загружаем сначала
+    if (state.routesById.size === 0) {
+      loadRoutes().then(() => renderProblems());
+    } else {
+      renderProblems();
+    }
+  }
 }
 document.querySelectorAll(".tab-btn").forEach((btn) => {
   btn.addEventListener("click", () => switchToTab(btn.dataset.tab));
@@ -1237,22 +1265,60 @@ function renderDashboard(data) {
   const minIntervalMs = state.minIntervalMin * 60000;
 
   // Применяем ручные правки и считаем эффективные времена.
+  // Дедупликация: убираем задваивающиеся блоки (одинаковый маршрут+рейс+время)
+  const _seenKeys = new Set();
   const processed = data.entries
+    .filter((e) => {
+      const k = `${e.routeId}:${e.tripOriginMs}:${e.arrivalMs}`;
+      if (_seenKeys.has(k)) return false;
+      _seenKeys.add(k);
+      return true;
+    })
     .map((e) => {
       const delta = getOverride(e.routeId, e.tripOriginMs);
       const effArrival = normalizeMs(e.arrivalMs + delta);
       const effDeparture = e.departureMs === null ? null : normalizeMs(e.departureMs + delta);
       const platformOverride = getPlatformOverride(e.routeId, e.tripOriginMs);
       const effPlatform = platformOverride && data.platforms.includes(platformOverride) ? platformOverride : e.platformName;
+      // Ищем точное совпадение рейса в _depIdxCache по tripOriginMs.
+      // Сопоставляем через tripOriginApproxMs (= a.arrival % 86400000).
+      // Если нашли запись с realtime=true — берём реальные arrival/departure.
+      const depTrips = _depIdxCache.get(e.routeId);
+      let liveTrip = null;
+      if (depTrips && depTrips.length > 0) {
+        const TOLERANCE = 5 * 60 * 1000;
+        let bestDiff = Infinity;
+        for (const t of depTrips) {
+          let diff = Math.abs(t.tripOriginApproxMs - e.arrivalMs);
+          if (diff > 43200000) diff = 86400000 - diff;
+          if (diff < bestDiff && diff <= TOLERANCE) { bestDiff = diff; liveTrip = t; }
+        }
+        // Только если realtime — иначе плановые данные не хуже
+        if (liveTrip && !liveTrip.realtime) liveTrip = null;
+      }
+      // Если нашли живой рейс — подменяем arrivalMs и deviationMs
+      const liveArrivalMs = liveTrip ? liveTrip.tripOriginApproxMs : null;
+      const effectiveArrivalMs = liveArrivalMs !== null ? liveArrivalMs : e.arrivalMs;
+      const effectiveDepartureMs = (liveTrip?.departureMs != null)
+        ? liveTrip.departureMs
+        : e.departureMs;
+      const effectiveDeviationMs = liveTrip ? liveTrip.deviation : e.deviationMs;
+      const isLiveData = !!liveTrip;
+      // effArrival/effDeparture пересчитываем с live-данными + ручной правкой
+      const effArrivalFinal = normalizeMs(effectiveArrivalMs + delta);
+      const effDepartureFinal = effectiveDepartureMs === null
+        ? null : normalizeMs(effectiveDepartureMs + delta);
       return {
         ...e,
         entryKey: `${e.routeId}:${e.tripOriginMs}:${e.platformName}`,
         delta,
         isEdited: delta !== 0,
-        effArrival,
-        effDeparture,
+        effArrival: effArrivalFinal,
+        effDeparture: effDepartureFinal,
         effPlatform,
         isPlatformMoved: effPlatform !== e.platformName,
+        deviationMs: effectiveDeviationMs,
+        isLiveData,
       };
     })
     .filter((e) => visiblePlatforms.includes(e.effPlatform));
@@ -1293,6 +1359,7 @@ function renderDashboard(data) {
         const idx = state.currentDashboardEntries.indexOf(e);
         const leftPx = (e.effArrival / MS_PER_DAY) * TIMELINE_WIDTH - 28;
         const devClass = Math.abs(e.deviationMs) <= 60000 ? "" : e.deviationMs > 0 ? "dev-late" : "dev-early";
+        const liveClass = e.isLiveData ? "is-live" : "";
         const conflictClass = conflictKeys.has(e.entryKey) ? "has-conflict" : "";
         const editedClass = e.isEdited ? "is-edited" : "";
         const draftClass = e.isDraft ? "is-draft" : "";
@@ -1321,7 +1388,7 @@ function renderDashboard(data) {
         const dwellNub = nubHeight > 0
           ? `<span class="eb-dwell-nub" style="height:${nubHeight}px;width:${nubWidth}px;top:-${nubHeight}px" title="${formatSecondsShort(Math.round(dwellSec))}"></span>`
           : "";
-        return `<div class="entry-block ${devClass} ${conflictClass} ${editedClass} ${draftClass} ${movedClass}" style="left:${leftPx}px;background:${e.color}" data-eidx="${idx}" data-route-id="${escapeHtml(e.routeId)}">
+        return `<div class="entry-block ${devClass} ${conflictClass} ${editedClass} ${draftClass} ${movedClass} ${liveClass}" style="left:${leftPx}px;background:${e.color}" data-eidx="${idx}" data-route-id="${escapeHtml(e.routeId)}">
           ${dwellNub}
           <span class="eb-num">${escapeHtml(e.routeNumber || "•")}</span>
           <span class="eb-time">${formatLocal(e.effArrival)}</span>
@@ -1704,6 +1771,7 @@ async function loadSchedule() {
     const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}/schedule`);
     const data = await res.json();
     if (!res.ok) { scheduleMeta.textContent = data.error || "Error"; return; }
+    loadArrivals(stationId).catch(() => {});
     state.lastScheduleData = data;
     updateScheduleMeta();
     renderDashboard(data);
@@ -2260,7 +2328,9 @@ async function openRouteModal(routeId) {
           const delta = getOverride(e.routeId, e.tripOriginMs);
           const effArrival = normalizeMs(e.arrivalMs + delta);
           const effDeparture = e.departureMs === null ? null : normalizeMs(e.departureMs + delta);
-          return { ...e, effArrival, effDeparture, delta };
+          // entryKey нужен для computeConflicts
+          const entryKey = `${e.routeId}:${e.tripOriginMs}:${e.platformName}`;
+          return { ...e, effArrival, effDeparture, delta, entryKey };
         });
         const { conflictKeys } = computeConflicts(processed, minIntervalMs);
         // Из найденных конфликтных ключей берём те, что относятся к нашему маршруту.
@@ -2278,6 +2348,7 @@ async function openRouteModal(routeId) {
     }
     // conflictedTrips — итоговый Map<tripOriginMs, Set<stationId>> для renderRouteModal
     const conflictedTrips = conflictMap;
+
     let rawDraft = null;
     if (detail.isDraft) {
       try {
@@ -2293,6 +2364,46 @@ async function openRouteModal(routeId) {
   } catch (err) {
     document.getElementById("routeModalBody").innerHTML = `<p>${escapeHtml(t("errLoading", { msg: err.message }))}</p>`;
   }
+}
+
+// Строит HTML-секцию "Активные поезда" из _arrivalsCache для данного маршрута
+function buildLiveTripsSection(routeId, lang) {
+  const trips = _depIdxCache.get(routeId);
+  if (!trips || trips.length === 0) return "";
+  // Только realtime
+  const live = trips.filter(t => t.realtime);
+  if (live.length === 0) return "";
+
+  const rows = live.map(t => {
+    const devMs = t.deviation || 0;
+    const devMin = Math.round(devMs / 60000);
+    const devHtml = Math.abs(devMs) < 60000
+      ? `<span style="color:var(--green)">●</span>`
+      : `<span style="color:${devMs > 0 ? "var(--red)" : "var(--green)"}">
+          ${devMs > 0 ? "+" : ""}${devMin} ${lang === "ru" ? "мин" : "min"}
+         </span>`;
+    // arrival — epoch ms → мс от полуночи → formatLocal
+    const arrivalOfDay = t.tripOriginApproxMs;
+    return `<tr>
+      <td><b>#${t.departureIndex}</b></td>
+      <td>${formatLocal(arrivalOfDay)}</td>
+      <td>${escapeHtml(t.platformName || "—")}</td>
+      <td>${devHtml}</td>
+    </tr>`;
+  }).join("");
+
+  const h = lang === "ru" ? "Активные поезда (live)" : "Active trains (live)";
+  const cols = lang === "ru"
+    ? ["Рейс", "Прибытие", "Платформа", "Задержка"]
+    : ["Trip", "Arrival", "Platform", "Delay"];
+  return `
+    <h4>🔴 ${h}</h4>
+    <div class="timetable-scroll-wrap">
+      <table class="live-trips-table">
+        <thead><tr>${cols.map(c => `<th>${c}</th>`).join("")}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
 }
 
 function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
@@ -2335,7 +2446,11 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
         const removeBtn = data.isDraft
           ? `<button class="col-remove-btn" data-remove-departure="${trip.tripOriginMs}" title="${escapeHtml(t("removeColumn"))}">×</button>`
           : "";
-        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}#${i + 1}<br>${formatLocal(effMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
+        // departureIndex = порядковый номер рейса за сутки UTC, начиная с 0.
+        // trips[] уже отсортированы по tripOriginMs (мс от полуночи UTC),
+        // поэтому i напрямую соответствует departureIndex из MTR.
+        const tripLabel = `#${i + 1}`;
+        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}${tripLabel}<br>${formatLocal(effMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
       })
       .join("");
     const addColHeader = data.isDraft
@@ -2358,7 +2473,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
             const effMs = normalizeMs(baseMs + delta);
             const cellHasConflict = conflictedTrips.get ? conflictedTrips.get(trip.tripOriginMs)?.has(st.stationId) : false;
             const cellIcon = cellHasConflict ? `<span class="tt-conflict-icon" title="${escapeHtml(t("conflictLabel"))}">!</span>` : "";
-            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}">${cellIcon}${formatLocal(effMs)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
+            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${effMs}" style="cursor:pointer">${cellIcon}${formatLocal(effMs)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
           })
           .join("");
         return `<tr><td class="station-col" data-goto-station="${escapeHtml(st.stationId)}">${escapeHtml(st.stationName)}</td>${cells}</tr>`;
@@ -2411,6 +2526,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
       </div>
     </div>
     ${metaList}
+    ${buildLiveTripsSection(data.id, currentLang())}
     <h4>${t("modalStops")}</h4>
     <table>
       <thead><tr><th>#</th><th>${t("colStation")}</th><th>${t("colPlatform")}</th><th>${t("colDwell")}</th><th>${t("colNext")}</th><th>${t("colCoords")}</th></tr></thead>
@@ -2496,6 +2612,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
   document.querySelectorAll("[data-goto-station]").forEach((el) => {
     el.addEventListener("click", () => {
       const stationId = el.dataset.gotoStation;
+      const gotoTimeMs = el.dataset.gotoTime ? Number(el.dataset.gotoTime) : null;
       const station = state.stations.find((s) => s.id === stationId);
       closeRouteModal();
       switchToTab("schedule");
@@ -2503,7 +2620,14 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
       scheduleAC.setSelected(stationId, station ? station.name : stationId);
       renderFavoritesBar();
       updateFavoriteBtn();
-      loadSchedule();
+      loadSchedule().then(() => {
+        if (gotoTimeMs == null) return;
+        // Прокручиваем дашборд к нужному времени
+        const pxPerHour = state.dashPxPerHour;
+        const scrollPx = (gotoTimeMs / 3600000) * pxPerHour - window.innerWidth / 3;
+        const scrollEl = document.getElementById("gridScroll");
+        if (scrollEl) scrollEl.scrollLeft = Math.max(0, scrollPx);
+      });
     });
   });
 
@@ -2559,27 +2683,52 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     }
   }
 
-  // Кнопка "Обратный маршрут" — ищем по депо, затем по цвету/номеру
+  // Кнопка «Обратный маршрут»
+  // Алгоритм: загружаем detail топ-кандидатов (одинаковый тип + цвет/номер),
+  // выбираем тот у которого совпадает ДЕПО и станции идут в обратном порядке.
+  // Всё делаем async — кнопка изначально disabled, включается когда нашли.
   const reverseBtn = document.getElementById("reverseRouteBtn");
   if (reverseBtn) {
-    const myDepots = new Set(data.depots || []);
-    const score = (r) => {
-      let s = 0;
-      if ((r.depots||[]).some((d) => myDepots.has(d))) s += 10;
-      if (data.number && r.number === data.number) s += 4;
-      if (data.color && r.color === data.color) s += 2;
-      if (r.name === data.name) s += 1;
-      return s;
-    };
-    const reverseRoute = state.routes
-      .filter((r) => r.id !== data.id && !r.isDraft && score(r) > 0)
-      .sort((a, b) => score(b) - score(a))[0] || null;
-    if (reverseRoute) {
-      reverseBtn.addEventListener("click", () => openRouteModal(reverseRoute.id));
-    } else {
-      reverseBtn.disabled = true;
-      reverseBtn.style.opacity = "0.4";
-    }
+    reverseBtn.disabled = true;
+    reverseBtn.style.opacity = "0.4";
+    const myDepotSet = new Set(data.depots || []);
+    const myStations = (data.stops || []).map(s => s.stationId);
+    const myStationsRev = [...myStations].reverse();
+    // Первичный фильтр по доступным полям в state.routes
+    const candidates = state.routes
+      .filter(r => r.id !== data.id && !r.isDraft && r.type === data.type)
+      .filter(r => (data.color && r.color === data.color) || (data.number && r.number === data.number))
+      .sort((a, b) => {
+        // Предпочитаем совпадение по номеру над совпадением по цвету
+        const an = data.number && a.number === data.number ? 1 : 0;
+        const bn = data.number && b.number === data.number ? 1 : 0;
+        return bn - an;
+      })
+      .slice(0, 5);
+    if (candidates.length === 0) return;
+    // Загружаем detail каждого кандидата и проверяем депо + станции
+    (async () => {
+      for (const cand of candidates) {
+        try {
+          const det = await fetch(`/api/routes/${cand.id}`).then(r => r.json());
+          const candDepots = new Set(det.depots || []);
+          // Депо должно совпадать — это главный критерий
+          const depotMatch = myDepotSet.size > 0 && [...myDepotSet].some(d => candDepots.has(d));
+          if (!depotMatch) continue;
+          // Станции должны идти в обратном порядке (хотя бы половина)
+          const candStations = (det.stops || []).map(s => s.stationId);
+          const revOverlap = myStationsRev.filter((sid, i) => candStations[i] === sid).length;
+          const minOverlap = Math.max(1, Math.floor(myStations.length * 0.4));
+          if (revOverlap < minOverlap) continue;
+          // Нашли — включаем кнопку
+          reverseBtn.disabled = false;
+          reverseBtn.style.opacity = "";
+          reverseBtn.addEventListener("click", () => openRouteModal(cand.id));
+          return;
+        } catch {}
+      }
+      // Ни один кандидат не прошёл проверку — кнопка остаётся disabled
+    })();
   }
 
   // Редактирование/удаление пробного маршрута прямо из карточки
@@ -3120,6 +3269,22 @@ function renderInstructions() {
 // ============================================================
 // Инициализация
 // ============================================================
+// Умная пауза — не опрашиваем сервер если приложение не используется
+let _pollPaused = false;
+document.addEventListener("visibilitychange", () => {
+  _pollPaused = document.hidden;
+});
+// Также приостанавливаем если пользователь не на вкладке расписания
+function _shouldPoll() {
+  if (_pollPaused) return false;
+  // Опрашиваем всегда — данные нужны для уведомлений и фоновых вкладок тоже
+  // Но arrivals — только если открыта станция и вкладка видима
+  return true;
+}
+function _shouldPollArrivals() {
+  return !_pollPaused && !!state.currentStationId;
+}
+
 (async function init() {
   // Сначала загружаем сохранённые настройки (язык, часовой пояс и т.д.),
   // затем применяем i18n — иначе язык сбрасывается на системный при каждом запуске.
@@ -3136,7 +3301,8 @@ function renderInstructions() {
   try { await restoreFromUrlHash(); } catch (e) { console.error("restoreFromUrlHash failed:", e); }
 
   setInterval(refreshStatus, 15000);
-  setInterval(() => { if (state.currentStationId) loadSchedule(); }, 20000);
+  setInterval(() => { if (_shouldPoll() && state.currentStationId) loadSchedule(); }, 60000);
+  setInterval(() => { if (_shouldPollArrivals()) loadArrivals(state.currentStationId).catch(()=>{}); }, 60000);
 })();
 
 // ============================================================
@@ -3389,26 +3555,44 @@ function renderNearestTrains() {
     } else {
       etaHtml = `<span class="nb-eta">${minsAway} ${t("nearestMin")}</span>`;
     }
-    const actualMs = normalizeMs(e.effArrival + e.deviationMs);
-    const hasDelay = Math.abs(e.deviationMs) > 60000;
+    const effectiveDev = getEffectiveDeviation(e.routeId, e.deviationMs);
+    const isLive = _arrivalsCache.get(e.routeId)?.realtime === true;
+    const actualMs = normalizeMs(e.effArrival + effectiveDev);
+    const hasDelay = Math.abs(effectiveDev) > 60000;
     const delayHtml = hasDelay
-      ? `<span class="${e.deviationMs > 0 ? "dev-pos" : "dev-neg"}">${e.deviationMs > 0 ? "+" : ""}${Math.round(e.deviationMs / 60000)} ${t("nearestMin")}</span>`
-      : `<span class="nb-ontime">●</span>`;
+      ? `<span class="${effectiveDev > 0 ? "dev-pos" : "dev-neg"}">${effectiveDev > 0 ? "+" : ""}${Math.round(effectiveDev / 60000)} ${t("nearestMin")}${isLive ? " 🔴" : ""}</span>`
+      : `<span class="nb-ontime">${isLive ? "🟢" : "●"}</span>`;
     // Конечная станция (последняя в маршруте из routesById)
     const route = state.routesById.get(e.routeId);
-    const terminus = route?.terminus || "—";
+    const routeFull = state.routes?.find(r => r.id === e.routeId);
+    const lastStop = routeFull?.stations?.[routeFull.stations.length - 1];
+    const lastStName = lastStop ? state.stations?.find(s => s.id === lastStop.id)?.name : null;
+    const terminus = route?.terminus || lastStName || "—";
+    // Платформа: берём из arrivals (точнее) если есть, иначе из расписания
+    const liveEntry = _arrivalsCache.get(e.routeId);
+    const livePlatform = liveEntry?.platformName;
+    const platformLabel = livePlatform || e.platformName || "—";
+    const depData = getDepartureData(e.routeId, e.arrivalMs);
+    const depTimeHtml = depData?.departureMs != null
+      ? formatLocal(depData.departureMs)
+      : (e.effDeparture !== null ? formatLocal(e.effDeparture) : `<span class="nb-muted">—</span>`);
     return `<tr class="nb-row" data-route-id="${escapeHtml(e.routeId)}">
       <td><span class="dot nb-dot" style="background:${e.color}"></span><b>${escapeHtml(e.routeNumber || e.routeName)}</b></td>
       <td class="nb-terminus">${escapeHtml(terminus)}</td>
+      <td class="nb-platform">${escapeHtml(platformLabel)}</td>
       <td>${formatLocal(hasDelay ? actualMs : e.effArrival)}</td>
+      <td>${depTimeHtml}</td>
       <td>${etaHtml}</td>
       <td>${delayHtml}</td>
     </tr>`;
   }).join("");
 
+  const colPlatform = lang === "ru" ? "Платф." : "Platf.";
+  const colDep = lang === "ru" ? "Отпр." : "Dep.";
   list.innerHTML = `<thead><tr class="nb-head">
     <th>${colNum}</th><th>${lang === "ru" ? "Конечная" : "Terminus"}</th>
-    <th>${colTime}</th><th>${colEta}</th><th>${colDelay}</th>
+    <th>${colPlatform}</th>
+    <th>${colTime}</th><th>${colDep}</th><th>${colEta}</th><th>${colDelay}</th>
   </tr></thead><tbody>${rows}</tbody>`;
 
   list.querySelectorAll("tr[data-route-id]").forEach((row) => {
@@ -3417,6 +3601,86 @@ function renderNearestTrains() {
 }
 
 setInterval(renderNearestTrains, 30000);
+
+// ── Живые данные arrivals (реальные отклонения по каждому поезду) ────
+// Кеш: Map<routeId hex, {deviationMs, realtime, arrival}> — обновляется при смене станции.
+// routeId в arrivals — signed int64 decimal, в topology — hex без ведущих нулей.
+const _arrivalsCache = new Map();
+// Индекс для поиска departureIndex по tripOriginMs:
+// Map<routeIdHex, Array<{tripOriginMs, departureIndex, deviation, realtime, platformName}>>
+const _depIdxCache = new Map();
+
+function _int64DecimalToHex(decStr) {
+  let n = BigInt(decStr);
+  if (n < 0n) n = n + (1n << 64n);
+  return n.toString(16).toUpperCase();
+}
+
+async function loadArrivals(stationId) {
+  try {
+    const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}/arrivals`);
+    if (!res.ok) return;
+    const data = await res.json();
+    _arrivalsCache.clear();
+    _depIdxCache.clear();
+    for (const a of (data.arrivals || [])) {
+      const hexId = _int64DecimalToHex(String(a.routeId));
+      // _arrivalsCache: только ближайший рейс (для виджета и дашборда)
+      const existing = _arrivalsCache.get(hexId);
+      if (!existing || a.arrival < existing.arrival) {
+        _arrivalsCache.set(hexId, {
+          deviationMs: a.deviation || 0,
+          realtime: a.realtime || false,
+          arrival: a.arrival,
+          platformName: a.platformName || null,
+        });
+      }
+      // _depIdxCache: все рейсы маршрута для сопоставления с tripOriginMs
+      if (!_depIdxCache.has(hexId)) _depIdxCache.set(hexId, []);
+      _depIdxCache.get(hexId).push({
+        // arrival — epoch ms, переводим в мс от полуночи для сопоставления с tripOriginMs
+        tripOriginApproxMs: a.arrival % 86400000,
+        departureMs: a.departure ? a.departure % 86400000 : null,
+        departureIndex: a.departureIndex,
+        deviation: a.deviation || 0,
+        realtime: a.realtime || false,
+        platformName: a.platformName || null,
+      });
+    }
+  } catch (e) {
+    console.warn("[arrivals] fetch failed:", e.message);
+  }
+}
+
+// Возвращает departureIndex из arrivals для конкретного рейса маршрута.
+// Сопоставляет tripOriginMs (мс от полуночи) с arrival из arrivals
+// в пределах погрешности ±5 минут (учитывает deviation и сдвиги).
+// Возвращает полный объект рейса из _depIdxCache по tripOriginMs
+function getDepartureData(routeId, tripOriginMs) {
+  const trips = _depIdxCache.get(routeId);
+  if (!trips || trips.length === 0) return null;
+  const TOLERANCE = 5 * 60 * 1000;
+  let best = null;
+  let bestDiff = Infinity;
+  for (const t of trips) {
+    let diff = Math.abs(t.tripOriginApproxMs - tripOriginMs);
+    if (diff > 43200000) diff = 86400000 - diff;
+    if (diff < bestDiff && diff <= TOLERANCE) { bestDiff = diff; best = t; }
+  }
+  return best;
+}
+
+function getDepartureIndex(routeId, tripOriginMs) {
+  const d = getDepartureData(routeId, tripOriginMs);
+  return d ? d.departureIndex : null;
+}
+
+function getEffectiveDeviation(routeId, plannedDeviationMs) {
+  const live = _arrivalsCache.get(routeId);
+  if (live && live.realtime) return live.deviationMs;
+  return plannedDeviationMs;
+}
+
 
 
 
@@ -3468,6 +3732,14 @@ setInterval(renderNearestTrains, 30000);
       { label: `${isFav ? "★ " + t("removeFavorite") : "☆ " + t("addFavorite")}`, action: "toggleFav" },
       { label: `ⓘ  ${t("ctxRouteInfo")}`, action: "openCard" },
       // copyShift removed
+      ...(getOverride(ctxEntry.routeId, ctxEntry.tripOriginMs) !== 0 ||
+          getRouteOverride(ctxEntry.routeId) !== 0 ? [
+        { divider: true },
+        { label: t("ctxResetTrip"), action: "resetTrip" },
+      ] : []),
+      ...(hasRouteOverride(ctxEntry.routeId) ? [
+        { label: t("ctxResetRoute"), action: "resetRoute" },
+      ] : []),
     ];
 
     if (conflicts.length) {
@@ -3476,8 +3748,12 @@ setInterval(renderNearestTrains, 30000);
       for (const other of conflicts) {
         const minIntervalMs = state.minIntervalMin * 60000;
         const gap = ctxEntry.effArrival - other.effArrival;
-        const shiftMs = gap >= 0 ? (minIntervalMs - gap) : -(minIntervalMs + gap);
-        const shiftMin = Math.ceil(Math.abs(shiftMs) / 60000);
+        // +1000мс буфер чтобы после сдвига интервал был строго > minIntervalMs
+        const BUFFER = 1000;
+        const rawShift = gap >= 0 ? (minIntervalMs - gap + BUFFER) : -(minIntervalMs + gap + BUFFER);
+        // Округляем вверх до полных минут чтобы показать пользователю целое число
+        const shiftMs = Math.sign(rawShift) * Math.ceil(Math.abs(rawShift) / 60000) * 60000;
+        const shiftMin = Math.abs(shiftMs) / 60000;
         const dir = shiftMs > 0 ? "+" : "−";
         items.push({
           label: `↕  ${escapeHtml(t("conflictSuggestShift", { name: ctxEntry.routeNumber || ctxEntry.routeName, mins: `${dir}${shiftMin}` }))}`,
@@ -3513,6 +3789,27 @@ setInterval(renderNearestTrains, 30000);
             (getOverride(saved.routeId, saved.tripOriginMs) || 0) + delta);
           renderDashboardFromCache();
           renderGraphFromCache();
+        }
+        else if (action === "resetTrip") {
+          pushUndoSnapshot();
+          const routeDelta = getRouteOverride(saved.routeId);
+          if (routeDelta !== 0) {
+            // Маршрут сдвинут целиком — компенсируем для этого рейса
+            // setOverride(tripDelta = -routeDelta) → эффективный сдвиг = 0
+            setOverride(saved.routeId, saved.tripOriginMs, -routeDelta);
+          } else {
+            removeOverride(saved.routeId, saved.tripOriginMs);
+          }
+          renderDashboardFromCache();
+          renderGraphFromCache();
+          savePrefsToServer();
+        }
+        else if (action === "resetRoute") {
+          pushUndoSnapshot();
+          removeRouteOverride(saved.routeId);
+          renderDashboardFromCache();
+          renderGraphFromCache();
+          savePrefsToServer();
         }
       });
     });

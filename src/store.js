@@ -148,6 +148,33 @@ async function pruneDelayHistory() {
   });
 }
 
+// Кеш результатов buildStationSchedule/buildRouteGraph.
+// Ключ: stationId или routeId. Значение: { result, departuresFetchedAt }.
+// Инвалидируется когда departures обновляется.
+const _scheduleCache = new Map();
+const _routeCache = new Map();
+
+function getScheduleCache(stationId, currentFetchedAt) {
+  const c = _scheduleCache.get(stationId);
+  if (!c) return null;
+  if (c.departuresFetchedAt !== currentFetchedAt) return null;
+  return c.result;
+}
+function setScheduleCache(stationId, result, departuresFetchedAt) {
+  _scheduleCache.set(stationId, { result, departuresFetchedAt });
+}
+function getRouteCache(routeId, currentFetchedAt) {
+  const c = _routeCache.get(routeId);
+  if (!c) return null;
+  if (c.departuresFetchedAt !== currentFetchedAt) return null;
+  return c.result;
+}
+function setRouteCache(routeId, result, departuresFetchedAt) {
+  _routeCache.set(routeId, { result, departuresFetchedAt });
+}
+// Очищаем кеш при обновлении departures
+const _origSetDepartures = module.exports?.setDepartures;
+
 module.exports = {
   loadFromDisk,
   setTopology,
@@ -160,4 +187,8 @@ module.exports = {
   appendDelayHistory,
   readDelayHistory,
   pruneDelayHistory,
+  getScheduleCache,
+  setScheduleCache,
+  getRouteCache,
+  setRouteCache,
 };

@@ -71,6 +71,10 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  // Временно: открыть DevTools по F12
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+  if (input.key === "F12") mainWindow.webContents.openDevTools();
+  });
 
   // Пока сервер поднимается — показываем заставку.
   mainWindow.loadFile(path.join(__dirname, "loading.html"));

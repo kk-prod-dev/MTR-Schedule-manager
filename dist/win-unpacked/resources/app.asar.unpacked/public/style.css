@@ -473,21 +473,22 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 }
 /* Жёлтая подсветка конфликта — только в ячейках тела (td), не в заголовках (th).
    Заголовки остаются серыми (var(--panel2)) как обычно. */
-td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; }
+td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: nowrap; }
 .tt-conflict-icon {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px; height: 13px;
+  border-radius: 50%;
   background: var(--amber, #f59e0b);
-  color: #000;
+  color: #1a1300;
   font-size: 9px;
   font-weight: 900;
-  width: 13px;
-  height: 13px;
-  line-height: 13px;
-  text-align: center;
-  border-radius: 50%;
-  margin-right: 3px;
+  margin-right: 4px;
   vertical-align: middle;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
   cursor: default;
+  flex-shrink: 0;
 }
 .timetable-deviation-row {
   /* Фон строки — сплошной, не прозрачный ни при каком условии */
@@ -733,6 +734,7 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; }
 .nb-row:hover { background: rgba(255,255,255,.04); }
 .nb-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: middle; }
 .nb-terminus { color: var(--muted); font-size: 12px; }
+.nb-platform { color: var(--text); font-size: 12px; font-weight: 600; white-space: nowrap; }
 .nb-now { color: var(--amber); font-weight: 700; }
 .nb-eta { color: var(--text); }
 .nb-ontime { color: var(--green); font-size: 16px; }
@@ -873,3 +875,30 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; }
   font-weight: 600;
   opacity: 0.85;
 }
+
+/* Живые данные из arrivals API — точка в нижнем левом углу блока */
+.entry-block.is-live::after {
+  content: "";
+  position: absolute;
+  bottom: 3px;
+  left: 4px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.3);
+}
+.entry-block.dev-late.is-live::after,
+.entry-block.dev-early.is-live::after { background: rgba(255,255,255,0.95); }
+
+/* departureIndex в виджете ближайших прибытий */
+.nb-depidx { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nb-muted { color: var(--border); }
+
+/* Таблица активных поездов в карточке маршрута */
+.live-trips-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.live-trips-table th { padding: 6px 12px; text-align: left; color: var(--muted); font-weight: 500; border-bottom: 1px solid var(--border); }
+.live-trips-table td { padding: 6px 12px; border-bottom: 1px solid var(--border); }
+.live-trips-table tr:last-child td { border-bottom: none; }
+
+

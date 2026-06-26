@@ -24,15 +24,14 @@ app.get("/api/stations", (req, res) => {
 });
 
 app.get("/api/stations/:id/schedule", (req, res) => {
+  const dep = store.getDepartures();
+  const fetchedAt = dep ? dep.fetchedAt : null;
+  const cached = store.getScheduleCache(req.params.id, fetchedAt);
+  if (cached) return res.json(cached);
   const result = buildStationSchedule(req.params.id);
-  if (!result) {
-    return res
-      .status(503)
-      .json({ error: "Данные ещё не получены от сервера MTR, подождите немного." });
-  }
-  if (result.notFound) {
-    return res.status(404).json({ error: "Станция с таким id не найдена." });
-  }
+  if (!result) return res.status(503).json({ error: "Данные ещё не получены от сервера MTR, подождите немного." });
+  if (result.notFound) return res.status(404).json({ error: "Станция с таким id не найдена." });
+  if (fetchedAt) store.setScheduleCache(req.params.id, result, fetchedAt);
   res.json(result);
 });
 
@@ -41,15 +40,14 @@ app.get("/api/routes", (req, res) => {
 });
 
 app.get("/api/routes/:id", (req, res) => {
+  const dep = store.getDepartures();
+  const fetchedAt = dep ? dep.fetchedAt : null;
+  const cached = store.getRouteCache(req.params.id, fetchedAt);
+  if (cached) return res.json(cached);
   const result = getRouteDetail(req.params.id);
-  if (!result) {
-    return res
-      .status(503)
-      .json({ error: "Данные ещё не получены от сервера MTR, подождите немного." });
-  }
-  if (result.notFound) {
-    return res.status(404).json({ error: "Маршрут с таким id не найден." });
-  }
+  if (!result) return res.status(503).json({ error: "Данные ещё не получены от сервера MTR, подождите немного." });
+  if (result.notFound) return res.status(404).json({ error: "Маршрут с таким id не найден." });
+  if (fetchedAt) store.setRouteCache(req.params.id, result, fetchedAt);
   res.json(result);
 });
 
@@ -202,6 +200,91 @@ app.put("/api/drafts/:id", (req, res) => {
   }
 });
 
+
+
+// ── Живые прибытия для конкретной станции (прокси к MTR arrivals API) ──
+// MTR arrivals принимает platformId (signed int64 decimal), а не stationId.
+// Мы накапливаем platformId из успешных ответов и переиспользуем их.
+// Карта: stationId hex → Set<platformId signed decimal string>
+const _platformIdCache = new Map();
+
+async function fetchArrivalsFromMTR(ids) {
+  const url = `${config.BASE_URL}/mtr/api/map/arrivals?dimension=${config.DIMENSION}`;
+  const body = JSON.stringify({ stationIdsHex: ids, maxCountPerPlatform: 10 });
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body,
+  });
+  if (!res.ok) throw new Error(`MTR API error: ${res.status}`);
+  const data = await res.json();
+  return data.data || { arrivals: [] };
+}
+
+app.get("/api/stations/:id/arrivals", async (req, res) => {
+  try {
+    const hexId = req.params.id.toUpperCase();
+
+    // MTR arrivals принимает stationIdsHex как HEX-строки (не decimal).
+    // Исходный код: parseHexId() → Long.parseUnsignedLong(id, 16)
+    // Собираем: stationId hex + известные platformId (тоже как hex)
+    const knownPlatforms = _platformIdCache.get(hexId) || new Set();
+    // platformId из arrivals храним как signed decimal → конвертируем в hex для запроса
+    const platformHexIds = [...knownPlatforms].map(id => {
+      let n = BigInt(id);
+      if (n < 0n) n = n + (1n << 64n);
+      return n.toString(16).toUpperCase();
+    });
+    const idsToQuery = [hexId, ...platformHexIds];
+    const uniqueIds = [...new Set(idsToQuery)];
+    const data = await fetchArrivalsFromMTR(uniqueIds);
+
+    // Накапливаем platformId из ответа
+    if (data.arrivals && data.arrivals.length > 0) {
+      if (!_platformIdCache.has(hexId)) _platformIdCache.set(hexId, new Set());
+      const cache = _platformIdCache.get(hexId);
+      for (const a of data.arrivals) {
+        if (a.platformId != null) {
+          cache.add(String(a.platformId));
+        }
+      }
+    }
+
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Эндпоинт для просмотра накопленных platformId (для отладки)
+app.get("/api/stations/:id/platforms", (req, res) => {
+  const hexId = req.params.id.toUpperCase();
+  const platforms = _platformIdCache.get(hexId);
+  res.json({ stationId: hexId, platformIds: platforms ? [...platforms] : [] });
+});
+
+// Seed: принимаем список platformId снаружи (например из arrivals ответа в браузере)
+// POST /api/platforms/seed { stationId: "hex", platformIds: ["123", "-456"] }
+app.post("/api/platforms/seed", (req, res) => {
+  const { stationId, platformIds } = req.body;
+  if (!stationId || !Array.isArray(platformIds)) {
+    return res.status(400).json({ error: "stationId и platformIds обязательны" });
+  }
+  const hexId = stationId.toUpperCase();
+  if (!_platformIdCache.has(hexId)) _platformIdCache.set(hexId, new Set());
+  const cache = _platformIdCache.get(hexId);
+  platformIds.forEach(id => cache.add(String(id)));
+  res.json({ ok: true, stationId: hexId, total: cache.size });
+});
+
+// Все накопленные платформы
+app.get("/api/platforms/all", (req, res) => {
+  const result = {};
+  for (const [stationId, platforms] of _platformIdCache) {
+    result[stationId] = [...platforms];
+  }
+  res.json(result);
+});
 
 // ── Пользовательские настройки (избранное, язык, часовой пояс, overrides) ──
 // Хранятся в DATA_DIR/prefs.json, переживают перезапуск Electron.

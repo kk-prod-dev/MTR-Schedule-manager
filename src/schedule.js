@@ -112,6 +112,16 @@ function buildStationSchedule(stationId) {
     return null;
   }
 
+  // t0 в departures API = scheduledDepartureTime - currentMillis (исходный код MTR).
+  // Это относительное время: сколько мс до отправления от момента запроса.
+  // currentTime из API = System.currentTimeMillis() — реальный epoch ms сервера.
+  // Правильная конвертация: realEpoch = currentTime + t0
+  // msOfDay = (currentTime + t0) % 86400000
+  const _mtrCurrent = departuresCache.currentTime || Date.now();
+  function t0ToUtcMs(t0) {
+    return ((_mtrCurrent + t0) % 86400000 + 86400000) % 86400000;
+  }
+
   const station = topology.stations.find((s) => s.id === stationId);
   if (!station) {
     return { notFound: true };
@@ -130,20 +140,31 @@ function buildStationSchedule(stationId) {
     const departureInfo = allDeparturesByRouteId.get(route.id);
     if (!departureInfo) continue; // у маршрута сейчас нет активных рейсов
 
-    // Считаем смещение (в мс) от момента отправления с первой станции
-    // маршрута до прибытия на нужную станцию.
-    let arrivalOffset = 0;
-    for (let i = 1; i <= idx; i++) {
-      arrivalOffset += route.durations[i - 1] ?? 0;
-      if (i < idx) {
-        arrivalOffset += stops[i].dwellTime ?? 0;
-      }
+    // t0 = scheduledDepartureTime на последней остановке.
+    // scheduledDepartureTime = scheduledArrivalTime + dwellTime последней остановки.
+    // Поэтому offset для последней остановки = -dwellTime_last (убираем стоянку).
+    // Для остальных: вычитаем dwellTime текущей + duration до следующей и т.д.
+    const lastIdx = stops.length - 1;
+    // Сначала считаем offset для каждой остановки от начала (0..lastIdx)
+    // затем перестраиваем относительно t0:
+    // forward[k] = сумма (duration[k-1] + dwellTime[k]) от 0 до k
+    // t0 соответствует forward[lastIdx] = полному времени от прибытия на первую до отправления с последней
+    let forward = 0;
+    const forwardOffsets = [0];
+    for (let i = 0; i < lastIdx; i++) {
+      forward += (stops[i].dwellTime ?? 0) + (route.durations[i] ?? 0);
+      forwardOffsets.push(forward);
     }
+    // t0 = forwardOffsets[lastIdx] + dwellTime_last
+    const t0Offset = forward + (stops[lastIdx].dwellTime ?? 0);
+    // arrivalOffset[idx] = forwardOffsets[idx] - t0Offset (всегда ≤ 0)
+    const arrivalOffset = forwardOffsets[idx] - t0Offset;
     const isOrigin = idx === 0;
-    const isTerminus = idx === stops.length - 1;
+    const isTerminus = idx === lastIdx;
     const departureOffset = isTerminus
       ? null
       : arrivalOffset + (stops[idx].dwellTime ?? 0);
+
 
     const { displayName, shortCode } = splitRouteName(route.name);
     const color = colorToHex(route.color);
@@ -153,7 +174,8 @@ function buildStationSchedule(stationId) {
     const platformName = normalizePlatformName(stops[idx].name, `Платформа (${route.id.slice(0, 4)})`);
 
     for (const group of departureInfo.departures) {
-      for (const t0 of group.departures) {
+      for (const t0raw of group.departures) {
+        const t0 = t0ToUtcMs(t0raw);
         const arrivalMs = normalizeTimeOfDay(t0 + arrivalOffset + group.deviation);
         const departureMs =
           departureOffset === null
@@ -366,6 +388,9 @@ function buildRouteGraph(fromStationId, toStationId) {
   const topology = store.getTopology();
   const departuresCache = store.getDepartures();
   if (!topology || !departuresCache) return null;
+  const _mtrCurG = departuresCache.currentTime || Date.now();
+  function t0ToUtcMs(t0) { return ((_mtrCurG + t0) % 86400000 + 86400000) % 86400000; }
+
 
   const fromStation = topology.stations.find((s) => s.id === fromStationId);
   const toStation = topology.stations.find((s) => s.id === toStationId);
@@ -441,11 +466,15 @@ function buildRouteGraph(fromStationId, toStationId) {
     // всё равно попадает в список (с пустым tripCount), а решение
     // показывать ли его в легенде/на графике — за фронтендом.
     const trips = [];
-    let baseArrivalOffset = 0;
-    for (let i = 1; i <= lo; i++) {
-      baseArrivalOffset += route.durations[i - 1] ?? 0;
-      if (i < lo) baseArrivalOffset += stops[i].dwellTime ?? 0;
+    // t0 = scheduledDepartureTime на последней остановке = arrival_last + dwellTime_last
+    let _fwd2 = 0;
+    const _fwdArr2 = [0];
+    for (let i = 0; i < stops.length - 1; i++) {
+      _fwd2 += (stops[i].dwellTime ?? 0) + (route.durations[i] ?? 0);
+      _fwdArr2.push(_fwd2);
     }
+    const _t0Off2 = _fwd2 + (stops[stops.length - 1].dwellTime ?? 0);
+    let baseArrivalOffset = _fwdArr2[lo] - _t0Off2;
 
     // Смещения прибытия/отправления для каждой станции сегмента,
     // считая по индексам маршрута lo -> hi (так считаются durations/dwell).
@@ -478,7 +507,8 @@ function buildRouteGraph(fromStationId, toStationId) {
 
     if (departureInfo) {
       for (const group of departureInfo.departures) {
-        for (const t0 of group.departures) {
+        for (const t0raw of group.departures) {
+          const t0 = t0ToUtcMs(t0raw);
           // Строим points в порядке движения поезда (первая остановка → последняя).
           // Для FORWARD (fromIsAtLo=true): поезд идёт segment[0]→segment[last]
           //   - arrivalOffsets[k] уже в правильном порядке (возрастает)
@@ -557,6 +587,9 @@ function buildRouteGraph(fromStationId, toStationId) {
 function buildRouteTimetable(routeId) {
   const topology = store.getTopology();
   const departuresCache = store.getDepartures();
+  const _mtrCurT = departuresCache?.currentTime || Date.now();
+  function t0ToUtcMs(t0) { return ((_mtrCurT + t0) % 86400000 + 86400000) % 86400000; }
+
   if (!topology) return null;
 
   const { allRoutes, allDeparturesByRouteId } = getMergedRoutesAndDepartures(topology, departuresCache);
@@ -566,15 +599,21 @@ function buildRouteTimetable(routeId) {
   const stops = route.stations || [];
   const departureInfo = allDeparturesByRouteId.get(routeId);
 
+  // t0 = scheduledDepartureTime на последней остановке = arrival_last + dwellTime_last
   const arrivalOffsets = [];
   const departureOffsets = [];
-  let running = 0;
+  let _fwdT = 0;
+  const _fwdArrT = [0];
+  for (let k = 0; k < stops.length - 1; k++) {
+    _fwdT += (stops[k].dwellTime ?? 0) + (route.durations[k] ?? 0);
+    _fwdArrT.push(_fwdT);
+  }
+  const _t0OffT = _fwdT + (stops[stops.length - 1].dwellTime ?? 0);
   for (let k = 0; k < stops.length; k++) {
-    arrivalOffsets.push(running);
+    const arr = _fwdArrT[k] - _t0OffT;
+    arrivalOffsets.push(arr);
     const isLast = k === stops.length - 1;
-    const dep = isLast ? null : running + (stops[k].dwellTime ?? 0);
-    departureOffsets.push(dep);
-    if (!isLast) running = dep + (route.durations[k] ?? 0);
+    departureOffsets.push(isLast ? null : arr + (stops[k].dwellTime ?? 0));
   }
 
   const stationsOut = stops.map((s, i) => {
@@ -590,7 +629,8 @@ function buildRouteTimetable(routeId) {
   const depotDepartures = [];
   if (departureInfo) {
     for (const group of departureInfo.departures) {
-      for (const t0 of group.departures) {
+      for (const t0raw of group.departures) {
+        const t0 = t0ToUtcMs(t0raw);
         const times = stops.map((s, k) => {
           const arrivalMs = normalizeTimeOfDay(t0 + arrivalOffsets[k] + group.deviation);
           const departureMs =
