@@ -1,5 +1,10 @@
 "use strict";
 
-// Намеренно минимальный preload. Приложение работает как обычная веб-страница,
-// обращаясь к локальному API по http://127.0.0.1, поэтому мост в Node не нужен.
-// Файл оставлен как точка расширения на будущее (contextBridge при необходимости).
+const { contextBridge, ipcRenderer } = require("electron");
+
+// Экспортируем минимальный API для renderer процесса
+contextBridge.exposeInMainWorld("electronAPI", {
+  // Синхронная отправка prefs при закрытии окна
+  savePrefsSync: (payload) => ipcRenderer.send("save-prefs-sync", payload),
+  onChangelog: (cb) => ipcRenderer.on("show-changelog", (_, data) => cb(data)),
+});

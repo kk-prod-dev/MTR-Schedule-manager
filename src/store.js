@@ -55,6 +55,9 @@ function setTopologyError(message) {
 function setDepartures(data) {
   state.departures = { ...data, fetchedAt: Date.now() };
   state.lastDeparturesError = null;
+  // Инвалидируем кеш расписания при каждом обновлении данных
+  _scheduleCache.clear();
+  _routeCache.clear();
   ensureDataDir();
   fs.writeFile(DEPARTURES_CACHE_FILE, JSON.stringify(state.departures), () => {});
 }
@@ -154,6 +157,11 @@ async function pruneDelayHistory() {
 const _scheduleCache = new Map();
 const _routeCache = new Map();
 
+function clearScheduleCache() {
+  _scheduleCache.clear();
+  _routeCache.clear();
+}
+
 function getScheduleCache(stationId, currentFetchedAt) {
   const c = _scheduleCache.get(stationId);
   if (!c) return null;
@@ -189,6 +197,7 @@ module.exports = {
   pruneDelayHistory,
   getScheduleCache,
   setScheduleCache,
+  clearScheduleCache,
   getRouteCache,
   setRouteCache,
 };

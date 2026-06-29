@@ -16,6 +16,7 @@ files:
       - '!data/**'
       - '!dist/**'
       - '!diagnose-missing-route.js'
+      - pending-changelog.json
 asar: true
 asarUnpack:
   - public/**

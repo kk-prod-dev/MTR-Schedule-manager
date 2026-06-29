@@ -40,6 +40,7 @@ body {
 }
 .status-badge.ok { color: var(--green); border-color: var(--green); }
 .status-badge.error { color: var(--red); border-color: var(--red); }
+.status-badge.warn { color: var(--yellow, #f5a623); border-color: var(--yellow, #f5a623); }
 
 .tabs {
   display: flex;
@@ -902,3 +903,17 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .live-trips-table tr:last-child td { border-bottom: none; }
 
 
+
+/* Схема состава поезда в карточке маршрута */
+.train-diagram-wrap {
+  margin: 12px 0 16px;
+  overflow-x: auto;
+  padding: 8px 0 4px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.train-diagram-wrap svg {
+  margin: 0 auto;
+  display: block;
+}

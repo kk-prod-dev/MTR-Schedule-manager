@@ -7,6 +7,7 @@ const I18N = {
   ru: {
     appTitle: "MTR Schedule Manager",
     statusConnecting: "Подключение...",
+    statusCached: "Нет связи с сервером MTR (показаны кешированные данные: {st} ст., {rt} маршр.)",
     statusSynced: "Синхронизировано: {st} ст., {rt} маршр.",
     statusErrorConn: "Ошибка подключения к серверу MTR",
     statusWaiting: "Ожидание первого опроса...",
@@ -149,6 +150,12 @@ const I18N = {
     copiedOverrideMsg: "Сдвиг скопирован",
     notifAllow: "Разрешить уведомления",
     notifOnlyFav: "Уведомлять только по избранному",
+    checkUpdateBtn: "Проверить обновления",
+    serverListLabel: "Серверы MTR",
+    serverUrlLabel: "URL сервера MTR",
+    serverUrlHint: "Адрес карты системы MTR-сервера. Например: http://localhost:8888",
+    serverUrlSaved: "URL сохранён, данные перезагружаются...",
+    serverUrlError: "Ошибка сохранения URL",
     serverTzLabel: "Часовой пояс сервера MTR",
     serverTzHint: "Если времена поездов отображаются со сдвигом — выберите часовой пояс сервера.",
     favStationHint: "Избранная станция — кликни для быстрого перехода",
@@ -176,29 +183,30 @@ const I18N = {
     notifBigDelay: "Уведомлять о больших опозданиях (>5 мин)",
     notifThreshold: "Порог опоздания (мин)",
     'instr_title_schedule-basics': 'Расписание по станции',
-    'instr_body_schedule-basics': '<p>Начните вводить название станции в поле поиска — появится список подсказок, кликните по нужной. Дашборд покажет все платформы станции и прибытия поездов на временной шкале. Рядом с полем поиска — значок ☆: кликните, чтобы добавить станцию в <b>Избранное</b> (появится быстрая панель доступа снизу).</p><p>Жёлтая рамка вокруг блока — отклонение от графика более минуты. Янтарный «!» — конфликт: два поезда слишком близко на одной платформе. <b>Виджет «Ближайшие прибытия»</b> в сайдбаре показывает 6 ближайших поездов и обновляется каждые 30 секунд.</p>',
+    'instr_body_schedule-basics': '<p>Начните вводить название станции — выберите из подсказок. Дашборд: платформы по вертикали, время UTC 00:00–24:00 по горизонтали. Блок поезда: название маршрута и время прибытия; ! = конфликт; треугольник = live-задержка. Клик на блок — карточка рейса, клик на название маршрута — карточка маршрута.</p>',
     'instr_title_drag-edit': 'Ручное редактирование (перетаскивание)',
     'instr_body_drag-edit': '<p>Перетащите блок поезда (на дашборде) или линию поезда (на графике движения) по горизонтали — время сдвинется, рейс станет пунктирным.</p><p><code>Shift</code> + перетаскивание — сдвигает <b>все</b> рейсы маршрута сразу. <code>Alt</code> + вертикальное перетаскивание (≥ полная высота строки) — переносит поезд на другую платформу.</p><p><code>Ctrl+Z</code> — отменить, <code>Ctrl+Y</code> — вернуть.</p><p>Кнопка «Сбросить ручные правки» в сайдбаре — сбрасывает все сдвиги. В карточке маршрута — «Сбросить правки этого маршрута» (появляется только при наличии изменений).</p>',
     'instr_title_favorites': 'Избранное',
     'instr_body_favorites': '<p><b>Станции</b> — кнопка ☆ рядом с полем поиска. <b>Маршруты</b> — кнопка ☆ в карточке маршрута или в строке таблицы маршрутов.</p><p>Панель быстрого доступа появляется снизу: клик по станции открывает расписание, клик по маршруту — карточку.</p><p>В таблице маршрутов кнопка ☆ в панели управления оставляет только избранные. Уведомления тоже можно ограничить только избранными (см. Настройки).</p>',
     'instr_title_filters-zoom': 'Фильтры и масштаб',
-    'instr_body_filters-zoom': '<p>В сайдбаре слева — фильтр платформ, слайдер минимального интервала для конфликтов (по умолчанию 3 мин), масштаб времени.</p><p>Масштаб: кнопки +/− или <code>Ctrl</code>+колесо мыши над графиком.</p><p>В таблице маршрутов — фильтр по типу, источнику (настоящие/пробные), избранным, и поиск. Заголовки столбцов кликабельны для сортировки.</p>',
+    'instr_body_filters-zoom': '<p>Сайдбар: фильтр платформ, слайдер минимального интервала конфликта, источник (реальные/черновики), фильтр избранных. Zoom: +/− или Ctrl+колесо над графиком.</p><p>Конфликт = два поезда на одной платформе с интервалом меньше заданного. Оборотные пары одного маршрута конфликтами не считаются.</p>',
     'instr_title_train-graph': 'График движения поездов',
-    'instr_body_train-graph': '<p>Выберите станцию А и Б — приложение строит граф: станции по вертикали на реальном расстоянии, время по горизонтали, наклон = скорость.</p><p>Кнопка ⇄ меняет А и Б местами. Тумблер «Показывать обратные рейсы» добавляет маршруты Б→А. Каждый маршрут в легенде включается/выключается кликом. Значок ⓘ открывает карточку маршрута.</p><p>Маршруты, пересекающие полночь, показывают продолжение на противоположной стороне графика.</p>',
+    'instr_body_train-graph': '<p>Выберите станцию А и Б — граф: станции по вертикали (в порядке маршрута), время UTC 00:00–24:00 горизонтально. Наклон = скорость. «Обратные рейсы» добавляет рейсы в обратном направлении. Фильтр станций скрывает промежуточные. Ctrl+колесо или +/− для масштаба. Клик на линию — карточка маршрута.</p>',
     'instr_title_route-card': 'Карточка маршрута',
-    'instr_body_route-card': '<p>Клик по маршруту открывает карточку: метаданные, список остановок с координатами (⧉ копирует в буфер), таблица расписания на весь день. Шапка и первый столбец закреплены при прокрутке.</p><p>Ячейки с жёлтым «!» — конфликт платформы. Пунктирная рамка — ячейка изменена вручную.</p><p>Для пробных маршрутов — секция «Формула расписания» (D+X*I) для вставки в игру.</p>',
+    'instr_body_route-card': '<p>Клик по маршруту открывает карточку: метаданные, схема состава поезда (по live-данным), список остановок с координатами (⧉ копирует), таблица расписания UTC 00:00–24:00 (! = конфликт, пунктир = ручная правка). ☆ — в избранное, «Действия» — создать черновик, удалить рейс. При редактировании появляется «Формула расписания».</p>',
     'instr_title_drafts': 'Пробные маршруты',
     'instr_body_drafts': '<p>«+ Создать пробный маршрут» открывает форму: название, остановки через поиск станций, время стоянки и перегона (подбираются автоматически), время отправления и интервал.</p><p>Если указать <b>интервал (ЧЧ:ММ:СС)</b>, на весь день автоматически создадутся отправления с этим шагом. В карточке маршрута можно добавлять/удалять отдельные рейсы.</p><p>Кнопка «Создать пробный маршрут на основе этого» в карточке настоящего маршрута копирует все остановки и перегоны.</p>',
     'instr_title_problems': 'Проблемные места',
-    'instr_body_problems': '<p>Вкладка «Проблемные места» показывает три секции: конфликты по станциям, конфликты по маршрутам, и маршруты с наибольшим средним опозданием. Избранные элементы показываются первыми со значком ★.</p><p>Клик по станции → расписание по станции. Клик по маршруту → карточка маршрута.</p>',
-    'instr_title_notifications': 'Уведомления',
-    'instr_body_notifications': '<p>В разделе «Настройки» можно включить браузерные уведомления о новых конфликтах платформ и/или больших опозданиях (порог в минутах задаётся отдельно). Галочка «Только избранные» ограничивает уведомления маршрутами из избранного.</p>',
+    'instr_body_problems': '<p>Вкладка «Проблемные места»: конфликты по станциям, маршрутам и черновики. Данные накапливаются при просмотре станций. Клик — открывает станцию или карточку маршрута.</p>',
+    'instr_title_schedule_formula': 'Формула расписания',
+    'instr_body_schedule_formula': '<p>При редактировании маршрута в карточке появляется блок «Формула расписания». Он показывает паттерн отправлений на основе ваших ручных правок: интервал между рейсами и смещение первого рейса от полуночи UTC.</p><p>Формула автоматически обновляется при каждом изменении расписания и помогает убедиться что правки образуют равномерный интервал. Скопируйте формулу кнопкой ⧉ чтобы передать расписание другому игроку.</p>',
     'instr_title_settings': 'Настройки',
-    'instr_body_settings': '<p>Язык и часовой пояс определяются автоматически, но переключаются вручную — все времена пересчитываются мгновенно. Поддерживаемые языки: RU, EN, DE, FR, PL, PT, CS.</p><p><b>Часовой пояс сервера MTR</b> — если поезда показываются со сдвигом, выберите здесь пояс вашего MTR-сервера. Настройки и избранное сохраняются автоматически между запусками.</p><p>Текущая вкладка + выбранная станция сохраняются в URL (#tab=…).</p>',
+    'instr_body_settings': '<p>Язык и часовой пояс определяются автоматически. Языки: RU, EN, DE, FR, PL, PT, CS.</p><p><b>Серверы MTR</b> — список серверов; выберите активный из выпадающего, + добавляет URL, − удаляет; при смене данные перезагружаются; localhost:8888 доступен всегда.</p><p><b>Часовой пояс</b> — только на время поездов; таблицы и графики всегда UTC 00:00–24:00.</p><p>Настройки сохраняются автоматически. Внизу — версия и кнопка обновлений.</p>',
   },
   en: {
     appTitle: "MTR Schedule Manager",
     statusConnecting: "Connecting...",
+    statusCached: "No connection to MTR server (showing cached data: {st} stations, {rt} routes)",
     statusSynced: "Synced: {st} stations, {rt} routes",
     statusErrorConn: "Failed to connect to the MTR server",
     statusWaiting: "Waiting for first poll...",
@@ -388,7 +396,7 @@ const I18N = {
     'instr_body_notifications': '<p>In Settings you can enable browser notifications for new platform conflicts and/or large delays (threshold in minutes is configurable). The "Favorites only" toggle limits notifications to favorite routes.</p>',
     'instr_title_settings': 'Settings',
     'instr_body_settings': "<p>Language and timezone default to auto-detected values but can be switched manually — all times recalculate instantly. Supported languages: RU, EN, DE, FR, PL, PT, CS.</p><p><b>MTR server timezone</b> — if trains appear shifted, select your MTR server's timezone here. Settings and favorites persist across restarts.</p><p>The current tab + selected station are saved in the URL (#tab=…).</p>",
-  },
+  }
 };
 
 function detectSystemLang() {
@@ -416,6 +424,8 @@ const settings = {
   langMode: "auto",
   tzMode: "auto",
   serverTzOffsetMin: 0, // часовой пояс сервера MTR (вычитается из времён API)
+  serverUrl: "", // URL MTR-сервера (пустая строка = дефолтный)
+  serverList: [], // список серверов пользователя
 };
 function currentLang() {
   return settings.langMode === "auto" ? detectSystemLang() : settings.langMode;
@@ -449,6 +459,17 @@ function normalizeMs(ms) {
   const m = ms % MS_PER_DAY;
   return m < 0 ? m + MS_PER_DAY : m;
 }
+function formatUtc(msUtc, withSeconds) {
+  const ms = ((msUtc % 86400000) + 86400000) % 86400000;
+  const h = String(Math.floor(ms / 3600000)).padStart(2, '0');
+  const m = String(Math.floor((ms % 3600000) / 60000)).padStart(2, '0');
+  if (withSeconds) {
+    const s = String(Math.floor((ms % 60000) / 1000)).padStart(2, '0');
+    return h + ':' + m + ':' + s;
+  }
+  return h + ':' + m;
+}
+
 function formatLocal(msUtc, withSeconds) {
   // msUtc здесь — время от MTR API, которое на самом деле в локальном
   // времени сервера (serverTzOffsetMin). Вычитаем его, чтобы получить
@@ -624,6 +645,19 @@ function getOverride(routeId, tripOriginMs) {
   const tripDelta = idx === -1 ? 0 : overridesList[idx].deltaMs;
   return tripDelta + getRouteOverride(routeId);
 }
+function applyReverseShift(routeId, tripOriginMs, deltaMs) {
+  if (!state.lastScheduleData) return;
+  const entry = state.lastScheduleData.entries.find(
+    e => e.routeId === routeId && e.tripOriginMs === tripOriginMs
+  );
+  if (!entry) return;
+  if (entry.reverseRouteId != null && entry.reverseTripOriginMs != null) {
+    setOverride(entry.reverseRouteId, entry.reverseTripOriginMs, deltaMs);
+  } else if (entry.pairedForwardRouteId != null && entry.pairedForwardTripOriginMs != null) {
+    setOverride(entry.pairedForwardRouteId, entry.pairedForwardTripOriginMs, deltaMs);
+  }
+}
+
 function setOverride(routeId, tripOriginMs, deltaMs) {
   const idx = findOverrideIndex(routeId, tripOriginMs);
   if (idx === -1) overridesList.push({ routeId, t0: tripOriginMs, deltaMs });
@@ -967,7 +1001,11 @@ async function refreshStatus() {
     const data = await res.json();
     const hasErrors = data.topology.lastError || data.departures.lastError;
     const hasData = data.topology.fetchedAt && data.departures.fetchedAt;
-    if (hasErrors && !hasData) {
+    if (hasErrors && hasData) {
+      // Есть ошибки подключения, но данные загружены из кеша
+      badge.textContent = t("statusCached", { st: data.topology.stationCount, rt: data.topology.routeCount });
+      badge.className = "status-badge warn";
+    } else if (hasErrors && !hasData) {
       badge.textContent = t("statusErrorConn");
       badge.className = "status-badge error";
     } else if (hasData) {
@@ -1063,8 +1101,19 @@ function computeConflicts(entries, minIntervalMs) {
         // конфликта с curEnd + minIntervalMs. НО нужно учитывать dwellTime cur:
         // курсор = curEnd (уже включает dwell), а не просто effArrival.
         if (next.effArrival >= curEnd + minIntervalMs) break;
-        const isTurnaround = (cur.isTerminus && next.isOrigin) || (next.isTerminus && cur.isOrigin);
-        if (isTurnaround) continue;
+        // Пропускаем: конечная + начальная = оборотный поезд (один физический состав).
+        // Определяем по reverseRouteMap: если routeId одного — это reverseRouteId другого.
+        const isTurnaround =
+          (cur.isTerminus && next.isOrigin) || (next.isTerminus && cur.isOrigin);
+        if (isTurnaround) {
+          // Проверяем что это именно пара (один является обратным другого)
+          const isReversePair =
+            cur.reverseRouteId === next.routeId ||
+            next.reverseRouteId === cur.routeId ||
+            cur.pairedForwardRouteId === next.routeId ||
+            next.pairedForwardRouteId === cur.routeId;
+          if (isReversePair) continue;
+        }
         // Два случая конфликта:
         // 1. Физическое перекрытие стоянки: next приезжает пока cur ещё стоит
         //    → ВСЕГДА конфликт, независимо от minIntervalMs
@@ -1125,7 +1174,14 @@ function buildRulerHtml(pxPerHour) {
   for (let m = 0; m <= 24 * 60; m += tick) {
     const hasLabel = m % label === 0;
     const isHour = m % 60 === 0;
-    html += `<div class="tick ${isHour ? "tick-hour" : "tick-minor"}" style="left:${m * pxPerMin}px">${hasLabel ? formatLocal(m * 60000) : ""}</div>`;
+    // Ось в часовом поясе пользователя: смещаем метки
+    // Позиция тика = UTC позиция m, метка = местное время
+    const tzMin = currentTzOffsetMin();
+    const localM = ((m + tzMin) % (24 * 60) + 24 * 60) % (24 * 60);
+    const hh = String(Math.floor(localM / 60)).padStart(2, "0");
+    const mm2 = String(localM % 60).padStart(2, "0");
+    const tickLabel = hasLabel ? (localM % 60 === 0 ? hh + ":00" : hh + ":" + mm2) : "";
+    html += `<div class="tick ${isHour ? "tick-hour" : "tick-minor"}" style="left:${m * pxPerMin}px">${tickLabel}</div>`;
   }
   return html;
 }
@@ -1265,15 +1321,17 @@ function renderDashboard(data) {
   const minIntervalMs = state.minIntervalMin * 60000;
 
   // Применяем ручные правки и считаем эффективные времена.
-  // Дедупликация: убираем задваивающиеся блоки (одинаковый маршрут+рейс+время)
+  // allProcessed — все записи включая скрытые (нужны для расчёта конфликтов)
+  // processed — только видимые (для отображения блоков)
   const _seenKeys = new Set();
-  const processed = data.entries
+  const allProcessed = data.entries
     .filter((e) => {
       const k = `${e.routeId}:${e.tripOriginMs}:${e.arrivalMs}`;
       if (_seenKeys.has(k)) return false;
       _seenKeys.add(k);
       return true;
     })
+  // .map() продолжается ниже
     .map((e) => {
       const delta = getOverride(e.routeId, e.tripOriginMs);
       const effArrival = normalizeMs(e.arrivalMs + delta);
@@ -1323,7 +1381,27 @@ function renderDashboard(data) {
     })
     .filter((e) => visiblePlatforms.includes(e.effPlatform));
 
-  const { conflictKeys, details } = computeConflicts(processed, minIntervalMs);
+  // Видимые блоки — без скрытых обратных маршрутов
+  const processed = allProcessed.filter(e => !e.hiddenByReverse);
+
+  // Конфликты считаем по ВСЕМ записям (включая скрытые) чтобы
+  // конечная S19 учитывалась при расчёте интервала
+  const allForConflicts = allProcessed.filter(e => visiblePlatforms.includes(e.effPlatform));
+  const { conflictKeys, details } = computeConflicts(allForConflicts, minIntervalMs);
+  // Переносим conflictKeys со скрытых записей на их видимых партнёров
+  for (const e of allProcessed) {
+    if (!e.hiddenByReverse) continue;
+    if (!conflictKeys.has(e.entryKey)) continue;
+    // Ищем видимого партнёра
+    const partner = processed.find(p =>
+      p.routeId === e.pairedForwardRouteId &&
+      p.tripOriginMs === e.pairedForwardTripOriginMs
+    );
+    if (partner) {
+      conflictKeys.add(partner.entryKey);
+      if (details.has(e.entryKey)) details.set(partner.entryKey, details.get(e.entryKey));
+    }
+  }
   state.conflictDetails = details;
   state.currentDashboardEntries = processed;
   state.currentDashboardPlatforms = visiblePlatforms;
@@ -1732,7 +1810,9 @@ document.addEventListener("mouseup", (e) => {
           bumpRouteOverride(dragState.entry.routeId, deltaMs);
         } else {
           const prev = getOverride(dragState.entry.routeId, dragState.entry.tripOriginMs);
-          setOverride(dragState.entry.routeId, dragState.entry.tripOriginMs, prev + deltaMs);
+          const nd = prev + deltaMs;
+          setOverride(dragState.entry.routeId, dragState.entry.tripOriginMs, nd);
+          applyReverseShift(dragState.entry.routeId, dragState.entry.tripOriginMs, nd);
         }
       }
       renderDashboardFromCache();
@@ -1750,7 +1830,9 @@ document.addEventListener("mouseup", (e) => {
         bumpRouteOverride(dragState.routeId, deltaMs);
       } else {
         const prev = getOverride(dragState.routeId, dragState.tripOriginMs);
-        setOverride(dragState.routeId, dragState.tripOriginMs, prev + deltaMs);
+        const nd2 = prev + deltaMs;
+        setOverride(dragState.routeId, dragState.tripOriginMs, nd2);
+        applyReverseShift(dragState.routeId, dragState.tripOriginMs, nd2);
       }
       renderGraphFromCache();
       renderDashboardFromCache();
@@ -1773,6 +1855,13 @@ async function loadSchedule() {
     if (!res.ok) { scheduleMeta.textContent = data.error || "Error"; return; }
     loadArrivals(stationId).catch(() => {});
     state.lastScheduleData = data;
+    // Диагностика пар прямой/обратный
+    const hidden = data.entries.filter(e => e.hiddenByReverse);
+    const paired = data.entries.filter(e => e.pairedForwardRouteId);
+    if (hidden.length || paired.length)
+      console.log('[reverse] скрыто прямых:', hidden.length, '| обратных с парой:', paired.length);
+    else
+      console.log('[reverse] пар не найдено. Уникальных маршрутов:', new Set(data.entries.map(e=>e.routeId)).size);
     updateScheduleMeta();
     renderDashboard(data);
     updateFavoriteBtn();
@@ -1912,7 +2001,30 @@ function renderGraph(data) {
   const totalDistance = data.stations[data.stations.length - 1].distance || 1;
   const TIMELINE_WIDTH = state.graphPxPerHour * 24;
 
-  const yScale = (dist) => topMargin + (dist / totalDistance) * (height - topMargin - bottomMargin);
+  // Минимальное расстояние между соседними станциями на графике
+  const MIN_STATION_GAP_PX = 32;
+  // Вычисляем сырые Y-позиции пропорционально дистанции
+  const rawYPositions = stationsForAxis.map(s =>
+    topMargin + (s.distance / totalDistance) * (height - topMargin - bottomMargin)
+  );
+  // Корректируем: раздвигаем станции если они слишком близко
+  const adjY = [...rawYPositions];
+  for (let i = 1; i < adjY.length; i++) {
+    if (adjY[i] - adjY[i - 1] < MIN_STATION_GAP_PX) {
+      adjY[i] = adjY[i - 1] + MIN_STATION_GAP_PX;
+    }
+  }
+  // yScale теперь ищет позицию станции по дистанции через скорректированный массив
+  const yScale = (dist) => {
+    // Ищем ближайшую станцию по дистанции и берём её скорректированную Y
+    let closest = 0;
+    let minDiff = Infinity;
+    for (let i = 0; i < stationsForAxis.length; i++) {
+      const diff = Math.abs(stationsForAxis[i].distance - dist);
+      if (diff < minDiff) { minDiff = diff; closest = i; }
+    }
+    return adjY[closest];
+  };
   // Подписи станций теперь в graphYPanel (отдельный DOM-элемент слева),
   // поэтому xScale начинается с x=0 (без leftMargin-смещения)
   const xScale = (ms) => (ms / MS_PER_DAY) * TIMELINE_WIDTH;
@@ -1951,7 +2063,10 @@ function renderGraph(data) {
   parts.push(`<g id="graphXAxisLabels">`);
   const { tick: tickMin, label: labelMin } = getTickSteps(state.graphPxPerHour);
   const pxPerMinGraph = state.graphPxPerHour / 60;
+  const _tzMinG = currentTzOffsetMin();
   for (let m = 0; m <= 24 * 60; m += tickMin) {
+    // Позиция тика = UTC позиция, метка = локальное время
+    const localMG = ((m + _tzMinG) % (24 * 60) + 24 * 60) % (24 * 60);
     const x = m * pxPerMinGraph;
     const isHour = m % 60 === 0;
     parts.push(`<line class="graph-gridline ${isHour ? "" : "graph-gridline-minor"}" x1="${x}" y1="${topMargin - 10}" x2="${x}" y2="${height - bottomMargin}"></line>`);
@@ -2038,6 +2153,8 @@ function renderGraph(data) {
 
   parts.push("</svg>");
   graphWrap.innerHTML = parts.join("");
+  // Ограничиваем высоту graphWrap высотой SVG чтобы скролл не уходил дальше
+  graphWrap.style.maxHeight = height + "px";
   state.graphTripRefs = tripRefs;
   if (!state._graphScrolled) {
     state._graphScrolled = true;
@@ -2059,6 +2176,7 @@ function renderGraph(data) {
     graphYPanel.innerHTML = yPanelParts.join("");
     graphYPanel.style.width = PANEL_W + "px";
     graphYPanel.style.minWidth = PANEL_W + "px";
+    graphYPanel.style.maxHeight = height + "px";
     // Синхронизация вертикального скролла Y-панели и основного графика
     let _ySync = false;
     graphWrap.addEventListener("scroll", () => {
@@ -2095,7 +2213,7 @@ function renderGraph(data) {
         <span class="dot" style="background:${r.color}"></span>
         ${escapeHtml(r.routeName)}${r.routeNumber ? " · " + escapeHtml(r.routeNumber) : ""}
         ${r.direction === "backward" ? `<span class="dir-tag">${escapeHtml(t("directionBackwardShort"))}</span>` : ""}
-        (${r.tripCount} ${escapeHtml(t("tripsPerDay"))})
+        (${r.tripCount} ${escapeHtml(t("tripsPerDay", {n: r.tripCount}))})
         <span class="info-btn" data-route-info="${r.routeId}" title="${escapeHtml(t("modalStops"))}">ⓘ</span>
       </div>`;
     })
@@ -2122,7 +2240,6 @@ function renderGraph(data) {
 graphWrap.addEventListener("mousedown", (e) => {
   const target = e.target.closest(".graph-trip-hit");
   if (!target) return;
-  e.preventDefault();
   const refIdx = Number(target.dataset.tref);
   const ref = state.graphTripRefs[refIdx];
   if (!ref) return;
@@ -2182,6 +2299,15 @@ function applyRouteFilters() {
   if (typeFilter !== "all") filtered = filtered.filter((r) => r.type === typeFilter);
   if (sourceFilter === "real") filtered = filtered.filter((r) => !r.isDraft);
   if (sourceFilter === "draft") filtered = filtered.filter((r) => r.isDraft);
+  // Скрываем черновики у которых ни одна остановка не найдена на текущем сервере
+  if (state.stations.length > 0) {
+    const stationIds = new Set(state.stations.map(s => s.id));
+    filtered = filtered.filter(r => {
+      if (!r.isDraft) return true; // реальные маршруты всегда показываем
+      if (!r.stops || r.stops.length === 0) return true; // черновик без остановок — показываем
+      return r.stops.some(s => stationIds.has(s.stationId));
+    });
+  }
   filtered = fuzzyFilterAndSort(filtered, query, (r) => `${r.name} ${r.number || ""}`);
   if (state.routeSort.key) {
     const { key, dir } = state.routeSort;
@@ -2243,6 +2369,7 @@ function renderRouteList(routes) {
       e.stopPropagation();
       const res = await fetch(`/api/drafts/${btn.dataset.editDraft}`);
       const d = await res.json();
+      closeRouteModal();
       openDraftForm(d);
     });
   });
@@ -2303,6 +2430,27 @@ async function openRouteModal(routeId) {
     const detail = await detailRes.json();
     if (!detailRes.ok) { document.getElementById("routeModalBody").innerHTML = `<p>${escapeHtml(detail.error)}</p>`; return; }
     const timetable = timetableRes.ok ? await timetableRes.json() : null;
+    // Загружаем arrivals для схемы состава (async, не блокируем рендер)
+    if (detail?.stops?.length > 0) {
+      const firstStId = detail.stops[0].stationId;
+      loadArrivals(firstStId).then(() => {
+        const diagramWrap = document.querySelector(".train-diagram-wrap");
+        if (!diagramWrap) {
+          const cars2 = _carsCache.get(detail.number);
+          const n = cars2 ? cars2.length : null;
+          if (n) {
+            const svgHtml = buildTrainDiagramSvg(detail.number || detail.name, detail.type, n, "#ffffff", cars2);
+            const h4stops = document.querySelector("#routeModalBody h4[data-stops-header]") ||
+              Array.from(document.querySelectorAll("#routeModalBody h4"))[0];
+            if (h4stops && svgHtml) {
+              const div = document.createElement("div");
+              div.innerHTML = svgHtml;
+              h4stops.parentNode.insertBefore(div.firstChild, h4stops);
+            }
+          }
+        }
+      }).catch(() => {});
+    }
     // Вычисляем конфликты с учётом ручных правок (overrides):
     // серверный endpoint не знает о drag-сдвигах, поэтому считаем на фронтенде.
     // Для каждой станции маршрута загружаем её расписание и ищем конфликты.
@@ -2384,18 +2532,22 @@ function buildLiveTripsSection(routeId, lang) {
          </span>`;
     // arrival — epoch ms → мс от полуночи → formatLocal
     const arrivalOfDay = t.tripOriginApproxMs;
+    const carHtml = t.carCount != null
+      ? `<span title="${lang === "ru" ? "Вагонов" : "Cars"}">${"🚃".repeat(Math.min(t.carCount, 8))} ${t.carCount}</span>`
+      : "—";
     return `<tr>
       <td><b>#${t.departureIndex}</b></td>
-      <td>${formatLocal(arrivalOfDay)}</td>
+      <td>${formatUtc(arrivalOfDay)}</td>
       <td>${escapeHtml(t.platformName || "—")}</td>
+      <td>${carHtml}</td>
       <td>${devHtml}</td>
     </tr>`;
   }).join("");
 
   const h = lang === "ru" ? "Активные поезда (live)" : "Active trains (live)";
   const cols = lang === "ru"
-    ? ["Рейс", "Прибытие", "Платформа", "Задержка"]
-    : ["Trip", "Arrival", "Platform", "Delay"];
+    ? ["Рейс", "Прибытие", "Платформа", "Состав", "Задержка"]
+    : ["Trip", "Arrival", "Platform", "Consist", "Delay"];
   return `
     <h4>🔴 ${h}</h4>
     <div class="timetable-scroll-wrap">
@@ -2404,6 +2556,129 @@ function buildLiveTripsSection(routeId, lang) {
         <tbody>${rows}</tbody>
       </table>
     </div>`;
+}
+
+
+// Генерирует SVG-схему состава поезда (минималистичный стиль)
+function buildTrainDiagramSvg(routeName, routeType, carCount, color, cars) {
+  if (!carCount || carCount < 1) return "";
+
+  function getCarType(idx) {
+    if (cars && cars[idx]) {
+      const vid = (cars[idx].vehicleId || "").toLowerCase();
+      // Головной: cab_foward (опечатка в MTR API), cab_forward, cab_1, cab_cab_1
+      if (vid.includes("cab_foward") || vid.includes("cab_forward") ||
+          vid.endsWith("_cab_1") || vid.endsWith("_cab_foward") ||
+          vid.endsWith("_cab_open_1") || vid.includes("head_front")) return "head";
+      // Хвостовой: cab_backward, cab_2, cab_open_2
+      if (vid.includes("cab_backward") ||
+          vid.endsWith("_cab_2") || vid.endsWith("_cab_backward") ||
+          vid.endsWith("_cab_open_2") || vid.includes("head_rear")) return "tail";
+      // Локомотив
+      if (vid.includes("locomotive")) return "loco";
+      // Промежуточные: carriage, trailer, scarriage, panto и т.д.
+      return "middle";
+    }
+    // Fallback по имени маршрута
+    const n = (routeName || "").toLowerCase();
+    const isICE = /ice/i.test(routeName || "");
+    const isEMU = /s[0-9]|s-bahn|sbahn|metro|u-bahn|ubahn|stadtbahn|tram/i.test(n);
+    const hasLoco = !isICE && !isEMU && /\bic\b|\brb\b|\bre\b|flixtrain|flx|irex|jnr/i.test(routeName || "");
+    if (idx === 0 && hasLoco) return "loco";
+    if (idx === 0) return "head";
+    if (idx === carCount - 1) return "tail";
+    return "middle";
+  }
+
+  const W = 44, H = 22, GAP = 2, NOSE = 10, PAD = 12;
+  const totalW = carCount * W + (carCount - 1) * GAP + PAD * 2;
+  const PANTO_H = 14; // высота пантографа над крышей
+  const totalH = PANTO_H + H + 14; // сверху место для пантографа
+  const p = [];
+
+  p.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + totalW + '" height="' + totalH + '" style="display:block">');
+
+  for (let i = 0; i < carCount; i++) {
+    const x = PAD + i * (W + GAP), y = PANTO_H + 2; // сдвиг вниз под пантограф
+    const type = getCarType(i);
+
+    if (type === "loco") {
+      // Локомотив: 6-угольник — верх скошен (NOSE), нижние скосы у самого дна
+      const BN = 5; // нижний скос
+      const CUT = Math.round(H * 0.78); // где начинаются нижние скосы (78% высоты)
+      const lpath =
+        "M" + (x+NOSE) + " " + y +
+        " L" + (x+W-NOSE) + " " + y +
+        " L" + (x+W) + " " + (y+CUT) +
+        " L" + (x+W-BN) + " " + (y+H) +
+        " L" + (x+BN) + " " + (y+H) +
+        " L" + x + " " + (y+CUT) +
+        " Z";
+      p.push('<path d="' + lpath + '" fill="#e8e8e8" stroke="#bbb" stroke-width="1"/>');
+      // Полоса крыши как у обычных вагонов
+      p.push('<line x1="' + (x+NOSE) + '" y1="' + (y+1) + '" x2="' + (x+W-NOSE) + '" y2="' + (y+1) + '" stroke="#aaa" stroke-width="2"/>');
+      // Вент-блок (вместо окон)
+      const vx = x+NOSE+2, vw = W-NOSE*2-4, vy = y+6, vh = 8;
+      if (vw > 4) {
+        p.push('<rect x="' + vx + '" y="' + vy + '" width="' + vw + '" height="' + vh + '" rx="1" fill="#b0b4b8" stroke="#8a9099" stroke-width="0.6"/>');
+        const vm = vy + Math.round(vh/2);
+        p.push('<line x1="' + vx + '" y1="' + vm + '" x2="' + (vx+vw) + '" y2="' + vm + '" stroke="#8a9099" stroke-width="0.5"/>');
+        if (vw > 16) {
+          p.push('<line x1="' + (vx+Math.round(vw/3)) + '" y1="' + vy + '" x2="' + (vx+Math.round(vw/3)) + '" y2="' + (vy+vh) + '" stroke="#9098a0" stroke-width="0.4"/>');
+          p.push('<line x1="' + (vx+Math.round(vw*2/3)) + '" y1="' + vy + '" x2="' + (vx+Math.round(vw*2/3)) + '" y2="' + (vy+vh) + '" stroke="#9098a0" stroke-width="0.4"/>');
+        }
+      }
+      // Ромб-пантограф: правильный ромб (вариант А)
+      const pmx = x + W/2;
+      const pmBot = y - 1;   // нижний угол
+      const pmTop = pmBot - 10; // верхний (меньше высота)
+      const pmMid = pmBot - 5;  // середина (плоский ромб)
+      const pmW = 8;            // полуширина
+      p.push('<polygon points="' + pmx + ',' + pmTop + ' ' + (pmx+pmW) + ',' + pmMid + ' ' + pmx + ',' + pmBot + ' ' + (pmx-pmW) + ',' + pmMid + '" fill="none" stroke="#888" stroke-width="1.4" stroke-linejoin="round"/>');
+      p.push('<line x1="' + pmx + '" y1="' + pmBot + '" x2="' + pmx + '" y2="' + y + '" stroke="#888" stroke-width="1" stroke-linecap="round"/>');
+    } else {
+      // Обычные вагоны: head/tail/middle
+      let path;
+      if (type === "head") {
+        path = "M" + (x+NOSE) + " " + y + " L" + (x+W) + " " + y + " L" + (x+W) + " " + (y+H) + " L" + x + " " + (y+H) + " Z";
+      } else if (type === "tail") {
+        path = "M" + x + " " + y + " L" + (x+W-NOSE) + " " + y + " L" + (x+W) + " " + (y+H) + " L" + x + " " + (y+H) + " Z";
+      } else {
+        path = "M" + x + " " + y + " L" + (x+W) + " " + y + " L" + (x+W) + " " + (y+H) + " L" + x + " " + (y+H) + " Z";
+      }
+      p.push('<path d="' + path + '" fill="#e8e8e8" stroke="#bbb" stroke-width="1"/>');
+      // Полоса крыши
+      const rx1 = type === "head" ? x+NOSE : x+1;
+      const rx2 = type === "tail" ? x+W-NOSE : x+W-1;
+      p.push('<line x1="' + rx1 + '" y1="' + (y+1) + '" x2="' + rx2 + '" y2="' + (y+1) + '" stroke="#aaa" stroke-width="2"/>');
+      // Окна
+      const winH = 7, winY = y + 7;
+      const bStart = type === "head" ? x+NOSE+2 : x+2;
+      const bEnd = type === "tail" ? x+W-NOSE-2 : x+W-2;
+      const bW = bEnd - bStart;
+      const wCount = Math.max(1, Math.floor(bW / 12));
+      const twW = wCount * 9 + (wCount - 1) * 3;
+      const wStartX = bStart + (bW - twW) / 2;
+      for (let w = 0; w < wCount; w++) {
+        const wx = wStartX + w * 12;
+        p.push('<rect x="' + wx + '" y="' + winY + '" width="9" height="' + winH + '" rx="1.5" fill="#2a3a4a" stroke="#1a2a3a" stroke-width="0.5"/>');
+      }
+      // Пантограф для вагонов с panto в vehicleId
+      const hasPanto = cars && cars[i] && (cars[i].vehicleId || "").toLowerCase().includes("panto");
+      if (hasPanto) {
+        const pmx2 = x + W/2;
+        const pb2 = y - 1, pt2 = pb2 - 10, pm2 = pb2 - 5, pw2 = 7;
+        p.push('<polygon points="' + pmx2 + ',' + pt2 + ' ' + (pmx2+pw2) + ',' + pm2 + ' ' + pmx2 + ',' + pb2 + ' ' + (pmx2-pw2) + ',' + pm2 + '" fill="none" stroke="#888" stroke-width="1.4" stroke-linejoin="round"/>');
+        p.push('<line x1="' + pmx2 + '" y1="' + pb2 + '" x2="' + pmx2 + '" y2="' + y + '" stroke="#888" stroke-width="1" stroke-linecap="round"/>');
+      }
+    }
+  }
+
+  // Одна линия рельса
+  const railY = PANTO_H + 2 + H + 5;
+  p.push('<line x1="' + (PAD-4) + '" y1="' + railY + '" x2="' + (totalW-PAD+4) + '" y2="' + railY + '" stroke="#555" stroke-width="2" stroke-linecap="round"/>');
+  p.push('</svg>');
+  return '<div class="train-diagram-wrap">' + p.join("") + '</div>';
 }
 
 function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
@@ -2428,6 +2703,14 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
       <li><span class="meta-label">${t("modalType")}:</span> ${escapeHtml(data.type || "—")}</li>
       <li><span class="meta-label">${t("modalDepots")}:</span> ${escapeHtml((data.depots || []).join(", ") || "—")}</li>
       <li><span class="meta-label">${t("modalActiveTrips")}:</span> ${data.activeTripCount}</li>
+      ${(() => {
+        const trips = _depIdxCache.get(data.id);
+        const counts = trips ? [...new Set(trips.filter(t=>t.carCount!=null).map(t=>t.carCount))] : [];
+        if (counts.length === 0) return "";
+        const label = currentLang() === "ru" ? "Вагонов в составе" : "Cars per train";
+        const val = counts.length === 1 ? counts[0] : counts.join(" / ");
+        return `<li><span class="meta-label">${label}:</span> ${val}</li>`;
+      })()}
       <li><span class="meta-label">${t("modalTotalDuration")}:</span> ${formatMinutesShort((data.totalDurationMs / 60000).toFixed(1))}</li>
       <li><span class="meta-label">${t("modalTotalDwell")}:</span> ${formatMinutesShort((data.totalDwellMs / 60000).toFixed(1))}</li>
     </ul>`;
@@ -2444,13 +2727,13 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
         const tripConflictStations = conflictedTrips.get ? conflictedTrips.get(trip.tripOriginMs) : null;
         const hasAnyConflict = tripConflictStations && tripConflictStations.size > 0;
         const removeBtn = data.isDraft
-          ? `<button class="col-remove-btn" data-remove-departure="${trip.tripOriginMs}" title="${escapeHtml(t("removeColumn"))}">×</button>`
+          ? `<button class="col-remove-btn" data-remove-departure="${trip.originalDepartureMs ?? trip.tripOriginMs}" title="${escapeHtml(t("removeColumn"))}">×</button>`
           : "";
         // departureIndex = порядковый номер рейса за сутки UTC, начиная с 0.
         // trips[] уже отсортированы по tripOriginMs (мс от полуночи UTC),
         // поэтому i напрямую соответствует departureIndex из MTR.
         const tripLabel = `#${i + 1}`;
-        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}${tripLabel}<br>${formatLocal(effMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
+        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}${tripLabel}<br>${formatUtc(effMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
       })
       .join("");
     const addColHeader = data.isDraft
@@ -2473,7 +2756,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
             const effMs = normalizeMs(baseMs + delta);
             const cellHasConflict = conflictedTrips.get ? conflictedTrips.get(trip.tripOriginMs)?.has(st.stationId) : false;
             const cellIcon = cellHasConflict ? `<span class="tt-conflict-icon" title="${escapeHtml(t("conflictLabel"))}">!</span>` : "";
-            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${effMs}" style="cursor:pointer">${cellIcon}${formatLocal(effMs)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
+            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${effMs}" style="cursor:pointer">${cellIcon}${formatUtc(effMs)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
           })
           .join("");
         return `<tr><td class="station-col" data-goto-station="${escapeHtml(st.stationId)}">${escapeHtml(st.stationName)}</td>${cells}</tr>`;
@@ -2513,7 +2796,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
           ${hasAnyOverrideForRoute(data.id) ? `<button class="secondary-btn danger-btn" id="resetRouteEditsBtn" data-i18n="resetRouteEdits">Сбросить правки</button>` : ""}
         `}
         <button class="icon-btn" id="toggleFavoriteRouteBtn" style="font-size:18px;" title="">☆</button>
-        <button class="secondary-btn" id="reverseRouteBtn" data-i18n="openReverseRoute">Обратный маршрут</button>
+        <button class="secondary-btn" id="reverseRouteBtn">${t("openReverseRoute")}</button>
       </div>
       <div class="modal-toolbar-right">
         <div class="dropdown-wrap">
@@ -2527,7 +2810,12 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     </div>
     ${metaList}
     ${buildLiveTripsSection(data.id, currentLang())}
-    <h4>${t("modalStops")}</h4>
+    ${(() => {
+      const cars = _carsCache.get(data.number) || null;
+      const n = cars ? cars.length : null;
+      return buildTrainDiagramSvg(data.number || data.name, data.type, n, "#ffffff", cars);
+    })()}
+    <h4 data-stops-header="1">${t("modalStops")}</h4>
     <table>
       <thead><tr><th>#</th><th>${t("colStation")}</th><th>${t("colPlatform")}</th><th>${t("colDwell")}</th><th>${t("colNext")}</th><th>${t("colCoords")}</th></tr></thead>
       <tbody>${stopsRows}</tbody>
@@ -2691,43 +2979,59 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
   if (reverseBtn) {
     reverseBtn.disabled = true;
     reverseBtn.style.opacity = "0.4";
-    const myDepotSet = new Set(data.depots || []);
     const myStations = (data.stops || []).map(s => s.stationId);
-    const myStationsRev = [...myStations].reverse();
-    // Первичный фильтр по доступным полям в state.routes
+    if (myStations.length < 2) return;
+    const myFirst = myStations[0];
+    const myLast = myStations[myStations.length - 1];
+    const mySet = new Set(myStations);
+
+    // Кандидаты: тот же тип, другой маршрут, не черновик
+    // НЕ фильтруем по цвету — у пар маршрутов цвет может совпадать или нет
     const candidates = state.routes
       .filter(r => r.id !== data.id && !r.isDraft && r.type === data.type)
-      .filter(r => (data.color && r.color === data.color) || (data.number && r.number === data.number))
-      .sort((a, b) => {
-        // Предпочитаем совпадение по номеру над совпадением по цвету
-        const an = data.number && a.number === data.number ? 1 : 0;
-        const bn = data.number && b.number === data.number ? 1 : 0;
-        return bn - an;
-      })
-      .slice(0, 5);
+      .slice(0, 20);
     if (candidates.length === 0) return;
-    // Загружаем detail каждого кандидата и проверяем депо + станции
+
     (async () => {
+      // Собираем баллы для каждого кандидата
+      const scored = [];
       for (const cand of candidates) {
         try {
           const det = await fetch(`/api/routes/${cand.id}`).then(r => r.json());
+          const cs = (det.stops || []).map(s => s.stationId);
+          if (cs.length < 2) continue;
+
+          let score = 0;
+          // Главный признак: первая и последняя станции поменялись местами
+          if (cs[0] === myLast && cs[cs.length - 1] === myFirst) score += 100;
+          else if (cs[0] === myLast || cs[cs.length - 1] === myFirst) score += 30;
+          else continue; // нет ни одного совпадения — пропускаем
+
+          // Бонус: общие станции (в любом порядке)
+          const csSet = new Set(cs);
+          const commonCount = [...mySet].filter(s => csSet.has(s)).length;
+          score += commonCount * 2;
+
+          // Бонус: совпадение депо
+          const myDepots = new Set(data.depots || []);
           const candDepots = new Set(det.depots || []);
-          // Депо должно совпадать — это главный критерий
-          const depotMatch = myDepotSet.size > 0 && [...myDepotSet].some(d => candDepots.has(d));
-          if (!depotMatch) continue;
-          // Станции должны идти в обратном порядке (хотя бы половина)
-          const candStations = (det.stops || []).map(s => s.stationId);
-          const revOverlap = myStationsRev.filter((sid, i) => candStations[i] === sid).length;
-          const minOverlap = Math.max(1, Math.floor(myStations.length * 0.4));
-          if (revOverlap < minOverlap) continue;
-          // Нашли — включаем кнопку
-          reverseBtn.disabled = false;
-          reverseBtn.style.opacity = "";
-          reverseBtn.addEventListener("click", () => openRouteModal(cand.id));
-          return;
+          if ([...myDepots].some(d => candDepots.has(d))) score += 20;
+
+          // Штраф: цвет не совпадает (но не блокируем)
+          if (data.color && det.color && det.color !== data.color) score -= 10;
+
+          scored.push({ id: cand.id, score });
         } catch {}
       }
-      // Ни один кандидат не прошёл проверку — кнопка остаётся disabled
+
+      if (scored.length === 0) return;
+      scored.sort((a, b) => b.score - a.score);
+      const best = scored[0];
+      if (best.score >= 30) {
+        reverseBtn.disabled = false;
+        reverseBtn.style.opacity = "";
+        reverseBtn.onclick = () => openRouteModal(best.id);
+      }
     })();
   }
 
@@ -2828,23 +3132,63 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
   });
   const addColBtn = document.getElementById("addDepartureColBtn");
   if (addColBtn) {
-    addColBtn.addEventListener("click", async () => {
-      const input = prompt(t("addColumnPrompt"), "08:00");
-      if (!input) return;
-      const m = input.trim().match(/^(\d{1,2}):(\d{2})$/);
-      if (!m) { alert(t("addColumnInvalid")); return; }
-      const hh = Number(m[1]), mm = Number(m[2]);
-      if (hh > 23 || mm > 59) { alert(t("addColumnInvalid")); return; }
-      const localMs = (hh * 60 + mm) * 60000;
-      const newTimeMs = normalizeMs(localMs - currentTzOffsetMin() * 60000);
-      const fullDraft = await (await fetch(`/api/drafts/${data.id}`)).json();
-      const updated = [...fullDraft.departureTimesOfDayMs, newTimeMs];
-      const res = await fetch(`/api/drafts/${data.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...fullDraft, departureTimesOfDayMs: updated }),
+    addColBtn.addEventListener("click", () => {
+      // Добавляем inline-столбец в таблицу расписания (timetable-matrix)
+      const timetableTable = document.querySelector("#routeModalBody .timetable-matrix");
+      const thead = timetableTable?.querySelector("thead tr");
+      const tbody = timetableTable?.querySelector("tbody");
+      if (!thead || !tbody) return;
+
+      // Создаём заголовок с полем ввода
+      const newTh = document.createElement("th");
+      newTh.style.minWidth = "80px";
+      newTh.innerHTML = '<input type="time" id="newDepartureInput" style="width:72px;font-size:12px;background:var(--input);border:1px solid var(--accent);border-radius:4px;color:var(--fg);padding:2px 4px;" placeholder="HH:MM" autofocus>';
+      // Вставляем перед последним th (кнопка +)
+      thead.insertBefore(newTh, thead.lastElementChild);
+
+      // В каждую строку tbody добавляем пустую ячейку
+      for (const tr of tbody.rows) {
+        const td = document.createElement("td");
+        td.style.color = "var(--muted)";
+        td.textContent = "—";
+        tr.insertBefore(td, tr.lastElementChild);
+      }
+
+      const input = newTh.querySelector("input");
+      input.focus();
+
+      async function commitNewDeparture() {
+        const val = input.value;
+        if (!val) {
+          // Отмена — убираем добавленные ячейки
+          newTh.remove();
+          for (const tr of tbody.rows) tr.cells[tr.cells.length - 2]?.remove();
+          return;
+        }
+        const m = val.match(/^(\d{1,2}):(\d{2})$/);
+        if (!m) return;
+        const hh = Number(m[1]), mm = Number(m[2]);
+        if (hh > 23 || mm > 59) return;
+        // Время в таблице показывается как UTC — сохраняем напрямую без смещения
+        const newTimeMs = (hh * 60 + mm) * 60000;
+        const fullDraft = await (await fetch(`/api/drafts/${data.id}`)).json();
+        const updated = [...(fullDraft.departureTimesOfDayMs || []), newTimeMs].sort((a, b) => a - b);
+        const res = await fetch(`/api/drafts/${data.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...fullDraft, departureTimesOfDayMs: updated }),
+        });
+        if (res.ok) openRouteModal(data.id);
+      }
+
+      input.addEventListener("change", commitNewDeparture);
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { input.blur(); commitNewDeparture(); }
+        if (e.key === "Escape") {
+          newTh.remove();
+          for (const tr of tbody.rows) tr.cells[tr.cells.length - 2]?.remove();
+        }
       });
-      if (res.ok) openRouteModal(data.id);
     });
   }
   // Применяем переводы к кнопкам которые были созданы динамически через innerHTML
@@ -3173,7 +3517,106 @@ function buildTzOptions() {
   return opts;
 }
 
+const DEFAULT_SERVER = "http://localhost:8888";
+
+function getServerList() {
+  const list = settings.serverList || [];
+  return list.includes(DEFAULT_SERVER) ? list : [DEFAULT_SERVER, ...list];
+}
+
+function renderServerList() {
+  const sel = document.getElementById("serverListSelect");
+  if (!sel) return;
+  const list = getServerList();
+  const active = settings.serverUrl || DEFAULT_SERVER;
+  sel.innerHTML = list.map(url =>
+    '<option value="' + escapeHtml(url) + '" ' + (url === active ? 'selected' : '') + '>' + escapeHtml(url) + '</option>'
+  ).join("");
+}
+
 function initSettingsUI() {
+  // ── Список серверов MTR ─────────────────────────────────────────────
+  const serverListSelect = document.getElementById("serverListSelect");
+  const serverUrlInput = document.getElementById("serverUrlInput");
+  const serverUrlAddBtn = document.getElementById("serverUrlAddBtn");
+  const serverUrlRemoveBtn = document.getElementById("serverUrlRemoveBtn");
+  const serverUrlHint = document.getElementById("serverUrlHint");
+
+  // renderServerList и getServerList определены глобально
+
+  async function applyServerUrl(url) {
+    try {
+      const res = await fetch("/api/server-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      settings.serverUrl = url;
+      savePrefsToServer();
+      if (serverUrlHint) { serverUrlHint.textContent = t("serverUrlSaved"); serverUrlHint.style.color = "var(--green)"; }
+      setTimeout(async () => {
+        // Сбрасываем кеш станций перед загрузкой с нового сервера
+        state.stations = [];
+        state.routes = [];
+        state.lastScheduleData = null;
+        await loadStations();
+        if (state.stations.length > 0) loadSchedule();
+        if (serverUrlHint) { serverUrlHint.textContent = ""; serverUrlHint.style.color = ""; }
+      }, 1500);
+    } catch (e) {
+      if (serverUrlHint) { serverUrlHint.textContent = t("serverUrlError") + ": " + e.message; serverUrlHint.style.color = "var(--red)"; }
+    }
+  }
+
+  renderServerList();
+
+  if (serverListSelect && !serverListSelect._hasListener) {
+    serverListSelect._hasListener = true;
+    serverListSelect.addEventListener("change", () => { applyServerUrl(serverListSelect.value); });
+  }
+  if (serverUrlAddBtn && !serverUrlAddBtn._hasListener) {
+    serverUrlAddBtn._hasListener = true;
+    serverUrlAddBtn.addEventListener("click", async () => {
+      const url = serverUrlInput?.value?.trim();
+      if (!url) return;
+      const list = settings.serverList || [];
+      if (!list.includes(url) && url !== DEFAULT_SERVER) settings.serverList = [...list, url];
+      await applyServerUrl(url);
+      renderServerList();
+      if (serverUrlInput) serverUrlInput.value = "";
+    });
+  }
+  if (serverUrlRemoveBtn && !serverUrlRemoveBtn._hasListener) {
+    serverUrlRemoveBtn._hasListener = true;
+    serverUrlRemoveBtn.addEventListener("click", () => {
+      const selected = serverListSelect?.value;
+      if (!selected || selected === DEFAULT_SERVER) return;
+      settings.serverList = (settings.serverList || []).filter(u => u !== selected);
+      applyServerUrl(DEFAULT_SERVER);
+      renderServerList();
+      savePrefsToServer();
+    });
+  }
+
+  // ── Версия приложения ────────────────────────────────────────────
+  const appVersionEl = document.getElementById("appVersionLabel");
+  if (appVersionEl) {
+    fetch("/api/status").then(r => r.json()).then(d => {
+      appVersionEl.textContent = d.version ? `v${d.version}` : "";
+    }).catch(() => {});
+  }
+  const checkUpdateBtn = document.getElementById("checkUpdateBtn");
+  if (checkUpdateBtn) {
+    checkUpdateBtn.addEventListener("click", () => {
+      if (window.electronAPI?.checkForUpdates) {
+        window.electronAPI.checkForUpdates();
+      } else {
+        window.open("https://github.com/kk-prod-dev/MTR-Schedule-manager/releases", "_blank");
+      }
+    });
+  }
+
   const langSelect = document.getElementById("languageSelect");
   const tzSelect = document.getElementById("timezoneSelect");
 
@@ -3214,17 +3657,21 @@ function initSettingsUI() {
 
 function refreshAllViews() {
   applyI18n();
-  initSettingsUI(); // переотрисовать подписи селектов на новом языке
+  if (document.getElementById("serverListSelect")) renderServerList();
+  initSettingsUI();
   renderInstructions();
   refreshStatus();
   document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
-  renderDashboardFromCache();
-  updateScheduleMeta();
-  renderGraphFromCache();
-  if (state.routes.length) { populateRouteTypeFilter(); applyRouteFilters(); }
-  if (state.lastRouteDetail && routeModalOverlay.style.display !== "none") {
-    renderRouteModal(state.lastRouteDetail, state.lastRouteTimetable, state.lastRouteRawDraft, state.lastRouteConflictedTrips);
-  }
+  // Тяжёлые операции — откладываем чтобы не блокировать UI
+  setTimeout(() => {
+    renderDashboardFromCache();
+    updateScheduleMeta();
+    renderGraphFromCache();
+    if (state.routes.length) { populateRouteTypeFilter(); applyRouteFilters(); }
+    if (state.lastRouteDetail && routeModalOverlay.style.display !== "none") {
+      renderRouteModal(state.lastRouteDetail, state.lastRouteTimetable, state.lastRouteRawDraft, state.lastRouteConflictedTrips);
+    }
+  }, 0);
 }
 
 // ============================================================
@@ -3239,8 +3686,8 @@ const INSTRUCTIONS = [
   { id: "route-card" },
   { id: "drafts" },
   { id: "problems" },
-  { id: "notifications" },
   { id: "settings" },
+  { id: "schedule_formula" },
 ];
 
 function renderInstructions() {
@@ -3285,9 +3732,79 @@ function _shouldPollArrivals() {
   return !_pollPaused && !!state.currentStationId;
 }
 
+// Сохраняем настройки при закрытии окна (sendBeacon работает даже при выгрузке страницы)
+// Сохранение при закрытии через ipcRenderer (Electron) или XHR sync (браузер)
+function buildPrefsPayload() {
+  return JSON.stringify({
+    favorites, favoriteRoutes,
+    langMode: settings.langMode,
+    tzMode: settings.tzMode,
+    serverTzOffsetMin: settings.serverTzOffsetMin,
+    minIntervalMin: state.minIntervalMin,
+    overridesV2: overridesList,
+    routeOverrides: routeOverridesMap,
+    platformOverrides: platformOverridesMap,
+    notifConflict: settings.notifConflict,
+    notifOnlyFav: settings.notifOnlyFav,
+    notifDelay: settings.notifDelay,
+    delayThresholdMin: settings.delayThresholdMin,
+    serverUrl: settings.serverUrl,
+    serverList: settings.serverList || [],
+  });
+}
+window.addEventListener("beforeunload", () => {
+  const payload = buildPrefsPayload();
+  // В Electron — через contextBridge API (надёжнее)
+  if (window.electronAPI?.savePrefsSync) {
+    try { window.electronAPI.savePrefsSync(payload); } catch {}
+  }
+  // Fallback: синхронный XHR
+  try {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/prefs", false);
+    xhr.setRequestHeader("Content-Type", "application/json");
+    xhr.send(payload);
+  } catch {}
+});
+
+
+// Показ changelog при обновлении
+function showChangelogModal(version, notes) {
+  var lang = currentLang();
+  var text = (typeof notes === "object" ? notes[lang] || notes["en"] || notes["ru"] : notes) || "";
+  var overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px";
+  var modal = document.createElement("div");
+  modal.style.cssText = "background:var(--panel);border:1px solid var(--border);border-radius:12px;max-width:560px;width:100%;max-height:80vh;overflow-y:auto;padding:28px;position:relative";
+  var html = text.split("\n").map(function(line) {
+    if (line.startsWith("## ")) return "<h2 style=\"margin:0 0 12px;font-size:17px\">" + line.slice(3) + "</h2>";
+    if (line.startsWith("### ")) return "<h3 style=\"margin:10px 0 4px;font-size:13px;color:var(--accent)\">" + line.slice(4) + "</h3>";
+    if (line.startsWith("**") && line.endsWith("**") && line.length > 4) return "<p style=\"margin:8px 0 2px;font-weight:600;font-size:13px\">" + line.slice(2,-2) + "</p>";
+    if (line.trim() === "") return "<br>";
+    return "<p style=\"margin:0 0 3px;font-size:12px;color:var(--muted)\">" + line + "</p>";
+  }).join("");
+  modal.innerHTML = "<button onclick=\"this.closest(\'[data-cl]\').remove()\" style=\"position:absolute;top:12px;right:12px;background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer\">\u2715</button>"
+    + "<div style=\"font-size:11px;color:var(--accent);font-weight:700;margin-bottom:8px;letter-spacing:1px\">v" + version + "</div>"
+    + "<div>" + html + "</div>"
+    + "<div style=\"margin-top:20px;text-align:right\"><button onclick=\"this.closest(\'[data-cl]\').remove()\" style=\"background:var(--accent);color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer\">OK</button></div>";
+  overlay.setAttribute("data-cl","1");
+  overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+  overlay.addEventListener("click", function(e) { if (e.target === overlay) overlay.remove(); });
+}
+if (window.electronAPI && window.electronAPI.onChangelog) {
+  window.electronAPI.onChangelog(function(d) { showChangelogModal(d.version, d.notes); });
+}
+
+
 (async function init() {
   // Сначала загружаем сохранённые настройки (язык, часовой пояс и т.д.),
   // затем применяем i18n — иначе язык сбрасывается на системный при каждом запуске.
+  // Проверяем pending-changelog
+  try {
+    var _clr = await fetch("/api/pending-changelog");
+    if (_clr.ok) { var _cl = await _clr.json(); if (_cl && _cl.version) setTimeout(function(){ showChangelogModal(_cl.version, _cl.translations || _cl.notes); }, 800); }
+  } catch(_cle) {}
   await loadPrefsFromServer();
   try { applyI18n(); } catch (e) { console.error("applyI18n failed:", e); }
   try { initSettingsUI(); } catch (e) { console.error("initSettingsUI failed:", e); }
@@ -3400,6 +3917,8 @@ async function savePrefsToServer() {
         overridesV2: overridesList,
         routeOverrides: routeOverridesMap,
         platformOverrides: platformOverridesMap,
+        serverUrl: settings.serverUrl,
+        serverList: settings.serverList || [],
       }),
     });
   } catch (e) { console.warn("savePrefsToServer failed:", e.message); }
@@ -3415,9 +3934,11 @@ async function loadPrefsFromServer() {
     if (p.tzMode !== undefined) settings.tzMode = p.tzMode;
     if (p.serverTzOffsetMin !== undefined) settings.serverTzOffsetMin = Number(p.serverTzOffsetMin);
     if (Number.isFinite(p.minIntervalMin)) state.minIntervalMin = p.minIntervalMin;
-    if (Array.isArray(p.overridesV2)) { overridesList = p.overridesV2; rebuildOverridesIndex(); }
+    if (Array.isArray(p.overridesV2)) { overridesList = p.overridesV2; }
     if (p.routeOverrides) routeOverridesMap = p.routeOverrides;
     if (p.platformOverrides) platformOverridesMap = p.platformOverrides;
+    if (p.serverUrl) settings.serverUrl = p.serverUrl;
+    if (Array.isArray(p.serverList)) settings.serverList = p.serverList;
   } catch (e) { console.warn("loadPrefsFromServer failed:", e.message); }
 }
 
@@ -3609,6 +4130,7 @@ const _arrivalsCache = new Map();
 // Индекс для поиска departureIndex по tripOriginMs:
 // Map<routeIdHex, Array<{tripOriginMs, departureIndex, deviation, realtime, platformName}>>
 const _depIdxCache = new Map();
+const _carsCache = new Map(); // routeNumber → cars[] из arrivals
 
 function _int64DecimalToHex(decStr) {
   let n = BigInt(decStr);
@@ -3625,6 +4147,9 @@ async function loadArrivals(stationId) {
     _depIdxCache.clear();
     for (const a of (data.arrivals || [])) {
       const hexId = _int64DecimalToHex(String(a.routeId));
+      if (Array.isArray(a.cars) && a.cars.length > 0 && a.routeNumber) {
+        _carsCache.set(a.routeNumber, a.cars);
+      }
       // _arrivalsCache: только ближайший рейс (для виджета и дашборда)
       const existing = _arrivalsCache.get(hexId);
       if (!existing || a.arrival < existing.arrival) {
@@ -3645,6 +4170,7 @@ async function loadArrivals(stationId) {
         deviation: a.deviation || 0,
         realtime: a.realtime || false,
         platformName: a.platformName || null,
+        carCount: Array.isArray(a.cars) ? a.cars.length : null,
       });
     }
   } catch (e) {
@@ -3747,7 +4273,10 @@ function getEffectiveDeviation(routeId, plannedDeviationMs) {
       items.push({ label: `⚠ ${t("conflictLabel")}`, header: true });
       for (const other of conflicts) {
         const minIntervalMs = state.minIntervalMin * 60000;
-        const gap = ctxEntry.effArrival - other.effArrival;
+        // Интервал считаем между отправлением другого и прибытием текущего
+        // (или между прибытиями если отправление недоступно)
+        const otherEnd = other.effDeparture ?? other.effArrival;
+        const gap = ctxEntry.effArrival - otherEnd;
         // +1000мс буфер чтобы после сдвига интервал был строго > minIntervalMs
         const BUFFER = 1000;
         const rawShift = gap >= 0 ? (minIntervalMs - gap + BUFFER) : -(minIntervalMs + gap + BUFFER);
@@ -3785,8 +4314,9 @@ function getEffectiveDeviation(routeId, plannedDeviationMs) {
         else if (action === "fixConflict") {
           const delta = Number(el.dataset.shift);
           pushUndoSnapshot();
-          setOverride(saved.routeId, saved.tripOriginMs,
-            (getOverride(saved.routeId, saved.tripOriginMs) || 0) + delta);
+          const _nd3 = (getOverride(saved.routeId, saved.tripOriginMs) || 0) + delta;
+          setOverride(saved.routeId, saved.tripOriginMs, _nd3);
+          applyReverseShift(saved.routeId, saved.tripOriginMs, _nd3);
           renderDashboardFromCache();
           renderGraphFromCache();
         }

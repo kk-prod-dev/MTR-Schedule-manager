@@ -3,7 +3,7 @@ const path = require("path");
 module.exports = {
   // Базовый адрес MTR API. Можно переопределить переменной окружения
   // MTR_BASE_URL, если адрес карты сервера изменится.
-  BASE_URL: process.env.MTR_BASE_URL || "https://system.georail.eu",
+  BASE_URL: process.env.MTR_BASE_URL || "http://localhost:8888",
 
   // Измерение (0 = Overworld). У большинства серверов вся сеть в 0.
   DIMENSION: 0,

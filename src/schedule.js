@@ -84,7 +84,7 @@ function expandDraftDepartureTimes(draft) {
   return times;
 }
 function draftDepartureEntry(draft) {
-  return { id: draft.id, departures: [{ deviation: 0, departures: expandDraftDepartureTimes(draft) }] };
+  return { id: draft.id, isDraftEntry: true, departures: [{ deviation: 0, departures: expandDraftDepartureTimes(draft) }] };
 }
 function getMergedRoutesAndDepartures(topology, departuresCache) {
   const draftList = drafts.list();
@@ -175,12 +175,15 @@ function buildStationSchedule(stationId) {
 
     for (const group of departureInfo.departures) {
       for (const t0raw of group.departures) {
-        const t0 = t0ToUtcMs(t0raw);
-        const arrivalMs = normalizeTimeOfDay(t0 + arrivalOffset + group.deviation);
+        const t0 = departureInfo.isDraftEntry ? t0raw : t0ToUtcMs(t0raw);
+        // Для черновиков t0 = время отправления с первой остановки (пользователь задаёт)
+        // Для реальных — t0 = время отправления с последней остановки
+        const draftShift = departureInfo.isDraftEntry ? t0Offset : 0;
+        const arrivalMs = normalizeTimeOfDay(t0 + arrivalOffset + draftShift + group.deviation);
         const departureMs =
           departureOffset === null
             ? null
-            : normalizeTimeOfDay(t0 + departureOffset + group.deviation);
+            : normalizeTimeOfDay(t0 + departureOffset + draftShift + group.deviation);
 
         entries.push({
           routeId: route.id,
@@ -212,6 +215,65 @@ function buildStationSchedule(stationId) {
   }
 
   entries.sort((a, b) => a.arrivalMs - b.arrivalMs);
+
+  // ── Определяем пары прямой/обратный маршрут ──────────────────────────
+  // Если поезд прямого маршрута A приезжает на станцию и через короткое время
+  // поезд обратного маршрута B уезжает с той же платформы — это один состав.
+  // Прямой маршрут помечаем hiddenByReverse: true, обратный показываем.
+  //
+  // Условия пары: одинаковое депо + станции B = reverse(A) + платформа совпадает
+  // + время отправления A ≈ время прибытия B (в пределах dwellTime конечной).
+  // Строим карту обратных маршрутов: станции идут в обратном порядке + совпадение цвета
+  const reverseRouteMap = new Map(); // routeId → reverseRouteId
+  for (const route of allRoutes) {
+    if (reverseRouteMap.has(route.id)) continue;
+    const myStops = (route.stations || []).map(s => s.id);
+    if (myStops.length < 2) continue;
+    for (const other of allRoutes) {
+      if (other.id === route.id || reverseRouteMap.has(other.id)) continue;
+      const otherStops = (other.stations || []).map(s => s.id);
+      if (otherStops.length !== myStops.length) continue;
+      // Станции должны идти строго в обратном порядке
+      const isReverse = myStops.every((id, i) => otherStops[myStops.length - 1 - i] === id);
+      if (!isReverse) continue;
+      // Дополнительно: одинаковый цвет (защита от случайных совпадений)
+      if (route.color !== other.color) continue;
+      reverseRouteMap.set(route.id, other.id);
+      reverseRouteMap.set(other.id, route.id);
+      break;
+    }
+  }
+
+  // Находим пары прямой/обратный и скрываем прямой (тот у которого есть departureMs).
+  // Обратный (конечная, departureMs === null) показываем — он содержит время прибытия
+  // которое актуально для пассажира.
+  // Обрабатываем каждую пару только один раз через Set уже обработанных.
+  const PAIR_TOLERANCE_MS = 5 * 60 * 1000;
+  const pairedEntries = new Set();
+  for (const entry of entries) {
+    if (pairedEntries.has(entry)) continue;
+    const revId = reverseRouteMap.get(entry.routeId);
+    if (!revId) continue;
+    const depMs = entry.departureMs ?? entry.arrivalMs;
+    const partner = entries.find(e =>
+      e.routeId === revId &&
+      e.platformName === entry.platformName &&
+      !pairedEntries.has(e) &&
+      Math.abs(e.arrivalMs - depMs) <= PAIR_TOLERANCE_MS
+    );
+    if (!partner) continue;
+    pairedEntries.add(entry);
+    pairedEntries.add(partner);
+    // Прячем того у кого есть departureMs (ещё едет дальше = прямой на этой станции)
+    // Показываем того у кого departureMs === null (конечная = обратный начинается здесь)
+    // Скрываем конечную (depMs === null), показываем начальную (depMs !== null)
+    const [hide, show] = entry.departureMs === null ? [entry, partner] : [partner, entry];
+    hide.hiddenByReverse = true;
+    hide.reverseRouteId = show.routeId;
+    hide.reverseTripOriginMs = show.tripOriginMs;
+    show.pairedForwardRouteId = hide.routeId;
+    show.pairedForwardTripOriginMs = hide.tripOriginMs;
+  }
 
   // Список уникальных платформ станции.
   // Если на одной и той же «платформе» (по имени) едут маршруты, которые
@@ -417,47 +479,69 @@ function buildRouteGraph(fromStationId, toStationId) {
   }
 
   const routesOut = [];
-  // Раньше ось Y строилась только по станциям САМОГО ДЛИННОГО маршрута —
-  // если другой, более короткий маршрут проходил через станцию, которой
-  // не было в "лучшем" списке, её гридлайн/подпись просто не появлялись,
-  // и "ступенька" стоянки повисала в воздухе без своей линии станции.
-  // Теперь собираем ОБЪЕДИНЕНИЕ станций со ВСЕХ подходящих маршрутов —
-  // расстояние у каждой станции теперь единое (canonicalDistance), так
-  // что объединять их корректно и просто.
-  const stationUnion = new Map(); // stationId -> {stationId, name, platformName, distance}
 
+  // Шаг 1: собираем validSegments — все маршруты через А и Б с сегментами А→Б
+  const validSegments = [];
   for (const route of allRoutes) {
     if (route.hidden) continue;
     const stops = route.stations || [];
-    const idxFrom = stops.findIndex((s) => s.id === fromStationId);
-    const idxTo = stops.findIndex((s) => s.id === toStationId);
+    const idxFrom = stops.findIndex(s => s.id === fromStationId);
+    const idxTo = stops.findIndex(s => s.id === toStationId);
     if (idxFrom === -1 || idxTo === -1 || idxFrom === idxTo) continue;
-
     const lo = Math.min(idxFrom, idxTo);
     const hi = Math.max(idxFrom, idxTo);
     const segment = stops.slice(lo, hi + 1);
     const fromIsAtLo = idxFrom === lo;
+    const segAtoB = fromIsAtLo ? segment : [...segment].reverse();
+    validSegments.push({ route, stops, segment, segAtoB, lo, hi, fromIsAtLo });
+  }
 
-
-    // Дистанция на оси Y = 3D-расстояние от fromStation (canonicalDistance).
-    // ВАЖНО: это единственный консистентный источник — если разные маршруты
-    // обработают одну станцию в разном порядке своих сегментов, index-based
-    // подход даст ей разные дистанции у разных маршрутов → зигзаги на графике.
-    // canonicalDistance даёт одно и то же число для любой станции независимо
-    // от того, какой маршрут добавил её в stationUnion первым.
-    const distanceFromAnchor = segment.map((s) => canonicalDistance(s.id));
-    const totalSegmentDistance = canonicalDistance(toStationId) || 1;
-
-    segment.forEach((s, i) => {
-      if (stationUnion.has(s.id)) return;
-      const st = topology.stations.find((x) => x.id === s.id);
+  // Шаг 2: глобальный порядок станций по маршруту с наибольшим числом станций А→Б
+  const stationUnion = new Map(); // stationId → {stationId, name, platformName, distance}
+  const longestSeg = validSegments.slice().sort((a, b) => b.segAtoB.length - a.segAtoB.length)[0];
+  if (longestSeg) {
+    let t = 0;
+    longestSeg.segAtoB.forEach((s, i) => {
+      const st = topology.stations.find(x => x.id === s.id);
+      if (i > 0) {
+        const origIdx = longestSeg.fromIsAtLo ? longestSeg.lo + i - 1 : longestSeg.hi - i;
+        t += (longestSeg.segAtoB[i-1].dwellTime ?? 0) + (longestSeg.route.durations[origIdx] ?? 60000);
+      }
       stationUnion.set(s.id, {
         stationId: s.id,
         name: st ? st.name : s.id,
-        platformName: normalizePlatformName(s.name, `#${i + 1}`),
-        distance: distanceFromAnchor[i], // = canonicalDistance(s.id)
+        platformName: normalizePlatformName(s.name, `#${i+1}`),
+        distance: t,
       });
     });
+  }
+
+  // Шаг 3: добавляем пропущенные станции из других маршрутов — вставляем между соседями
+  for (const { segAtoB } of validSegments) {
+    for (let i = 0; i < segAtoB.length; i++) {
+      const s = segAtoB[i];
+      if (stationUnion.has(s.id)) continue;
+      const prevKnown = segAtoB.slice(0, i).reverse().find(x => stationUnion.has(x.id));
+      const nextKnown = segAtoB.slice(i + 1).find(x => stationUnion.has(x.id));
+      const prevDist = prevKnown ? stationUnion.get(prevKnown.id).distance : 0;
+      const nextDist = nextKnown ? stationUnion.get(nextKnown.id).distance : (prevDist + 60000);
+      const prevIdx = prevKnown ? segAtoB.findIndex(x => x.id === prevKnown.id) : -1;
+      const nextIdx = nextKnown ? segAtoB.findIndex(x => x.id === nextKnown.id) : segAtoB.length;
+      const span = nextIdx - prevIdx;
+      const frac = span > 1 ? (i - prevIdx) / span : 0.5;
+      const st = topology.stations.find(x => x.id === s.id);
+      stationUnion.set(s.id, {
+        stationId: s.id,
+        name: st ? st.name : s.id,
+        platformName: normalizePlatformName(s.name, `#${i+1}`),
+        distance: prevDist + (nextDist - prevDist) * frac,
+      });
+    }
+  }
+
+  // Шаг 4: основной цикл — строим trips для каждого маршрута
+  for (const { route, stops, segment, segAtoB, lo, hi, fromIsAtLo } of validSegments) {
+    const totalSegmentDistance = stationUnion.get(toStationId)?.distance || 1;
 
     const departureInfo = allDeparturesByRouteId.get(route.id);
     // Раньше при отсутствии активных рейсов маршрут полностью пропускался,
@@ -508,7 +592,7 @@ function buildRouteGraph(fromStationId, toStationId) {
     if (departureInfo) {
       for (const group of departureInfo.departures) {
         for (const t0raw of group.departures) {
-          const t0 = t0ToUtcMs(t0raw);
+          const t0 = departureInfo.isDraftEntry ? t0raw : t0ToUtcMs(t0raw);
           // Строим points в порядке движения поезда (первая остановка → последняя).
           // Для FORWARD (fromIsAtLo=true): поезд идёт segment[0]→segment[last]
           //   - arrivalOffsets[k] уже в правильном порядке (возрастает)
@@ -519,27 +603,25 @@ function buildRouteGraph(fromStationId, toStationId) {
           //   - arrivalOffsets[k] идут в порядке lo→hi (A→B), т.е. reversed в
           //     порядке движения: arrivalOffsets[last] = время прибытия в segment[last]
           //   - поэтому для backward мы переворачиваем оба: offsets И sIdx
-          const rawPoints = segment.map((s, k) => {
-            let dist, arrivalMs, departureMs;
-            if (fromIsAtLo) {
-              // Прямой: k=0 начало, k=last конец
-              dist = stationUnion.get(segment[k].id)?.distance ?? distanceFromAnchor[k];
-              arrivalMs = t0 + arrivalOffsets[k] + group.deviation;
-              departureMs = departureOffsets[k] === null ? null : t0 + departureOffsets[k] + group.deviation;
-            } else {
-              // Обратный: k=0 соответствует segment[last] (конец segment = начало движения)
-              const sIdx = segment.length - 1 - k;
-              dist = stationUnion.get(segment[sIdx].id)?.distance ?? distanceFromAnchor[sIdx];
-              // Поезд прибывает в segment[sIdx] через arrivalOffsets[sIdx]
-              // (offsets считаются в порядке lo→hi, sIdx = убывает при k=0..last)
-              arrivalMs = t0 + arrivalOffsets[sIdx] + group.deviation;
-              departureMs = departureOffsets[sIdx] === null ? null : t0 + departureOffsets[sIdx] + group.deviation;
-            }
-            return { distance: dist, arrivalMs, departureMs };
-          });
-          // Для обратного маршрута: отсортируем по времени (arrivalMs) чтобы
-          // линия на графике шла слева направо (время всегда возрастает по X)
-          if (!fromIsAtLo) rawPoints.sort((a, b) => a.arrivalMs - b.arrivalMs);
+          // Строим points в порядке движения поезда.
+          // stationUnion.distance всегда в порядке А→Б.
+          // arrivalOffsets[k] = offset для segment[lo+k] (порядок lo→hi).
+          // Для forward: segment идёт от А(lo) к Б(hi) — порядок совпадает.
+          // Для backward: segment идёт от Б(lo) к А(hi), движение А(hi)→Б(lo).
+          //   sIdx = hi - k → убывает от hi до lo по мере движения поезда.
+          const rawPoints = [];
+          for (let k = 0; k < segment.length; k++) {
+            const sIdx = fromIsAtLo ? k : segment.length - 1 - k;
+            const st = segment[sIdx];
+            const dist = stationUnion.get(st.id)?.distance ?? 0;
+            const _draftShift2 = departureInfo.isDraftEntry ? _t0Off2 : 0;
+            const arrivalMs = t0 + arrivalOffsets[sIdx] + _draftShift2 + group.deviation;
+            const dep = departureOffsets[sIdx];
+            const departureMs = dep === null ? null : t0 + dep + _draftShift2 + group.deviation;
+            rawPoints.push({ distance: dist, arrivalMs, departureMs });
+          }
+          // Сортируем по времени чтобы линия шла слева→направо
+          rawPoints.sort((a, b) => a.arrivalMs - b.arrivalMs);
           const points = rawPoints;
           trips.push({
             deviationMs: group.deviation,
@@ -560,7 +642,7 @@ function buildRouteGraph(fromStationId, toStationId) {
       direction,
       isDraft: !!route.isDraft,
       hasActiveService: !!departureInfo,
-      totalDistance: totalSegmentDistance,
+      totalDistance: totalSegmentDistance, // в мс времени пути
       tripCount: trips.length,
       trips,
     });
@@ -630,16 +712,18 @@ function buildRouteTimetable(routeId) {
   if (departureInfo) {
     for (const group of departureInfo.departures) {
       for (const t0raw of group.departures) {
-        const t0 = t0ToUtcMs(t0raw);
+        const t0 = departureInfo.isDraftEntry ? t0raw : t0ToUtcMs(t0raw);
+        const _draftShiftT = departureInfo.isDraftEntry ? _t0OffT : 0;
         const times = stops.map((s, k) => {
-          const arrivalMs = normalizeTimeOfDay(t0 + arrivalOffsets[k] + group.deviation);
+          const arrivalMs = normalizeTimeOfDay(t0 + arrivalOffsets[k] + _draftShiftT + group.deviation);
           const departureMs =
-            departureOffsets[k] === null ? null : normalizeTimeOfDay(t0 + departureOffsets[k] + group.deviation);
+            departureOffsets[k] === null ? null : normalizeTimeOfDay(t0 + departureOffsets[k] + _draftShiftT + group.deviation);
           return { arrivalMs, departureMs };
         });
-        trips.push({ tripOriginMs: t0, deviationMs: group.deviation, times });
+        trips.push({ tripOriginMs: t0, originalDepartureMs: t0raw, deviationMs: group.deviation, times });
         depotDepartures.push({
           tripOriginMs: t0,
+          originalDepartureMs: t0raw,
           deviationMs: group.deviation,
           scheduledTimeOfDayMs: t0,
           effectiveTimeOfDayMs: normalizeTimeOfDay(t0 + group.deviation),

@@ -232,39 +232,29 @@
         </select>
       </div>
       <div class="settings-block">
+        <label data-i18n="serverListLabel">MTR Servers</label>
+        <select id="serverListSelect" class="sidebar-select" style="margin-bottom:6px;"></select>
+        <div style="display:flex;gap:4px;margin-bottom:4px;">
+          <input type="text" id="serverUrlInput" class="sidebar-input"
+            placeholder="http://my-mtr-server:8888" style="flex:1;font-size:12px;">
+          <button id="serverUrlAddBtn" class="secondary-btn" style="white-space:nowrap;padding:4px 8px" title="Add">+</button>
+          <button id="serverUrlRemoveBtn" class="secondary-btn" style="white-space:nowrap;padding:4px 8px" title="Remove">−</button>
+        </div>
+        <p class="hint small" id="serverUrlHint" data-i18n="serverUrlHint"></p>
+      </div>
+      <div class="settings-block">
         <label data-i18n="timezoneLabel">Часовой пояс</label>
         <select id="timezoneSelect"></select>
         <p class="hint small" id="tzDetectedHint"></p>
 
-        <label class="sidebar-label" data-i18n="serverTzLabel">MTR server timezone</label>
-        <select id="serverTimezoneSelect" class="sidebar-select"></select>
-        <p class="hint small" id="serverTzHint" data-i18n="serverTzHint"></p>
       </div>
       <div class="settings-block">
         <p class="hint small" data-i18n="settingsNote">Все времена в приложении (расписания, графики, аналитика) автоматически пересчитываются под выбранный часовой пояс. Исходные данные сервер всегда хранит в UTC.</p>
       </div>
-      <div class="settings-block">
-        <label data-i18n="notifSettingsTitle">Уведомления</label>
-        <div style="display:flex;flex-direction:column;gap:8px;margin-top:6px;">
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
-            <input type="checkbox" id="notifConflictToggle">
-            <span data-i18n="notifConflict">Уведомлять о новых конфликтах платформ</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
-            <input type="checkbox" id="notifOnlyFavToggle">
-            <span data-i18n="notifOnlyFav">Уведомлять только по избранному</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
-            <input type="checkbox" id="notifDelayToggle">
-            <span data-i18n="notifBigDelay">Уведомлять о больших опозданиях</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
-            <span data-i18n="notifThreshold">Порог опоздания (мин)</span>
-            <input type="number" id="notifDelayThreshold" min="1" max="30" value="5" style="width:54px;margin-left:4px;">
-          </label>
-        </div>
-        <p class="hint small" id="notifPermissionNote"></p>
-        <button class="secondary-btn" id="requestNotifPermissionBtn" style="margin-top:6px;display:none;" data-i18n="notifAllow">Разрешить уведомления</button>
+
+      <div class="settings-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+        <span class="hint small" id="appVersionLabel" style="opacity:0.6;"></span>
+        <button class="secondary-btn" id="checkUpdateBtn" data-i18n="checkUpdateBtn">Проверить обновления</button>
       </div>
     </section>
   </main>

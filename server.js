@@ -15,8 +15,23 @@ app.use(express.static(path.join(__dirname, "public"), { etag: false, lastModifi
 
 // ---- API ----
 
+const PKG_VERSION = (() => { try { return require("./package.json").version; } catch { return "?"; } })();
+
+// Чейнджлог после обновления
+app.get("/api/pending-changelog", (req, res) => {
+  const f = require("path").join(config.DATA_DIR, "pending-changelog.json");
+  try {
+    if (fs.existsSync(f)) {
+      const data = JSON.parse(fs.readFileSync(f, "utf8"));
+      fs.unlinkSync(f); // показываем только один раз
+      return res.json(data);
+    }
+  } catch {}
+  res.status(404).json({ none: true });
+});
+
 app.get("/api/status", (req, res) => {
-  res.json(store.getStatus());
+  res.json({ ...store.getStatus(), version: PKG_VERSION });
 });
 
 app.get("/api/stations", (req, res) => {
@@ -286,6 +301,29 @@ app.get("/api/platforms/all", (req, res) => {
   res.json(result);
 });
 
+// ── Настройка MTR-сервера (BASE_URL) ──────────────────────────────────
+app.get("/api/server-url", (req, res) => {
+  res.json({ url: config.BASE_URL });
+});
+
+app.post("/api/server-url", async (req, res) => {
+  const { url } = req.body;
+  if (!url || typeof url !== "string") {
+    return res.status(400).json({ error: "url обязателен" });
+  }
+  const normalized = url.replace(/\/+$/, ""); // убираем trailing slash
+  config.BASE_URL = normalized;
+  // Сохраняем в prefs.json
+  try {
+    const prefs = loadPrefs();
+    prefs.serverUrl = normalized;
+    savePrefs(prefs);
+  } catch {}
+  // Перезапускаем поллер с новым URL
+  try { poller.restart(); } catch {}
+  res.json({ ok: true, url: normalized });
+});
+
 // ── Пользовательские настройки (избранное, язык, часовой пояс, overrides) ──
 // Хранятся в DATA_DIR/prefs.json, переживают перезапуск Electron.
 const PREFS_FILE = path.join(config.DATA_DIR, "prefs.json");
@@ -319,7 +357,18 @@ const server = app.listen(config.PORT, () => {
   if (typeof process.send === "function") {
     process.send({ type: "server-ready", port: actualPort });
   }
-  poller.start();
+  // Восстанавливаем сохранённый URL сервера из prefs.json ДО старта поллера
+  (async () => {
+    try {
+      const prefs = loadPrefs();
+      if (prefs.serverUrl) {
+        config.BASE_URL = prefs.serverUrl;
+        console.log("[server] BASE_URL из настроек:", config.BASE_URL);
+      }
+    } catch {}
+    store.clearScheduleCache(); // сбрасываем кеш при старте
+    poller.start();
+  })();
 });
 
 // Экспортируем для Electron, который поднимает сервер внутри своего процесса.

@@ -1,6 +1,6 @@
 {
   "name": "mtr-schedule-manager",
-  "version": "0.2.0",
+  "version": "1.0.0",
   "private": true,
   "description": "MTR Schedule Manager — система управления расписанием Minecraft Transit Railway",
   "author": "GeoRail",
@@ -12,7 +12,8 @@
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
-    "release": "electron-builder --publish always"
+    "release": "electron-builder --publish always",
+    "build": "electron-builder --win"
   },
   "engines": {
     "node": ">=18.0.0"
@@ -43,7 +44,8 @@
       "!**/*.map",
       "!data/**",
       "!dist/**",
-      "!diagnose-missing-route.js"
+      "!diagnose-missing-route.js",
+      "pending-changelog.json"
     ],
     "asar": true,
     "asarUnpack": [

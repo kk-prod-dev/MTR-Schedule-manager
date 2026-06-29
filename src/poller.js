@@ -61,4 +61,11 @@ function start() {
   setInterval(() => store.pruneDelayHistory(), 60 * 60 * 1000);
 }
 
-module.exports = { start };
+// Немедленный переопрос при смене URL сервера
+function restart() {
+  console.log("[poller] Перезапуск после смены URL сервера...");
+  pollTopology();
+  pollDepartures();
+}
+
+module.exports = { start, restart };

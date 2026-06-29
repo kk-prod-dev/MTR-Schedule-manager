@@ -1,7 +1,8 @@
 "use strict";
 
 const path = require("path");
-const { app, BrowserWindow, Menu, shell, dialog } = require("electron");
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require("electron");
+const http = require("http");
 
 // ---------------------------------------------------------------------------
 // Подготовка окружения ДО запуска сервера.
@@ -71,6 +72,9 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  mainWindow.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") mainWindow.webContents.openDevTools();
+  });
 
   // Пока сервер поднимается — показываем заставку.
   mainWindow.loadFile(path.join(__dirname, "loading.html"));
@@ -144,6 +148,21 @@ async function loadApp() {
 // Авто-обновление (electron-updater + GitHub Releases).
 // Активно только в собранном приложении и при наличии настроенного publish.
 // ---------------------------------------------------------------------------
+// IPC: renderer запрашивает сохранение prefs при закрытии
+ipcMain.on("save-prefs-sync", (event, prefsJson) => {
+  if (!serverPort) return;
+  const req = http.request({
+    hostname: "127.0.0.1",
+    port: serverPort,
+    path: "/api/prefs",
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(prefsJson) },
+  });
+  req.on("error", () => {}); // игнорируем ошибки (сервер может уже закрываться)
+  req.write(prefsJson);
+  req.end();
+});
+
 function initAutoUpdate() {
   let autoUpdater;
   try {
@@ -174,7 +193,7 @@ function initAutoUpdate() {
     // Сохраняем для показа после перезапуска
     try {
       const pendingFile = require("path").join(require("electron").app.getPath("userData"), "pending-changelog.json");
-      if (notes) fs.writeFileSync(pendingFile, JSON.stringify({ version: info.version, notes }), "utf8");
+      if (notes) fs.writeFileSync(pendingFile, JSON.stringify({ version: info.version, notes, translations: { en: notes } }), "utf8");
     } catch {}
     const detail = notes
       ? notes + "\n\nRestart now to install?"
@@ -217,13 +236,8 @@ function initAutoUpdate() {
     if (pendingNotes) {
       mainWindow.once("ready-to-show", () => {
         setTimeout(() => {
-          dialog.showMessageBoxSync(mainWindow, {
-            type: "info",
-            buttons: ["OK"],
-            title: `Updated to v${currentVersion}`,
-            message: `What's new in v${currentVersion}:`,
-            detail: pendingNotes,
-          });
+          // Отправляем в renderer для показа in-app модального окна
+          mainWindow.webContents.send("show-changelog", { version: currentVersion, notes: pendingNotes });
         }, 2000);
       });
     }
