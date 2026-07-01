@@ -1,6 +1,6 @@
 {
   "name": "mtr-schedule-manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "description": "MTR Schedule Manager — система управления расписанием Minecraft Transit Railway",
   "author": "GeoRail",
@@ -87,17 +87,15 @@
       "icon": "build/icon.png",
       "category": "public.app-category.utilities",
       "artifactName": "MTRScheduleManager-${version}.${ext}"
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "kk-prod-dev",
-        "repo": "MTR-Schedule-manager"
-      }
-    ]
+    }
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/kk-prod-dev/MTR-Schedule-manager"
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "kk-prod-dev",
+    "repo": "MTR-Schedule-manager"
   }
 }

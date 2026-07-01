@@ -47,8 +47,4 @@ mac:
   icon: build/icon.png
   category: public.app-category.utilities
   artifactName: MTRScheduleManager-${version}.${ext}
-publish:
-  - provider: github
-    owner: kk-prod-dev
-    repo: MTR-Schedule-manager
 electronVersion: 31.7.7

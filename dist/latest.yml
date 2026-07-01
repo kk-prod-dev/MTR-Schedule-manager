@@ -1,8 +1,8 @@
-version: 1.0.0
+version: 1.0.1
 files:
-  - url: MTRScheduleManager-Setup-1.0.0.exe
-    sha512: WuN7mREyMcResm/qorUn86pviLLCBwzG3qTQ7xxPxBx/nf+Gq6vCb1L4FaYs+dfY18hahH++uMmp9CXAHHdfNA==
-    size: 78927864
-path: MTRScheduleManager-Setup-1.0.0.exe
-sha512: WuN7mREyMcResm/qorUn86pviLLCBwzG3qTQ7xxPxBx/nf+Gq6vCb1L4FaYs+dfY18hahH++uMmp9CXAHHdfNA==
-releaseDate: '2026-06-29T12:18:58.988Z'
+  - url: MTRScheduleManager-Setup-1.0.1.exe
+    sha512: mqzG4RnGBO76vhkkjqvKW/a6j6G5KCxf4eV3HIpbOBM6vyxcGmU2/RUGLcb05s7MusCePWnFt+HQkNreUubZdQ==
+    size: 78925321
+path: MTRScheduleManager-Setup-1.0.1.exe
+sha512: mqzG4RnGBO76vhkkjqvKW/a6j6G5KCxf4eV3HIpbOBM6vyxcGmU2/RUGLcb05s7MusCePWnFt+HQkNreUubZdQ==
+releaseDate: '2026-07-01T12:17:27.572Z'

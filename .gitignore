@@ -1,3 +1,49 @@
-GeoRail.exe
-electron.exe
-MTR Schedule Manager.exe
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+dist-electron/
+
+# Electron temporary files
+out/
+release/
+*.asar
+win-unpacked/
+linux-unpacked/
+mac/
+*.dmg
+*.exe
+*.AppImage
+*.deb
+*.rpm
+*.snap
+*.blockmap
+
+# App data & cache
+data/
+*.log
+npm-debug.log*
+electron-builder-debug.yml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Env
+.env
+.env.local
+
+# Misc
+diagnose-missing-route.js
+README-ELECTRON.md
+
+# Exe
+*.exe

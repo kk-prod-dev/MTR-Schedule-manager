@@ -131,7 +131,7 @@ const I18N = {
     removeColumnLastError: "Нельзя удалить последнее отправление — у маршрута должен остаться хотя бы один рейс.",
     addColumnPrompt: "Время отправления (ЧЧ:ММ) в выбранном часовом поясе:",
     addColumnInvalid: "Некорректный формат времени. Введите в формате ЧЧ:ММ, например 08:30.",
-    colDepotDeparture: "Время отправления",
+    colDepotDeparture: "От первой остановки",
     colStation: "Станция", colPlatform: "Платформа", colDwell: "Стоянка", colNext: "До следующей", colCoords: "Координаты",
     copyBtn: "Копировать", copiedBtn: "Скопировано",
     errLoading: "Ошибка загрузки: {msg}",
@@ -151,6 +151,7 @@ const I18N = {
     notifAllow: "Разрешить уведомления",
     notifOnlyFav: "Уведомлять только по избранному",
     checkUpdateBtn: "Проверить обновления",
+    supportBtn: "Поддержка",
     serverListLabel: "Серверы MTR",
     serverUrlLabel: "URL сервера MTR",
     serverUrlHint: "Адрес карты системы MTR-сервера. Например: http://localhost:8888",
@@ -330,7 +331,7 @@ const I18N = {
     removeColumnLastError: "Can't remove the last departure — the route must keep at least one trip.",
     addColumnPrompt: "Departure time (HH:MM) in the selected timezone:",
     addColumnInvalid: "Invalid time format. Use HH:MM, e.g. 08:30.",
-    colDepotDeparture: "Departure time",
+    colDepotDeparture: "First stop time",
     colStation: "Station", colPlatform: "Platform", colDwell: "Dwell", colNext: "To next", colCoords: "Coordinates",
     copyBtn: "Copy", copiedBtn: "Copied",
     errLoading: "Failed to load: {msg}",
@@ -395,6 +396,13 @@ const I18N = {
     'instr_title_notifications': 'Notifications',
     'instr_body_notifications': '<p>In Settings you can enable browser notifications for new platform conflicts and/or large delays (threshold in minutes is configurable). The "Favorites only" toggle limits notifications to favorite routes.</p>',
     'instr_title_settings': 'Settings',
+    checkUpdateBtn: "Check for updates",
+    supportBtn: "Support",
+    serverListLabel: "MTR Servers",
+    serverUrlLabel: "MTR Server URL",
+    serverUrlHint: "System map address of your MTR server. E.g.: http://localhost:8888",
+    serverUrlSaved: "URL saved, reloading...",
+    serverUrlError: "Error saving URL",
     'instr_body_settings': "<p>Language and timezone default to auto-detected values but can be switched manually — all times recalculate instantly. Supported languages: RU, EN, DE, FR, PL, PT, CS.</p><p><b>MTR server timezone</b> — if trains appear shifted, select your MTR server's timezone here. Settings and favorites persist across restarts.</p><p>The current tab + selected station are saved in the URL (#tab=…).</p>",
   }
 };
@@ -2733,7 +2741,12 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
         // trips[] уже отсортированы по tripOriginMs (мс от полуночи UTC),
         // поэтому i напрямую соответствует departureIndex из MTR.
         const tripLabel = `#${i + 1}`;
-        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}${tripLabel}<br>${formatUtc(effMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
+        // Расчётное время отправления из депо: arrival_first - dwell_first - 1мин
+        const firstStop = trip.times && trip.times[0];
+        const depotDepartMs = firstStop
+          ? normalizeMs(firstStop.arrivalMs - (firstStop.dwellTimeMs || 0) - 60000 + delta)
+          : effMs;
+        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}${tripLabel}<br>${formatUtc(depotDepartMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
       })
       .join("");
     const addColHeader = data.isDraft
@@ -2926,13 +2939,16 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     favRouteBtn.textContent = isFav ? "★" : "☆";
     favRouteBtn.style.color = isFav ? "#fbbf24" : "";
     favRouteBtn.title = isFav ? t("removeFavorite") : t("addFavorite");
-    favRouteBtn.addEventListener("click", () => {
+    if (!favRouteBtn._hasListener) {
+      favRouteBtn._hasListener = true;
+      favRouteBtn.addEventListener("click", () => {
       toggleFavoriteRoute(data.id);
       const nowFav = isFavoriteRoute(data.id);
       favRouteBtn.textContent = nowFav ? "★" : "☆";
       favRouteBtn.style.color = nowFav ? "#fbbf24" : "";
       favRouteBtn.title = nowFav ? t("removeFavorite") : t("addFavorite");
-    });
+      });
+    }
   }
 
   const resetEditsBtn = document.getElementById("resetRouteEditsBtn");
@@ -3037,7 +3053,8 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
 
   // Редактирование/удаление пробного маршрута прямо из карточки
   const editBtn = document.getElementById("editDraftInModalBtn");
-  if (editBtn) {
+  if (editBtn && !editBtn._hasListener) {
+    editBtn._hasListener = true;
     editBtn.addEventListener("click", async () => {
       const res = await fetch(`/api/drafts/${data.id}`);
       const d = await res.json();
@@ -3046,7 +3063,8 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     });
   }
   const deleteBtn = document.getElementById("deleteDraftInModalBtn");
-  if (deleteBtn) {
+  if (deleteBtn && !deleteBtn._hasListener) {
+    deleteBtn._hasListener = true;
     deleteBtn.addEventListener("click", async () => {
       if (!confirm(t("draftConfirmDelete"))) return;
       await fetch(`/api/drafts/${data.id}`, { method: "DELETE" });
@@ -3607,12 +3625,22 @@ function initSettingsUI() {
     }).catch(() => {});
   }
   const checkUpdateBtn = document.getElementById("checkUpdateBtn");
-  if (checkUpdateBtn) {
+  if (checkUpdateBtn && !checkUpdateBtn._hasListener) {
+    checkUpdateBtn._hasListener = true;
     checkUpdateBtn.addEventListener("click", () => {
       if (window.electronAPI?.checkForUpdates) {
         window.electronAPI.checkForUpdates();
-      } else {
-        window.open("https://github.com/kk-prod-dev/MTR-Schedule-manager/releases", "_blank");
+      }
+  const supportBtn = document.getElementById("supportBtn");
+  if (supportBtn && !supportBtn._hasListener) {
+    supportBtn._hasListener = true;
+    supportBtn.addEventListener("click", () => {
+      if (window.electronAPI?.openExternal) window.electronAPI.openExternal("https://discord.gg/qEuc7xCfwe");
+      else window.open("https://discord.gg/qEuc7xCfwe", "_blank");
+    });
+  }
+ else {
+        window.open("https://github.com/kk-prod-dev/MTR-Schedule-manager/releases/latest", "_blank");
       }
     });
   }

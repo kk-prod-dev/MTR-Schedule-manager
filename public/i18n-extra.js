@@ -105,7 +105,7 @@
       modalTotalDuration: "Gesamtfahrzeit",
       modalTotalDwell: "Gesamthaltezeit",
       modalNoActiveTrips: "Aktuell keine aktiven Fahrten für diese Linie.",
-      colDepotDeparture: "Abfahrtszeit",
+      colDepotDeparture: "Erste Haltestelle",
       colStation: "Station", colPlatform: "Bahnsteig", colDwell: "Halt", colNext: "Bis nächste", colCoords: "Koordinaten",
       colLine: "Linie", colNumber: "Nr.", colType: "Typ", colStops: "Halte",
       colSamples: "Messungen", colAvgDev: "Ø Abweichung", colMaxDev: "Max. Verspätung",
@@ -147,6 +147,7 @@
       'instr_body_problems': '<p>Problembereich-Tab: Konflikte nach Station, nach Linie und Entwürfe. Daten werden beim Durchsuchen gesammelt. Klick öffnet Station oder Linienkarte.</p>',
 
       checkUpdateBtn: "Nach Updates suchen",
+      supportBtn: "Support",
       sourceFilterDraft: "Entwürfe",
       sourceFilterReal: "Echte Linien",
       favFilterAll: "Alle",
@@ -334,7 +335,7 @@
       modalTotalDuration: "Durée totale",
       modalTotalDwell: "Temps d'arrêt total",
       modalNoActiveTrips: "Pas de trajets actifs en ce moment.",
-      colDepotDeparture: "Heure de départ",
+      colDepotDeparture: "Premier arrêt",
       colStation: "Gare", colPlatform: "Quai", colDwell: "Arrêt", colNext: "Jusqu'au suivant", colCoords: "Coordonnées",
       colLine: "Ligne", colNumber: "N°", colType: "Type", colStops: "Arrêts",
       colSamples: "Mesures", colAvgDev: "Écart moyen", colMaxDev: "Retard max",
@@ -376,6 +377,7 @@
       'instr_body_problems': '<p>Onglet Zones problématiques: conflits par station, par ligne et brouillons. Données accumulées en parcourant les stations. Clic ouvre la station ou fiche de ligne.</p>',
 
       checkUpdateBtn: "Vérifier les mises à jour",
+      supportBtn: "Support",
       sourceFilterDraft: "Brouillons",
       sourceFilterReal: "Lignes réelles",
       favFilterAll: "Tous",
@@ -560,7 +562,7 @@
       modalTotalDuration: "Łączny czas jazdy",
       modalTotalDwell: "Łączny czas postoju",
       modalNoActiveTrips: "Brak aktywnych kursów dla tej linii.",
-      colDepotDeparture: "Czas odjazdu",
+      colDepotDeparture: "Pierwsza stacja",
       colStation: "Stacja", colPlatform: "Peron", colDwell: "Postój", colNext: "Do następnej", colCoords: "Współrzędne",
       colLine: "Linia", colNumber: "Nr", colType: "Typ", colStops: "Przystanki",
       colSamples: "Pomiary", colAvgDev: "Śr. odchylenie", colMaxDev: "Maks. opóźnienie",
@@ -602,6 +604,7 @@
       'instr_body_problems': '<p>Zakładka Problematyczne miejsca: konflikty wg stacji, wg linii i szkice. Dane zbierają się podczas przeglądania stacji. Klik otwiera stację lub kartę linii.</p>',
 
       checkUpdateBtn: "Sprawdź aktualizacje",
+      supportBtn: "Pomoc",
       sourceFilterDraft: "Szkice",
       sourceFilterReal: "Prawdziwe linie",
       favFilterAll: "Wszystkie",
@@ -828,6 +831,7 @@
       'instr_body_problems': '<p>Aba Áreas problemáticas: conflitos por estação, por linha e rascunhos. Dados acumulam-se ao navegar. Clique abre a estação ou ficha de linha.</p>',
 
       checkUpdateBtn: "Verificar atualizações",
+      supportBtn: "Suporte",
       sourceFilterDraft: "Rascunhos",
       sourceFilterReal: "Linhas reais",
       favFilterAll: "Todas",
@@ -1054,6 +1058,7 @@
       'instr_body_problems': '<p>Záložka Problémové oblasti: konflikty dle stanice, dle linky a návrhy. Data se hromadí při procházení stanic. Klik otevře stanici nebo kartu linky.</p>',
 
       checkUpdateBtn: "Zkontrolovat aktualizace",
+      supportBtn: "Podpora",
       sourceFilterDraft: "Návrhy",
       sourceFilterReal: "Skutečné linky",
       favFilterAll: "Vše",
