@@ -12,6 +12,8 @@ release/
 win-unpacked/
 linux-unpacked/
 mac/
+mac-arm64/
+mac-universal/
 *.dmg
 *.exe
 *.AppImage
@@ -19,6 +21,11 @@ mac/
 *.rpm
 *.snap
 *.blockmap
+*.nsis.7z
+builder-debug.yml
+builder-effective-config.yaml
+latest*.yml
+.icon-ico/
 
 # App data & cache
 data/
@@ -36,6 +43,9 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+
+# Claude Code local settings (launch.json остаётся в репозитории)
+.claude/settings.local.json
 
 # Env
 .env

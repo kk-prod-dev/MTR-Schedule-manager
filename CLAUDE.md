@@ -25,7 +25,14 @@ Frontend (public/app.js)
   ├── fetches /api/stations, /api/routes, /api/schedule/:id
   ├── renders dashboard, train graph, route cards
   ├── i18n via I18N object (RU+EN in app.js, DE/FR/PL/PT/CS in i18n-extra.js)
+  ├── desktop notifications (conflicts network-wide + delays, runNotificationChecks)
   └── persists prefs via /api/prefs
+
+Editor tab (public/boardEditor.js)
+  ├── fabric.js canvas (vendor/fabric.min.js 5.5.2) for printable timetables
+  ├── inserts live station schedule as fabric groups (beRole/beCol/beSection meta)
+  ├── user edits stored as overrides in tableEdits — survive rebuilds/restart
+  └── persists presets + canvas + lastSchedule inside common prefs.json
 ```
 
 ## Key files
@@ -37,9 +44,12 @@ Frontend (public/app.js)
 | `src/schedule.js` | Core: buildStationSchedule, buildRouteGraph, conflict detection |
 | `src/store.js` | In-memory store, disk persistence (topology.json, departures-cache.json) |
 | `src/poller.js` | Background polling from MTR API |
-| `public/app.js` | All frontend logic (~4000 lines) |
+| `public/app.js` | All frontend logic (~5000 lines) |
+| `public/boardEditor.js` | Editor tab: fabric.js canvas for printable timetables |
+| `public/vendor/` | fabric.min.js, lz-string.min.js, Monocraft.ttf (plain `<script>` includes) |
 | `public/i18n-extra.js` | Translations for DE/FR/PL/PT/CS (merged into I18N at runtime) |
 | `public/index.html` | Single-page app shell |
+| `.github/workflows/build.yml` | CI: Win/mac/Linux builds on every push to main; publishes on `v*` tags |
 | `electron/main.js` | Electron main process, auto-updater |
 | `electron/preload.js` | contextBridge (savePrefsSync, onChangelog) |
 | `pending-changelog.json` | Shown once after update, then deleted by server |
@@ -63,10 +73,11 @@ npm run build         # alias for dist:win
 ### Time handling
 - All internal calculations use **UTC milliseconds from midnight**
 - `effArrival` / `tripOriginMs` are UTC ms — position blocks at `(ms / MS_PER_DAY) * TIMELINE_WIDTH`
-- Axis ticks: position at UTC ms, label via `formatLocal(m * 60000)` — shows local time at correct UTC position
+- Axis ticks (dashboard ruler + train graph): **strictly UTC 00:00–24:00**, regardless of user timezone — tz affects only train time labels (`formatLocal`)
 - `formatLocal(ms)` adds `currentTzOffsetMin() * 60000` for display only
-- `formatUtc(ms)` — pure UTC display, used in timetable cells
-- **Never** shift block positions by tzOffset — only shift labels
+- `formatUtc(ms)` — pure UTC display, used in timetable cells and axis labels
+- **Never** shift block positions by tzOffset
+- Route timetable cells: `trip.times` from the API already include live deviation — display planned time as `base − trip.deviationMs`, deviation separately in parens (`formatDeviationParen`)
 
 ### MTR API quirks
 - `vehicleId` has a typo: `cab_foward` (not `cab_forward`) — match both
@@ -148,10 +159,14 @@ npm run build         # alias for dist:win
 
 1. Update `version` in `package.json`
 2. Update `pending-changelog.json` with translations for all 7 languages (ru/en/de/fr/pl/pt/cs)
-3. Close running Electron app (releases `app.asar` lock)
-4. `npm run build` → creates `dist/MTRScheduleManager-Setup-x.x.x.exe`
-5. Create GitHub Release with tag `vX.X.X`, attach `.exe` + `latest.yml` from `dist/`
-6. `pending-changelog.json` ships in build — shown once on first launch after update
+3. Commit + push to `main`, then push tag `vX.X.X` — CI (`.github/workflows/build.yml`) builds Windows/macOS/Linux and attaches them to the GitHub Release automatically (release is created as draft — publish manually)
+4. `pending-changelog.json` ships in build — shown once on first launch after update
+
+Local Windows build still possible: close running Electron app (releases `app.asar` lock), then `npm run build`. macOS/Linux **cannot** be built on Windows — CI only.
+
+### Repo hygiene
+- `node_modules/`, `dist/`, `data/` are gitignored and **must stay untracked** — committed node_modules previously broke CI (Windows bin shims without exec bits shadowed real binaries on Linux/mac runners)
+- CI runs on every push to `main` (artifacts only) and on `v*` tags (publishes to release)
 
 ---
 

@@ -1,6 +1,6 @@
 # MTR Schedule Manager
 
-A desktop application for visualizing and managing train schedules on [Minecraft Transit Railway](https://www.minecrafttransitailway.com/) servers.
+A desktop application for visualizing and managing train schedules on [Minecraft Transit Railway](https://www.minecrafttransitrailway.com/) servers.
 
 ![Build](https://github.com/kk-prod-dev/MTR-Schedule-manager/actions/workflows/build.yml/badge.svg)
 ![Version](https://img.shields.io/github/v/release/kk-prod-dev/MTR-Schedule-manager)
@@ -11,7 +11,9 @@ A desktop application for visualizing and managing train schedules on [Minecraft
 
 - **Live timetable dashboard** — see all trains at any station in real time, with platform conflict detection
 - **Train graph** — space-time diagram showing all trips across stations
-- **Route cards** — metadata, train consist diagram, per-stop timetable, schedule formula
+- **Route cards** — metadata, train consist diagram, per-stop timetable with live deviations, schedule formula
+- **Editor** — free-form canvas for designing printable station timetables (Aushangfahrplan): insert a live timetable with filters and column selection, format text and shapes, presets, share codes, PNG export
+- **Desktop notifications** — alerts for new platform conflicts across the whole network and route delays, with thresholds and a favorites-only mode
 - **Conflict detection** — highlights platform overlaps and minimum-interval violations
 - **Draft routes** — plan new lines before adding them to the server
 - **Multi-server support** — manage and switch between multiple MTR servers
@@ -34,8 +36,11 @@ Download the latest installer from [Releases](https://github.com/kk-prod-dev/MTR
 | Platform | File |
 |----------|------|
 | Windows  | `MTRScheduleManager-Setup-x.x.x.exe` |
-| macOS    | `MTRScheduleManager-x.x.x.dmg` |
+| macOS (Apple Silicon) | `MTRScheduleManager-x.x.x-arm64.dmg` |
+| macOS (Intel) | `MTRScheduleManager-x.x.x-x64.dmg` |
 | Linux    | `MTRScheduleManager-x.x.x.AppImage` |
+
+macOS builds are unsigned — on first launch, right-click the app and choose **Open**.
 
 ---
 
@@ -63,9 +68,12 @@ npm run electron   # run in dev mode
 
 ```bash
 npm run dist:win    # Windows (.exe)
-npm run dist:mac    # macOS (.dmg)
-npm run dist:linux  # Linux (.AppImage)
+npm run dist:mac    # macOS (.dmg) — requires macOS
+npm run dist:linux  # Linux (.AppImage) — requires Linux
 ```
+
+CI builds all three platforms on every push to `main` (artifacts in the
+Actions run); pushing a `v*` tag also attaches them to the GitHub Release.
 
 ### Stack
 
@@ -91,6 +99,7 @@ npm run dist:linux  # Linux (.AppImage)
 ### Key files
 
 - `public/app.js` — all frontend logic, rendering, i18n, state
+- `public/boardEditor.js` — the Editor tab (fabric.js canvas for printable timetables)
 - `public/i18n-extra.js` — translations for DE / FR / PL / PT / CS
 - `src/schedule.js` — timetable calculation, conflict detection, train graph data
 - `src/store.js` — in-memory store with disk persistence

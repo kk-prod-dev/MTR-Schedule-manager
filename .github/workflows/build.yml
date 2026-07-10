@@ -1,19 +1,22 @@
-# Сборка дистрибутивов Linux (AppImage) и macOS (DMG).
-# Windows-установщик собирается локально (npm run build) — здесь только те
-# платформы, которые невозможно собрать на Windows-машине.
+# Сборка дистрибутивов для Windows, macOS и Linux.
 #
-# Запуск:
-#  - вручную со страницы Actions (workflow_dispatch) — артефакты появятся
-#    в результатах запуска;
-#  - при пуше тега v* (например v1.1.0) — файлы дополнительно прикрепятся
-#    к GitHub Release этого тега (electron-builder --publish).
-name: Build Linux & macOS dist
+# Запускается:
+#  - на каждый коммит в main — артефакты доступны в результатах запуска;
+#  - при пуше тега v* (например v1.1.0) — дистрибутивы дополнительно
+#    прикрепляются к GitHub Release этого тега (electron-builder --publish);
+#  - вручную со страницы Actions (workflow_dispatch).
+name: Build
 
 on:
-  workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+# Новый пуш в ту же ветку отменяет ещё идущую сборку предыдущего коммита
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
 
 # electron-builder --publish создаёт/дополняет GitHub Release —
 # дефолтному GITHUB_TOKEN нужны права на запись содержимого репозитория
@@ -21,6 +24,27 @@ permissions:
   contents: write
 
 jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - name: Build NSIS installer
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # На теге публикуем в релиз, на обычном коммите — только собираем
+        run: npx electron-builder --win --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            dist/*.exe
+            dist/latest.yml
+          if-no-files-found: error
+
   linux:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +56,6 @@ jobs:
       - name: Build AppImage
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # На теге публикуем в релиз, на ручном запуске — только собираем
         run: npx electron-builder --linux --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
       - uses: actions/upload-artifact@v4
         with:
