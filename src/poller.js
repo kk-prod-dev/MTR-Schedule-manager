@@ -61,11 +61,15 @@ function start() {
   setInterval(() => store.pruneDelayHistory(), 60 * 60 * 1000);
 }
 
-// Немедленный переопрос при смене URL сервера
-function restart() {
+// Немедленный переопрос при смене URL сервера. Сначала СБРАСЫВАЕМ старые
+// данные (иначе API до завершения нового опроса продолжает отдавать станции
+// и маршруты прежнего сервера), затем дожидаемся первого опроса нового —
+// вызывающая сторона (POST /api/server-url) ждёт этот промис, чтобы клиент
+// перезагружал списки уже с готовыми данными нового сервера.
+async function restart() {
   console.log("[poller] Перезапуск после смены URL сервера...");
-  pollTopology();
-  pollDepartures();
+  store.clearData();
+  await Promise.all([pollTopology(), pollDepartures()]);
 }
 
 module.exports = { start, restart };

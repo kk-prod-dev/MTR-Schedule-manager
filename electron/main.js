@@ -1,7 +1,7 @@
 "use strict";
 
 const path = require("path");
-const { app, BrowserWindow, Menu, shell, dialog, ipcMain } = require("electron");
+const { app, BrowserWindow, Menu, shell, dialog, ipcMain, session } = require("electron");
 const http = require("http");
 
 // ---------------------------------------------------------------------------
@@ -20,6 +20,16 @@ if (process.env.PORT === undefined) {
 }
 
 const isDev = !app.isPackaged;
+
+// Имя приложения и AppUserModelID (Windows). Без явного AUMID системные
+// уведомления показывают источник как "electron.app…"/имя exe вместо
+// названия приложения — из-за этого в заголовке всплывашки было "electronapp".
+// AUMID должен совпадать с appId сборки (electron-builder регистрирует его
+// у ярлыка с именем "MTR Schedule Manager").
+app.setName("MTR Schedule Manager");
+if (process.platform === "win32") {
+  app.setAppUserModelId("eu.georail.schedule");
+}
 
 let mainWindow = null;
 let serverPort = null;
@@ -46,6 +56,14 @@ if (!gotLock) {
 // ---------------------------------------------------------------------------
 function onReady() {
   Menu.setApplicationMenu(null); // убрано по запросу (пункт 3)
+  // Разрешаем запросы разрешений от нашего локального приложения (в т.ч.
+  // local-fonts для queryLocalFonts — список шрифтов ПК в редакторе
+  // расписаний, и notifications для уведомлений). Поведение совпадает с
+  // дефолтом Electron (без обработчика всё тоже разрешено), но задано явно.
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(true);
+  });
+  session.defaultSession.setPermissionCheckHandler(() => true);
   createWindow();
   startServer();
   if (!isDev) {
@@ -148,6 +166,14 @@ async function loadApp() {
 // Авто-обновление (electron-updater + GitHub Releases).
 // Активно только в собранном приложении и при наличии настроенного publish.
 // ---------------------------------------------------------------------------
+// IPC: клик по десктоп-уведомлению должен развернуть окно приложения.
+ipcMain.on("focus-window", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isVisible()) mainWindow.show();
+  mainWindow.focus();
+});
+
 // IPC: renderer запрашивает сохранение prefs при закрытии
 ipcMain.on("save-prefs-sync", (event, prefsJson) => {
   if (!serverPort) return;

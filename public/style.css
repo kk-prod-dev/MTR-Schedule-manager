@@ -119,6 +119,7 @@ tr.clickable-row:hover td { background: rgba(99,102,241,0.10); }
 .dev-pos { color: var(--red); }
 .dev-neg { color: var(--green); }
 .dev-zero { color: var(--muted); }
+.tt-dev { font-size: 0.82em; font-weight: 600; white-space: nowrap; }
 
 /* ===== Layout: сайдбар + основная область ===== */
 .layout-with-sidebar { display: flex; gap: 16px; align-items: flex-start; }
@@ -625,8 +626,6 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 }
 .fav-chip:hover { background: var(--panel2); border-color: var(--accent); }
 .fav-chip.fav-active { background: rgba(99,102,241,.15); border-color: var(--accent); color: var(--accent); }
-.fav-chip.fav-clear { color: var(--muted); padding: 3px 8px; }
-.fav-chip.fav-clear:hover { color: var(--red); border-color: var(--red); }
 
 .nearest-row {
   display: flex;
@@ -672,8 +671,18 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 }
 .problems-chevron { margin-left: auto; font-size: 10px; opacity: .5; transition: transform .2s; }
 .problems-section.open .problems-chevron { transform: rotate(180deg); }
-.problems-section-body { display: none; padding: 12px; }
-.problems-section.open .problems-section-body { display: block; }
+/* Тело секции видно всегда; в свёрнутом виде показываем ПЕРВУЮ СТРОКУ сетки
+   (сколько карточек влезло по ширине), при раскрытии — все остальные.
+   Клипуем по высоте одной строки: grid-auto-rows фиксирует высоту ряда,
+   overflow:hidden обрезает остальные ряды независимо от числа колонок. */
+.problems-section-body { display: block; padding: 12px; }
+.problems-section:not(.open) .problems-grid {
+  grid-auto-rows: 58px;
+  max-height: 58px;
+  overflow: hidden;
+  margin-bottom: 0;
+}
+.problems-section:not(.open) .problem-card { height: 58px; overflow: hidden; }
 .fav-filter-btn.active { background: rgba(251,191,36,.15) !important; border-color: #fbbf24 !important; }
 .fav-inline-btn { font-size: 14px !important; }
 
@@ -917,3 +926,242 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
   margin: 0 auto;
   display: block;
 }
+
+/* ===== Конструктор бумажных расписаний (Aushangfahrplan) ===== */
+/* Шрифт в стиле Minecraft (Monocraft, лицензия SIL OFL 1.1) для холста */
+@font-face {
+  font-family: "Minecraft";
+  src: url("vendor/Monocraft.ttf") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: "Minecraft";
+  src: url("vendor/Monocraft-Bold.ttf") format("truetype");
+  font-weight: bold;
+  font-style: normal;
+}
+.board-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.board-toolbar-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.board-num-input { width: 70px; }
+
+/* Выпадающий список видов линии с рисунками-примерами */
+.board-line-dd { position: relative; display: inline-block; }
+.board-line-style-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 8px; min-height: 30px;
+}
+.board-line-preview { display: inline-flex; align-items: center; color: var(--text); }
+.board-line-preview svg { display: block; }
+.board-line-caret { color: var(--muted); font-size: 10px; }
+.board-line-dd-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+}
+.board-line-dd-panel.open { display: block; }
+.board-line-opt {
+  display: flex; align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+}
+.board-line-opt:hover { background: var(--accent); color: #fff; }
+.board-line-opt.active { background: var(--panel2); }
+.board-line-opt svg { display: block; }
+
+/* Ползунок прозрачности объекта */
+.board-opacity { display: inline-flex; align-items: center; gap: 4px; }
+.board-opacity-icon { color: var(--muted); font-size: 14px; }
+.board-opacity input[type="number"] { width: 80px; }
+.board-opacity-pct { color: var(--muted); font-size: 12px; }
+.board-toolbar input[type="color"] {
+  padding: 2px;
+  width: 34px;
+  height: 30px;
+  cursor: pointer;
+}
+.board-canvas-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: auto;
+  max-height: 78vh;
+}
+.board-canvas-wrap .canvas-container { box-shadow: 0 4px 24px rgba(0,0,0,0.4); }
+#boardStatusHint { min-height: 16px; }
+
+/* Комбобокс шрифтов: поиск по набору + избранное звёздочкой */
+.board-font-ac { flex: 0 1 auto; min-width: 130px; max-width: 190px; }
+.board-font-ac .autocomplete-list { min-width: 250px; max-height: 320px; }
+.board-font-item { display: flex; align-items: center; gap: 7px; padding: 5px 10px; cursor: pointer; font-size: 14px; }
+.board-font-item:hover { background: var(--accent); color: #fff; }
+.board-font-star { cursor: pointer; color: var(--muted); width: 16px; text-align: center; flex-shrink: 0; }
+.board-font-star.fav { color: var(--amber); }
+.board-font-item:hover .board-font-star { color: #fff; }
+.board-font-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Панель инструментов: все группы видны сразу, разделены подписями и линиями */
+.board-tools-flat { align-items: stretch; gap: 0; row-gap: 10px; }
+.board-tool-group {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0 14px;
+}
+.board-tool-group:first-child { padding-left: 2px; }
+.board-tool-group + .board-tool-group { border-left: 1px solid var(--border); }
+.board-tool-caption {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+.board-tool-history { margin-left: auto; border-left: 1px solid var(--border); }
+
+/* SVG-иконки в кнопках панели (выравнивание и т.п.) */
+#tab-board .icon-btn svg { display: block; pointer-events: none; }
+#tab-board .icon-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 26px; }
+/* Активное состояние (напр. жирный шрифт выделенного текста) */
+#tab-board .icon-btn.active { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--panel2); }
+
+/* Контекстное меню ПКМ в редакторе */
+.board-ctx-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 190px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+  font-size: 13px;
+  user-select: none;
+}
+.board-ctx-item {
+  padding: 7px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  white-space: nowrap;
+}
+.board-ctx-item:hover { background: var(--accent); color: #fff; }
+.board-ctx-item.danger { color: #f87171; }
+.board-ctx-item.danger:hover { background: #f87171; color: #fff; }
+.board-ctx-item.disabled { color: var(--muted); opacity: 0.5; pointer-events: none; }
+.board-ctx-divider { height: 1px; background: var(--border); margin: 4px 6px; }
+
+/* Плашка с размерами выделенного объекта */
+.board-size-indicator {
+  position: absolute;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 2px 7px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 6;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+}
+
+/* Зум холста: полупрозрачные кнопки в углу */
+.board-canvas-outer { position: relative; }
+.board-zoom-controls {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.55;
+  transition: opacity .15s;
+  z-index: 5;
+}
+.board-zoom-controls:hover { opacity: 1; }
+.board-zoom-btn {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+.board-zoom-label { font-size: 11px; color: var(--muted); min-width: 36px; text-align: center; }
+
+/* Выпадающие панели конструктора (столбцы / фильтры) */
+.board-dd { position: relative; }
+.board-dd-panel {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 60;
+  min-width: 240px;
+  max-width: 320px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding: 10px;
+  background: var(--panel2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.45);
+}
+.board-dd-panel.open { display: flex; flex-direction: column; gap: 6px; }
+.board-dd-panel label {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.board-dd-panel label span { overflow: hidden; text-overflow: ellipsis; }
+.board-dd-sub { margin-left: 20px; opacity: 0.85; }
+.board-dd-panel .secondary-btn { margin-top: 6px; }
+.board-filter-group { display: flex; flex-direction: column; gap: 5px; }
+.board-filter-group + .board-filter-group { margin-top: 8px; }
+.board-filter-group-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.board-filter-all { font-size: 11px; color: var(--accent); text-decoration: none; text-transform: none; }
+.board-filter-all:hover { text-decoration: underline; }
+.board-filter-empty { font-size: 12px; color: var(--muted); max-width: 220px; }
+.board-sections { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }

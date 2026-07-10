@@ -103,6 +103,11 @@ const I18N = {
     colRoute: "Маршрут", colSamples: "Образцов", colAvgDev: "Среднее отклонение", colMaxDev: "Макс. опоздание",
     analyticsEmptyNoHistory: "История ещё не накоплена. Оставьте приложение запущенным — данные появятся в течение нескольких минут.",
     analyticsEmptyNoMatch: "Ничего не найдено",
+    errRouteNotFound: "Маршрут с таким id не найден.",
+    errStationNotFound: "Станция с таким id не найдена.",
+    errDataNotReady: "Данные ещё не получены от сервера MTR, подождите немного.",
+    errDraftNotFound: "Пробный маршрут не найден.",
+    errStationsNotFound: "Одна из станций не найдена.",
     languageLabel: "Язык интерфейса",
     timezoneLabel: "Часовой пояс",
     autoOption: "Авто (по настройкам системы)",
@@ -131,7 +136,7 @@ const I18N = {
     removeColumnLastError: "Нельзя удалить последнее отправление — у маршрута должен остаться хотя бы один рейс.",
     addColumnPrompt: "Время отправления (ЧЧ:ММ) в выбранном часовом поясе:",
     addColumnInvalid: "Некорректный формат времени. Введите в формате ЧЧ:ММ, например 08:30.",
-    colDepotDeparture: "От первой остановки",
+    colDepotDeparture: "Время отправления",
     colStation: "Станция", colPlatform: "Платформа", colDwell: "Стоянка", colNext: "До следующей", colCoords: "Координаты",
     copyBtn: "Копировать", copiedBtn: "Скопировано",
     errLoading: "Ошибка загрузки: {msg}",
@@ -181,6 +186,20 @@ const I18N = {
     notifPermissionDenied: "Уведомления заблокированы в вашем браузере. Разрешите их в настройках браузера.",
     notifSettingsTitle: "Уведомления",
     notifConflict: "Уведомлять о новых конфликтах платформ",
+    notifDelay: "Уведомлять о новых опозданиях",
+    notifDelayThresholdLabel: "Порог опоздания",
+    notifSectionLabel: "Уведомления",
+    notifCooldownLabel: "Пауза между уведомлениями",
+    notifConflictTitle: "Конфликты на платформах",
+    notifConflictBodyOne: "Обнаружен конфликт на станции «{station}». Откройте вкладку «Проблемные места».",
+    notifConflictBodyMany: "Найдено конфликтов на {count} станциях. Откройте вкладку «Проблемные места».",
+    notifDelayTitle: "Опоздание",
+    notifDelayBody: "Маршрут {route} опаздывает на {min} мин.",
+    notifDelayBodyMany: "Опаздывают маршрутов: {count}. Наибольшее опоздание — {route} ({min} мин).",
+    problemsStationsWord: "ст.",
+    notifPermissionDenied: "Система или браузер запретили уведомления для приложения — разрешите их в настройках ОС.",
+    problemsScanStart: "Анализ сети…",
+    problemsScanProgress: "Анализ сети: просмотрено {done}/{total} станций…",
     notifBigDelay: "Уведомлять о больших опозданиях (>5 мин)",
     notifThreshold: "Порог опоздания (мин)",
     'instr_title_schedule-basics': 'Расписание по станции',
@@ -203,6 +222,123 @@ const I18N = {
     'instr_body_schedule_formula': '<p>При редактировании маршрута в карточке появляется блок «Формула расписания». Он показывает паттерн отправлений на основе ваших ручных правок: интервал между рейсами и смещение первого рейса от полуночи UTC.</p><p>Формула автоматически обновляется при каждом изменении расписания и помогает убедиться что правки образуют равномерный интервал. Скопируйте формулу кнопкой ⧉ чтобы передать расписание другому игроку.</p>',
     'instr_title_settings': 'Настройки',
     'instr_body_settings': '<p>Язык и часовой пояс определяются автоматически. Языки: RU, EN, DE, FR, PL, PT, CS.</p><p><b>Серверы MTR</b> — список серверов; выберите активный из выпадающего, + добавляет URL, − удаляет; при смене данные перезагружаются; localhost:8888 доступен всегда.</p><p><b>Часовой пояс</b> — только на время поездов; таблицы и графики всегда UTC 00:00–24:00.</p><p>Настройки сохраняются автоматически. Внизу — версия и кнопка обновлений.</p>',
+    'instr_title_board-editor': 'Редактор (бумажное расписание)',
+    'instr_body_board-editor': '<p>Вкладка <b>Редактор</b> — холст для вёрстки бумажного расписания станции (Aushangfahrplan): свободно расставляйте элементы, а живое расписание вставляйте кнопкой.</p><p><b>Вставка</b> — отдельные кнопки со значками: текст, квадрат, круг, треугольник, линия, картинка, схема станции. Каждый объект добавляется на холст и редактируется вручную.</p><p><b>Объект</b> — цвет, выравнивание, порядок слоёв, группировка (<code>Ctrl+G</code>), дублирование (<code>Ctrl+D</code>), удаление, цвет и толщина границы, а также выпадающий список <b>видов линии</b> — сплошная, пунктир, точки, штрих-пунктир, волнистая, зигзаг — с наглядными рисунками-примерами прямо в списке.</p><p>Объекты можно вращать за угловой маркер; с зажатым <code>Shift</code> поворот идёт шагом 45°.</p><p><b>Текст</b> — комбобокс шрифтов с поиском и избранным (★), кнопка «Шрифты с ПК», размер, жирность, выравнивание.</p><p>Нижняя панель: <b>Столбцы</b> (прибытие, отправление, линия, цвет маршрута, направление, платформа) → «Вставить столбцы»; <b>Фильтры</b>; число секций; шрифт расписания; «Холст под расписание»; пробел между часами; язык холста; поиск станции → «Вставить расписание станции».</p><p>Готовый холст можно сохранить в PNG, скопировать в буфер, сохранить как пресет или обменяться кодом (Экспорт/Импорт). Масштаб — <code>Ctrl</code>+колесо или кнопки +/−.</p>',
+    tabBoard: "Редактор",
+    boardHint: "Редактор-холст для оформления бумажного расписания станции: свободно расставляйте текст, фигуры и картинки, а расписание вставляйте кнопкой ниже — редактировать вручную можно всё.",
+    boardPageA4P: "A4 портрет",
+    boardPageA4L: "A4 альбом",
+    boardPageCustom: "Свой размер",
+    boardAddText: "+ Текст",
+    boardAddRect: "+ Прямоугольник",
+    boardAddShape: "+ Фигура",
+    boardShapeSquare: "Квадрат",
+    boardShapeCircle: "Круг",
+    boardShapeTriangle: "Треугольник",
+    boardShapeTypeTitle: "Тип фигуры",
+    boardInsertSchemeBtn: "+ Схема станции",
+    boardSchemeInserted: "Схема станции «{name}» добавлена.",
+    boardSchemeError: "Не удалось построить схему",
+    boardAddLine: "+ Линия",
+    boardAddImage: "+ Картинка",
+    boardBringFront: "На передний план",
+    boardSendBack: "На задний план",
+    boardGroup: "Сгруппировать",
+    boardUngroup: "Разгруппировать",
+    boardObjAlignLeft: "Выровнять по левому краю",
+    boardObjAlignCenterH: "Выровнять по центру (по горизонтали)",
+    boardObjAlignRight: "Выровнять по правому краю",
+    boardObjAlignTop: "Выровнять по верхнему краю",
+    boardObjAlignMiddleV: "Выровнять по центру (по вертикали)",
+    boardObjAlignBottom: "Выровнять по нижнему краю",
+    boardDuplicate: "Дублировать",
+    boardCut: "Вырезать",
+    boardCopy: "Копировать",
+    boardPaste: "Вставить",
+    boardDelete: "Удалить",
+    boardClearBtn: "Очистить холст",
+    boardInsertScheduleBtn: "Вставить расписание станции",
+    boardExportPngBtn: "Экспорт PNG",
+    boardCopyClipboardBtn: "Скопировать в буфер",
+    boardPresetNamePlaceholder: "Название пресета",
+    boardPresetSaveBtn: "Сохранить пресет",
+    boardPresetLoadBtn: "Загрузить",
+    boardShareExportBtn: "Код для шаринга",
+    boardShareImportBtn: "Импорт кода",
+    boardDefaultText: "Текст",
+    boardColTime: "Время",
+    boardColLine: "Линия",
+    boardColDest: "Направление",
+    boardColPlatform: "Платформа",
+    boardColArrival: "Прибытие",
+    boardColDeparture: "Отправление",
+    boardColRouteColor: "Квадрат с цветом маршрута",
+    boardColumnsBtn: "Столбцы",
+    boardInsertColumnsBtn: "Вставить столбцы",
+    boardFiltersBtn: "Фильтры",
+    boardFilterPlatforms: "Платформы",
+    boardFilterTypes: "Типы поездов",
+    boardFilterRoutes: "Маршруты",
+    boardFilterAll: "все",
+    boardFilterEmpty: "Сначала выберите станцию — фильтры строятся по её рейсам.",
+    boardSectionsLabel: "Секции",
+    boardSectionsAuto: "авто",
+    boardNoColumnsSelected: "Выберите хотя бы один столбец.",
+    boardColumnsInserted: "Заголовки столбцов вставлены — теперь вставьте расписание станции.",
+    boardFilteredOutAll: "Все рейсы скрыты фильтрами — ослабьте фильтры.",
+    boardTableFontLabel: "Шрифт расписания",
+    boardAutoSizeLabel: "Холст под расписание",
+    boardFitCanvasBtn: "Лист под таблицу",
+    boardFitCanvasHint: "Подогнать размер листа под таблицу (разово)",
+    boardHourGapLabel: "Пробел между часами",
+    boardCanvasLangLabel: "Язык холста",
+    boardCanvasLangAuto: "как интерфейс",
+    boardTabCanvas: "Холст",
+    boardTabInsert: "Вставка",
+    boardTabObject: "Объект",
+    boardTabText: "Текст",
+    boardLineStyleTitle: "Вид линии",
+    boardLineSolid: "Сплошная",
+    boardLineDashed: "Пунктир",
+    boardLineDotted: "Точки",
+    boardLineDashDot: "Штрих-пунктир",
+    boardLineWavy: "Волнистая",
+    boardLineZigzag: "Зигзаг",
+    boardFilterFlow: "Тип остановки",
+    boardFlowThrough: "Проходящие",
+    boardFlowOrigin: "Начальные (без прибытия)",
+    boardFlowTerminus: "Конечные (без отправления)",
+    boardColorTitle: "Цвет выделенных объектов",
+    boardStrokeColorTitle: "Цвет границы фигуры",
+    boardStrokeWidthTitle: "Толщина линии и границы (0 — граница выключена)",
+    boardOpacityTitle: "Прозрачность объекта",
+    boardUndo: "Отменить",
+    boardRedo: "Повторить",
+    boardSystemFontsBtn: "Шрифты с ПК",
+    boardSystemFontsGroup: "Системные шрифты",
+    boardSystemFontsLoaded: "Загружено системных шрифтов: {count}",
+    boardSystemFontsError: "Не удалось получить шрифты с ПК — система или браузер не разрешили доступ.",
+    boardLoadingSchedule: "Загружаем расписание...",
+    boardNoDepartures: "У этой станции сейчас нет активных рейсов.",
+    boardScheduleInserted: "Вставлено расписание станции «{name}»: {count} рейсов.",
+    boardScheduleOverflow: "Вставлено {total} рейсов, но {count} из них не помещаются на листе — увеличьте холст, уберите лишние столбцы или отфильтруйте рейсы.",
+    boardScheduleError: "Не удалось загрузить расписание",
+    boardSelectStationFirst: "Сначала выберите станцию из списка подсказок.",
+    boardConfirmClear: "Текущий холст будет заменён. Продолжить?",
+    boardCopiedToClipboard: "Скопировано в буфер обмена.",
+    boardCopyError: "Не удалось скопировать",
+    boardNoPresets: "Пресетов пока нет",
+    boardPresetNameRequired: "Укажите название пресета.",
+    boardPresetSaved: "Пресет «{name}» сохранён.",
+    boardShareExportTitle: "Код для шаринга",
+    boardShareExportHint: "Скопируйте код и отправьте его в чат — получатель сможет импортировать этот холст кнопкой «Импорт кода».",
+    boardShareImagesStripped: "Картинки не попадают в код (он раздувается) — в коде они заменены серыми плейсхолдерами.",
+    boardShareCopyBtn: "Скопировать",
+    boardShareImportTitle: "Импорт кода",
+    boardShareImportHint: "Вставьте код, полученный от другого игрока, и нажмите «Импортировать».",
+    boardShareImportBtnAction: "Импортировать",
+    boardShareInvalidCode: "Код повреждён или в неподдерживаемом формате.",
+    boardShareImported: "Холст импортирован.",
   },
   en: {
     appTitle: "MTR Schedule Manager",
@@ -303,6 +439,11 @@ const I18N = {
     colRoute: "Route", colSamples: "Samples", colAvgDev: "Average deviation", colMaxDev: "Max delay",
     analyticsEmptyNoHistory: "No history yet. Leave the app running — data will appear within a few minutes.",
     analyticsEmptyNoMatch: "No matches",
+    errRouteNotFound: "No route found with this id.",
+    errStationNotFound: "No station found with this id.",
+    errDataNotReady: "Data not yet received from the MTR server, please wait.",
+    errDraftNotFound: "Draft route not found.",
+    errStationsNotFound: "One of the stations was not found.",
     languageLabel: "Interface language",
     timezoneLabel: "Timezone",
     autoOption: "Auto (use system setting)",
@@ -331,7 +472,7 @@ const I18N = {
     removeColumnLastError: "Can't remove the last departure — the route must keep at least one trip.",
     addColumnPrompt: "Departure time (HH:MM) in the selected timezone:",
     addColumnInvalid: "Invalid time format. Use HH:MM, e.g. 08:30.",
-    colDepotDeparture: "First stop time",
+    colDepotDeparture: "Departure time",
     colStation: "Station", colPlatform: "Platform", colDwell: "Dwell", colNext: "To next", colCoords: "Coordinates",
     copyBtn: "Copy", copiedBtn: "Copied",
     errLoading: "Failed to load: {msg}",
@@ -375,8 +516,20 @@ const I18N = {
     notifPermissionDenied: "Notifications are blocked in your browser. Allow them in browser settings.",
     notifSettingsTitle: "Notifications",
     notifConflict: "Notify on new conflicts",
-    notifBigDelay: "Notify on large delays (>5 min)",
-    notifThreshold: "Delay threshold (min)",
+    notifDelay: "Notify on new delays",
+    notifDelayThresholdLabel: "Delay threshold",
+    notifSectionLabel: "Notifications",
+    notifCooldownLabel: "Pause between notifications",
+    notifConflictTitle: "Platform conflicts",
+    notifConflictBodyOne: "Conflict detected at station “{station}”. Open the Problem areas tab.",
+    notifConflictBodyMany: "Conflicts found at {count} stations. Open the Problem areas tab.",
+    notifDelayTitle: "Delay",
+    notifDelayBody: "Route {route} is running {min} min late.",
+    notifDelayBodyMany: "{count} routes are delayed. Biggest: {route} ({min} min).",
+    problemsStationsWord: "stations",
+    notifPermissionDenied: "The system or browser blocked notifications for this app — allow them in OS settings.",
+    problemsScanStart: "Analyzing the network…",
+    problemsScanProgress: "Analyzing the network: scanned {done}/{total} stations…",
     'instr_title_schedule-basics': 'Station schedule',
     'instr_body_schedule-basics': '<p>Start typing a station name in the search field — a list of suggestions appears, click the one you need. The dashboard shows all platforms and train arrivals on a timeline. The ☆ button next to the search adds the station to <b>Favorites</b> (a quick-access bar appears below).</p><p>A bright border = deviation over 1 min. Amber "!" = conflict: two trains too close on the same platform. The <b>"Upcoming arrivals"</b> sidebar widget shows the 6 nearest trains and refreshes every 30 seconds.</p>',
     'instr_title_drag-edit': 'Manual editing (drag)',
@@ -404,6 +557,125 @@ const I18N = {
     serverUrlSaved: "URL saved, reloading...",
     serverUrlError: "Error saving URL",
     'instr_body_settings': "<p>Language and timezone default to auto-detected values but can be switched manually — all times recalculate instantly. Supported languages: RU, EN, DE, FR, PL, PT, CS.</p><p><b>MTR server timezone</b> — if trains appear shifted, select your MTR server's timezone here. Settings and favorites persist across restarts.</p><p>The current tab + selected station are saved in the URL (#tab=…).</p>",
+    'instr_title_schedule_formula': 'Schedule formula',
+    'instr_body_schedule_formula': '<p>When editing a route, a "Schedule formula" block appears in the card. It shows the departure pattern derived from your manual edits: the interval between trips and the offset of the first trip from UTC midnight.</p><p>The formula updates automatically on every schedule change and helps confirm the edits form an even interval. Copy it with the ⧉ button to share the schedule with another player.</p>',
+    'instr_title_board-editor': 'Editor (paper schedule)',
+    'instr_body_board-editor': '<p>The <b>Editor</b> tab is a canvas for laying out a printable station schedule (Aushangfahrplan): place elements freely and insert the live timetable with a button.</p><p><b>Insert</b> — separate icon buttons: text, square, circle, triangle, line, image, station scheme. Each object is added to the canvas and fully editable by hand.</p><p><b>Object</b> — color, alignment, layer order, grouping (<code>Ctrl+G</code>), duplicate (<code>Ctrl+D</code>), delete, border color/width, and a <b>line-style</b> dropdown — solid, dashed, dotted, dash-dot, wavy, zigzag — showing an actual preview drawing of each style right in the list.</p><p>Rotate objects via the corner handle; hold <code>Shift</code> to snap rotation to 45° steps.</p><p><b>Text</b> — a font combobox with search and favorites (★), a "PC fonts" button, size, bold, alignment.</p><p>Bottom bar: <b>Columns</b> (arrival, departure, line, route color, destination, platform) → "Insert columns"; <b>Filters</b>; section count; schedule font size; "Fit canvas to schedule"; hour gap; canvas language; station search → "Insert station schedule".</p><p>Export the finished canvas to PNG, copy it to the clipboard, save it as a preset, or exchange it via a share code (Export/Import). Zoom with <code>Ctrl</code>+wheel or the +/− buttons.</p>',
+    tabBoard: "Editor",
+    boardHint: "A free-form canvas editor for a printable station timetable poster: place text, shapes and images anywhere, then insert the real schedule with the button below — everything stays manually editable afterwards.",
+    boardPageA4P: "A4 portrait",
+    boardPageA4L: "A4 landscape",
+    boardPageCustom: "Custom size",
+    boardAddText: "+ Text",
+    boardAddRect: "+ Rectangle",
+    boardAddShape: "+ Shape",
+    boardShapeSquare: "Square",
+    boardShapeCircle: "Circle",
+    boardShapeTriangle: "Triangle",
+    boardShapeTypeTitle: "Shape type",
+    boardInsertSchemeBtn: "+ Station scheme",
+    boardSchemeInserted: "Scheme for station “{name}” added.",
+    boardSchemeError: "Couldn't build the scheme",
+    boardAddLine: "+ Line",
+    boardAddImage: "+ Image",
+    boardBringFront: "Bring to front",
+    boardSendBack: "Send to back",
+    boardGroup: "Group",
+    boardUngroup: "Ungroup",
+    boardObjAlignLeft: "Align left",
+    boardObjAlignCenterH: "Align center (horizontal)",
+    boardObjAlignRight: "Align right",
+    boardObjAlignTop: "Align top",
+    boardObjAlignMiddleV: "Align middle (vertical)",
+    boardObjAlignBottom: "Align bottom",
+    boardDuplicate: "Duplicate",
+    boardCut: "Cut",
+    boardCopy: "Copy",
+    boardPaste: "Paste",
+    boardDelete: "Delete",
+    boardClearBtn: "Clear canvas",
+    boardInsertScheduleBtn: "Insert station schedule",
+    boardExportPngBtn: "Export PNG",
+    boardCopyClipboardBtn: "Copy to clipboard",
+    boardPresetNamePlaceholder: "Preset name",
+    boardPresetSaveBtn: "Save preset",
+    boardPresetLoadBtn: "Load",
+    boardShareExportBtn: "Share code",
+    boardShareImportBtn: "Import code",
+    boardDefaultText: "Text",
+    boardColTime: "Time",
+    boardColLine: "Line",
+    boardColDest: "Destination",
+    boardColPlatform: "Platform",
+    boardColArrival: "Arrival",
+    boardColDeparture: "Departure",
+    boardColRouteColor: "Route colour square",
+    boardColumnsBtn: "Columns",
+    boardInsertColumnsBtn: "Insert columns",
+    boardFiltersBtn: "Filters",
+    boardFilterPlatforms: "Platforms",
+    boardFilterTypes: "Train types",
+    boardFilterRoutes: "Routes",
+    boardFilterAll: "all",
+    boardFilterEmpty: "Select a station first — filters are built from its departures.",
+    boardSectionsLabel: "Sections",
+    boardSectionsAuto: "auto",
+    boardNoColumnsSelected: "Select at least one column.",
+    boardColumnsInserted: "Column headers inserted — now insert a station schedule.",
+    boardFilteredOutAll: "All departures are hidden by the filters — relax the filters.",
+    boardTableFontLabel: "Timetable font",
+    boardAutoSizeLabel: "Fit canvas to timetable",
+    boardFitCanvasBtn: "Fit sheet to table",
+    boardFitCanvasHint: "Resize the sheet to fit the timetable (once)",
+    boardHourGapLabel: "Gap between hours",
+    boardCanvasLangLabel: "Canvas language",
+    boardCanvasLangAuto: "same as UI",
+    boardTabCanvas: "Canvas",
+    boardTabInsert: "Insert",
+    boardTabObject: "Object",
+    boardTabText: "Text",
+    boardLineStyleTitle: "Line style",
+    boardLineSolid: "Solid",
+    boardLineDashed: "Dashed",
+    boardLineDotted: "Dotted",
+    boardLineDashDot: "Dash-dot",
+    boardLineWavy: "Wavy",
+    boardLineZigzag: "Zigzag",
+    boardFilterFlow: "Stop type",
+    boardFlowThrough: "Passing through",
+    boardFlowOrigin: "Originating (no arrival)",
+    boardFlowTerminus: "Terminating (no departure)",
+    boardColorTitle: "Colour of selected objects",
+    boardStrokeColorTitle: "Shape border colour",
+    boardStrokeWidthTitle: "Line and border width (0 = border off)",
+    boardOpacityTitle: "Object opacity",
+    boardUndo: "Undo",
+    boardRedo: "Redo",
+    boardSystemFontsBtn: "PC fonts",
+    boardSystemFontsGroup: "System fonts",
+    boardSystemFontsLoaded: "Loaded {count} system fonts",
+    boardSystemFontsError: "Couldn't get fonts from this PC — access was not allowed.",
+    boardLoadingSchedule: "Loading schedule...",
+    boardNoDepartures: "This station has no active trips right now.",
+    boardScheduleInserted: "Inserted schedule for station “{name}”: {count} trips.",
+    boardScheduleOverflow: "Inserted {total} trips, but {count} of them don't fit on the sheet — enlarge the canvas, remove columns or filter the trips.",
+    boardScheduleError: "Failed to load schedule",
+    boardSelectStationFirst: "Select a station from the suggestion list first.",
+    boardConfirmClear: "The current canvas will be replaced. Continue?",
+    boardCopiedToClipboard: "Copied to clipboard.",
+    boardCopyError: "Failed to copy",
+    boardNoPresets: "No presets yet",
+    boardPresetNameRequired: "Enter a preset name.",
+    boardPresetSaved: "Preset “{name}” saved.",
+    boardShareExportTitle: "Share code",
+    boardShareExportHint: "Copy this code and send it in chat — the recipient can import this canvas with the “Import code” button.",
+    boardShareImagesStripped: "Images are not included in the code (it would get too large) — they're replaced with gray placeholders in the code.",
+    boardShareCopyBtn: "Copy",
+    boardShareImportTitle: "Import code",
+    boardShareImportHint: "Paste the code you got from another player and click “Import”.",
+    boardShareImportBtnAction: "Import",
+    boardShareInvalidCode: "The code is corrupted or in an unsupported format.",
+    boardShareImported: "Canvas imported.",
   }
 };
 
@@ -434,6 +706,11 @@ const settings = {
   serverTzOffsetMin: 0, // часовой пояс сервера MTR (вычитается из времён API)
   serverUrl: "", // URL MTR-сервера (пустая строка = дефолтный)
   serverList: [], // список серверов пользователя
+  notifConflict: false,   // десктоп-уведомления о новых конфликтах платформ
+  notifDelay: false,      // десктоп-уведомления о новых опозданиях маршрутов
+  notifOnlyFav: false,    // уведомлять только по избранным станциям/маршрутам
+  notifCooldownMin: 5,    // пауза между уведомлениями, минут
+  delayThresholdMin: 5,   // порог опоздания для уведомления, минут
 };
 function currentLang() {
   return settings.langMode === "auto" ? detectSystemLang() : settings.langMode;
@@ -450,6 +727,61 @@ function t(key, vars) {
   return str;
 }
 
+// Ошибки приходят с сервера на русском (server.js). Переводим известные
+// сообщения в язык интерфейса; незнакомые показываем как есть.
+const SERVER_ERR_MAP = {
+  "Маршрут с таким id не найден.": "errRouteNotFound",
+  "Станция с таким id не найдена.": "errStationNotFound",
+  "Данные ещё не получены от сервера MTR, подождите немного.": "errDataNotReady",
+  "Пробный маршрут не найден.": "errDraftNotFound",
+  "Одна из станций не найдена.": "errStationsNotFound",
+};
+function tServerError(msg) {
+  const key = SERVER_ERR_MAP[(msg || "").trim()];
+  return key ? t(key) : (msg || "");
+}
+
+// ── Множественное число с учётом языка ──────────────────────────────────
+// Славянские языки (ru/pl/cs) требуют 3 формы (1 / 2–4 / 5+ с исключениями),
+// остальные — 2 (единственное / множественное).
+function _pluralSlavic(n, one, few, many) {
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+function _pluralCs(n, one, few, many) {
+  if (n === 1) return one;
+  if (n >= 2 && n <= 4) return few;
+  return many;
+}
+const PLURAL_FORMS = {
+  station: {
+    en: (n) => (n === 1 ? "station" : "stations"),
+    ru: (n) => _pluralSlavic(n, "станция", "станции", "станций"),
+    de: (n) => (n === 1 ? "Bahnhof" : "Bahnhöfe"),
+    fr: (n) => (n === 1 ? "gare" : "gares"),
+    pl: (n) => _pluralSlavic(n, "stacja", "stacje", "stacji"),
+    pt: (n) => (n === 1 ? "estação" : "estações"),
+    cs: (n) => _pluralCs(n, "stanice", "stanice", "stanic"),
+  },
+  conflict: {
+    en: (n) => (n === 1 ? "conflict" : "conflicts"),
+    ru: (n) => _pluralSlavic(n, "конфликт", "конфликта", "конфликтов"),
+    de: (n) => (n === 1 ? "Konflikt" : "Konflikte"),
+    fr: (n) => (n === 1 ? "conflit" : "conflits"),
+    pl: (n) => _pluralSlavic(n, "konflikt", "konflikty", "konfliktów"),
+    pt: (n) => (n === 1 ? "conflito" : "conflitos"),
+    cs: (n) => _pluralCs(n, "konflikt", "konflikty", "konfliktů"),
+  },
+};
+function pluralWord(count, kind) {
+  const table = PLURAL_FORMS[kind];
+  if (!table) return "";
+  const fn = table[currentLang()] || table.en;
+  return fn(Number(count) || 0);
+}
+
 function applyI18n() {
   document.documentElement.lang = currentLang();
   document.querySelectorAll("[data-i18n]").forEach((el) => {
@@ -457,6 +789,10 @@ function applyI18n() {
   });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    // data-hotkey — подсказка горячей клавиши, не переводится
+    el.title = t(el.dataset.i18nTitle) + (el.dataset.hotkey ? ` (${el.dataset.hotkey})` : "");
   });
 }
 
@@ -555,6 +891,13 @@ function formatDeviation(ms) {
   const s = totalSec % 60;
   const unit = currentLang() === "ru" ? `${m}м ${s}с` : `${m}m ${s}s`;
   return `${sign}${unit}`;
+}
+// Компактное отклонение в скобках для ячеек расписания: "(+5)" / "(−2)".
+// Пусто, если поезд идёт по графику (в пределах ±1 мин). Минуты округляются.
+function formatDeviationParen(ms) {
+  if (ms == null || Math.abs(ms) <= 60000) return "";
+  const mins = Math.round(ms / 60000);
+  return `(${mins > 0 ? "+" : "−"}${Math.abs(mins)})`;
 }
 /** Локализованное "N мин" / "N min" — переиспользуется везде, где нужно
  * показать длительность в минутах (правки, перегоны и т.п.). */
@@ -877,15 +1220,66 @@ document.addEventListener("click", (e) => {
 // ============================================================
 // Проблемные места — коллапсируемые секции, избранные первыми
 // ============================================================
-function renderProblems() {
+// Обход всей сети чанками через /api/analytics/conflict-scan. Результат
+// кешируется на CONFLICT_SCAN_TTL, чтобы фоновые уведомления и повторное
+// открытие вкладки не сканировали сеть заново каждый раз.
+const CONFLICT_SCAN_TTL = 120000;
+let _conflictScan = { at: 0, stations: [], running: null };
+async function runFullConflictScan(onProgress) {
+  const fresh = _conflictScan.stations.length && Date.now() - _conflictScan.at < CONFLICT_SCAN_TTL;
+  if (fresh && !onProgress) return _conflictScan.stations;
+  if (_conflictScan.running) return _conflictScan.running;
+  const minIntervalMin = state.minIntervalMin || 3;
+  const LIMIT = 60;
+  const run = (async () => {
+    const all = [];
+    let offset = 0, total = 0;
+    do {
+      let data;
+      try {
+        const res = await fetch(`/api/analytics/conflict-scan?offset=${offset}&limit=${LIMIT}&minIntervalMin=${minIntervalMin}`);
+        if (!res.ok) break;
+        data = await res.json();
+      } catch (e) { break; }
+      total = data.total || 0;
+      if (Array.isArray(data.conflicts)) all.push(...data.conflicts);
+      offset += data.scanned || LIMIT;
+      if (onProgress) { try { onProgress(Math.min(offset, total), total, all.length); } catch (e) {} }
+    } while (offset < total && total > 0);
+    _conflictScan = { at: Date.now(), stations: all, running: null };
+    return all;
+  })();
+  _conflictScan.running = run;
+  return run;
+}
+
+async function renderProblems() {
   const el = document.getElementById("problemsContent");
   if (!el) return;
 
+  // Если данных обхода нет или они устарели — показываем прогресс анализа.
+  const fresh = _conflictScan.stations.length && Date.now() - _conflictScan.at < CONFLICT_SCAN_TTL;
+  if (!fresh) {
+    el.innerHTML = `<p class="hint" id="problemsScanProgress">${escapeHtml(t("problemsScanStart"))}</p>`;
+    const prog = document.getElementById("problemsScanProgress");
+    await runFullConflictScan((done, total) => {
+      if (prog) prog.textContent = t("problemsScanProgress", { done, total });
+    });
+    // Пользователь мог уйти с вкладки — но перерисовка скрытого блока безвредна
+  }
+  renderProblemsSections(el);
+}
+
+function renderProblemsSections(el) {
   const favRouteIds = new Set(favoriteRoutes.map((r) => r.id));
   const favStationIds = new Set(favorites.map((s) => s.id));
 
-  // Используем накопленные конфликты (собираются по мере открытия станций на дашборде)
-  const allStationConflicts = Array.from((state._conflictedStations || new Map()).values());
+  // Обход всей сети + накопленные при просмотре станции конфликты (последние
+  // отражают ручные правки пользователя и имеют приоритет по stationId).
+  const merged = new Map();
+  for (const s of _conflictScan.stations) merged.set(s.stationId, s);
+  for (const s of (state._conflictedStations || new Map()).values()) merged.set(s.stationId, s);
+  const allStationConflicts = Array.from(merged.values());
   const conflictsByRoute = new Map();
   for (const st of allStationConflicts) {
     for (const rid of st.routeIds || []) {
@@ -894,8 +1288,11 @@ function renderProblems() {
     }
   }
 
+  // Только реально опаздывающие маршруты (среднее опоздание > 1 мин — вне
+  // «в графике ±60с»), и только те, что существуют на текущем сервере
+  // (в истории опозданий могут остаться ID с других серверов).
   const byDelay = state.lastAnalytics
-    .filter((a) => a.sampleCount >= 3 && a.avgDeviationMs > 0)
+    .filter((a) => a.sampleCount >= 3 && a.avgDeviationMs > 60000 && state.routesById.has(a.routeId))
     .sort((a, b) => {
       const fa = favRouteIds.has(a.routeId) ? 0 : 1, fb = favRouteIds.has(b.routeId) ? 0 : 1;
       if (fa !== fb) return fa - fb;
@@ -915,17 +1312,25 @@ function renderProblems() {
       </div>
     </div>`;
 
+  // Избранные станции — первыми, затем по числу конфликтов (по убыванию).
   const stItems = allStationConflicts
-    .sort((a, b) => (favStationIds.has(b.stationId) ? 1 : 0) - (favStationIds.has(a.stationId) ? 1 : 0));
+    .slice()
+    .sort((a, b) => {
+      const fa = favStationIds.has(a.stationId) ? 0 : 1, fb = favStationIds.has(b.stationId) ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      return (b.conflictCount || 0) - (a.conflictCount || 0);
+    });
   const stHtml = stItems.length
-    ? `<div class="problems-grid">${stItems.slice(0, 30).map((st) =>
+    ? `<div class="problems-grid">${stItems.slice(0, 300).map((st) =>
         `<div class="problem-card" data-goto-station="${escapeHtml(st.stationId)}" style="cursor:pointer;">
           <div class="problem-card-name">${favStationIds.has(st.stationId) ? "★ " : ""}${escapeHtml(st.stationName)}</div>
-          <div class="problem-card-sub">${st.conflictCount} ${escapeHtml(t("conflictLabel")).toLowerCase()}</div>
+          <div class="problem-card-sub">${st.conflictCount} ${escapeHtml(pluralWord(st.conflictCount, "conflict"))}</div>
         </div>`).join("")}</div>`
     : "";
 
+  // Маршруты с других серверов (ID нет в текущей топологии) не показываем.
   const rtItems = Array.from(conflictsByRoute.entries())
+    .filter(([rid]) => state.routesById.has(rid))
     .sort(([aId, aSt], [bId, bSt]) => {
       const fa = favRouteIds.has(aId) ? 0 : 1, fb = favRouteIds.has(bId) ? 0 : 1;
       if (fa !== fb) return fa - fb;
@@ -937,7 +1342,7 @@ function renderProblems() {
         const label = r ? (r.name + (r.number ? ` · ${r.number}` : "")) : rid;
         return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(rid)}" style="border-left:3px solid ${r?.color || "#888"}">
           <div class="problem-card-name">${favRouteIds.has(rid) ? "★ " : ""}${escapeHtml(label)}</div>
-          <div class="problem-card-sub">${sts.length} ${escapeHtml(t("colStation")).toLowerCase()}</div>
+          <div class="problem-card-sub">${sts.length} ${escapeHtml(pluralWord(sts.length, "station"))}</div>
         </div>`;
       }).join("")}</div>`
     : "";
@@ -977,7 +1382,196 @@ function renderProblems() {
   el.querySelectorAll("[data-route-id]").forEach((card) => {
     card.addEventListener("click", () => openRouteModal(card.dataset.routeId));
   });
-  el.querySelector(".problems-section")?.classList.add("open");
+  // Все секции стартуют свёрнутыми — в свёрнутом виде видна первая строка
+  // (первая карточка), при раскрытии показываются остальные.
+}
+
+// ============================================================
+// Десктоп-уведомления: конфликты платформ (по всей сети) и опоздания
+// ============================================================
+function _notifCooldownMs() {
+  return Math.max(1, Number(settings.notifCooldownMin) || 5) * 60000;
+}
+// Разрешение на уведомления. При отсутствии — тихо запрашиваем один раз.
+function _notifPermReady() {
+  if (typeof Notification === "undefined") return false;
+  if (Notification.permission === "default") { Notification.requestPermission().catch(() => {}); return false; }
+  return Notification.permission === "granted";
+}
+// Клик по уведомлению разворачивает приложение (в Electron — через IPC,
+// т.к. window.focus() из renderer не поднимает окно поверх других).
+function _focusAppWindow() {
+  try {
+    if (window.electronAPI && typeof window.electronAPI.focusWindow === "function") {
+      window.electronAPI.focusWindow();
+      return;
+    }
+  } catch (e) {}
+  try { window.focus(); } catch (e) {}
+}
+function _sendNotification(title, body) {
+  try {
+    const n = new Notification(title, { body });
+    n.onclick = () => { _focusAppWindow(); try { n.close(); } catch (e) {} };
+  } catch (e) {}
+}
+
+// Состояние уведомлений. Единый интервал (notifCooldownMin) управляет и
+// конфликтами, и опозданиями — в один тик могут прийти оба уведомления.
+let _lastNotifAt = 0;
+let _notifiedConflictStations = new Set();   // станции, о которых уже уведомили
+let _delayNotifiedDev = new Map();           // routeId → опоздание (мс) на момент последнего уведомления
+const _DELAY_REINCREASE_MS = 60000;          // повторно уведомляем, если опоздание выросло на ≥1 мин
+
+// Готовит текст уведомления о конфликтах (или null, если нового нет).
+function _buildConflictNotif(stations) {
+  const favStationIds = new Set(favorites.map((f) => f.id));
+  let relevant = Array.isArray(stations) ? stations : [];
+  if (settings.notifOnlyFav) relevant = relevant.filter((s) => favStationIds.has(s.stationId)); // только избранные станции
+  const currentIds = new Set(relevant.map((s) => s.stationId));
+  // Разрешившиеся станции забываем — если конфликт вернётся, он снова «новый»
+  _notifiedConflictStations = new Set([..._notifiedConflictStations].filter((id) => currentIds.has(id)));
+  const newOnes = relevant.filter((s) => !_notifiedConflictStations.has(s.stationId));
+  if (!newOnes.length) return null;
+  newOnes.forEach((s) => _notifiedConflictStations.add(s.stationId));
+  const count = relevant.length;
+  return {
+    title: t("notifConflictTitle"),
+    body: count === 1 ? t("notifConflictBodyOne", { station: relevant[0].stationName })
+                      : t("notifConflictBodyMany", { count }),
+  };
+}
+
+// Готовит текст уведомления об опозданиях (или null). «Новым» считается
+// маршрут, о котором ещё не уведомляли ЛИБО чьё опоздание выросло с прошлого
+// уведомления на ≥1 мин.
+async function _buildDelayNotif() {
+  const thr = Math.max(1, Number(settings.delayThresholdMin) || 5);
+  let delays;
+  try {
+    const res = await fetch(`/api/analytics/live-delays?thresholdMin=${thr}`);
+    if (!res.ok) return null;
+    delays = await res.json();
+  } catch (e) { return null; }
+  if (!Array.isArray(delays)) return null;
+  const favRouteIds = new Set(favoriteRoutes.map((r) => r.id));
+  let relevant = settings.notifOnlyFav ? delays.filter((d) => favRouteIds.has(d.routeId)) : delays;
+  const currentIds = new Set(relevant.map((d) => String(d.routeId)));
+  for (const rid of [..._delayNotifiedDev.keys()]) if (!currentIds.has(rid)) _delayNotifiedDev.delete(rid);
+  const worthy = relevant.filter((d) => {
+    const prev = _delayNotifiedDev.get(String(d.routeId));
+    return prev === undefined || d.maxDeviationMs >= prev + _DELAY_REINCREASE_MS;
+  });
+  if (!worthy.length) return null;
+  relevant.forEach((d) => _delayNotifiedDev.set(String(d.routeId), d.maxDeviationMs));
+  const worst = relevant.slice().sort((a, b) => b.maxDeviationMs - a.maxDeviationMs)[0];
+  const worstMin = Math.round(worst.maxDeviationMs / 60000);
+  return {
+    title: t("notifDelayTitle"),
+    body: relevant.length === 1
+      ? t("notifDelayBody", { route: worst.routeNumber || worst.routeName, min: worstMin })
+      : t("notifDelayBodyMany", { count: relevant.length, route: worst.routeNumber || worst.routeName, min: worstMin }),
+  };
+}
+
+// Фоновая проверка: единый интервал; при срабатывании шлём до 2 уведомлений
+// (конфликты и/или опоздания) одновременно.
+async function runNotificationChecks() {
+  if (!settings.notifConflict && !settings.notifDelay) return;
+  if (!_notifPermReady()) return;
+  if (Date.now() - _lastNotifAt < _notifCooldownMs()) return;
+
+  let conflictNotif = null, delayNotif = null;
+  if (settings.notifConflict) {
+    try { conflictNotif = _buildConflictNotif(await runFullConflictScan()); } catch (e) {}
+  }
+  if (settings.notifDelay) {
+    try { delayNotif = await _buildDelayNotif(); } catch (e) {}
+  }
+  if (!conflictNotif && !delayNotif) return;
+  _lastNotifAt = Date.now();
+  if (conflictNotif) _sendNotification(conflictNotif.title, conflictNotif.body);
+  if (delayNotif) _sendNotification(delayNotif.title, delayNotif.body);
+}
+
+// Блок «Уведомления» на вкладке настроек. Вызывается один раз из init().
+function initNotifSettings() {
+  const conflictCb = document.getElementById("notifConflictCb");
+  const delayCb = document.getElementById("notifDelayCb");
+  const onlyFavCb = document.getElementById("notifOnlyFavCb");
+  const cooldownSel = document.getElementById("notifCooldownSelect");
+  const delayThrSel = document.getElementById("notifDelayThreshold");
+  const permHint = document.getElementById("notifPermissionHint");
+  if (!conflictCb || !onlyFavCb || !cooldownSel) return;
+
+  conflictCb.checked = !!settings.notifConflict;
+  if (delayCb) delayCb.checked = !!settings.notifDelay;
+  onlyFavCb.checked = !!settings.notifOnlyFav;
+  cooldownSel.value = String(settings.notifCooldownMin || 5);
+  if (delayThrSel) {
+    // Старое сохранённое значение может не быть в новом списке — приводим к
+    // ближайшему допустимому (иначе селект отобразился бы пустым).
+    const allowed = [...delayThrSel.options].map((o) => o.value);
+    let v = String(settings.delayThresholdMin || 5);
+    if (!allowed.includes(v)) { v = "5"; settings.delayThresholdMin = 5; }
+    delayThrSel.value = v;
+  }
+
+  function updatePermHint() {
+    if (!permHint) return;
+    const wantNotif = settings.notifConflict || settings.notifDelay;
+    if (wantNotif && typeof Notification !== "undefined" && Notification.permission === "denied") {
+      permHint.textContent = t("notifPermissionDenied");
+    } else {
+      permHint.textContent = "";
+    }
+  }
+  function requestPermIfNeeded() {
+    if ((settings.notifConflict || settings.notifDelay) && typeof Notification !== "undefined" && Notification.permission === "default") {
+      Notification.requestPermission().then(updatePermHint).catch(() => {});
+    }
+  }
+
+  if (!conflictCb._hasListener) {
+    conflictCb._hasListener = true;
+    conflictCb.addEventListener("change", () => {
+      settings.notifConflict = conflictCb.checked;
+      requestPermIfNeeded();
+      updatePermHint();
+      savePrefsToServer();
+    });
+  }
+  if (delayCb && !delayCb._hasListener) {
+    delayCb._hasListener = true;
+    delayCb.addEventListener("change", () => {
+      settings.notifDelay = delayCb.checked;
+      requestPermIfNeeded();
+      updatePermHint();
+      savePrefsToServer();
+    });
+  }
+  if (!onlyFavCb._hasListener) {
+    onlyFavCb._hasListener = true;
+    onlyFavCb.addEventListener("change", () => {
+      settings.notifOnlyFav = onlyFavCb.checked;
+      savePrefsToServer();
+    });
+  }
+  if (!cooldownSel._hasListener) {
+    cooldownSel._hasListener = true;
+    cooldownSel.addEventListener("change", () => {
+      settings.notifCooldownMin = Number(cooldownSel.value) || 5;
+      savePrefsToServer();
+    });
+  }
+  if (delayThrSel && !delayThrSel._hasListener) {
+    delayThrSel._hasListener = true;
+    delayThrSel.addEventListener("change", () => {
+      settings.delayThresholdMin = Number(delayThrSel.value) || 3;
+      savePrefsToServer();
+    });
+  }
+  updatePermHint();
 }
 
 function switchToTab(tabName) {
@@ -1182,13 +1776,12 @@ function buildRulerHtml(pxPerHour) {
   for (let m = 0; m <= 24 * 60; m += tick) {
     const hasLabel = m % label === 0;
     const isHour = m % 60 === 0;
-    // Ось в часовом поясе пользователя: смещаем метки
-    // Позиция тика = UTC позиция m, метка = местное время
-    const tzMin = currentTzOffsetMin();
-    const localM = ((m + tzMin) % (24 * 60) + 24 * 60) % (24 * 60);
-    const hh = String(Math.floor(localM / 60)).padStart(2, "0");
-    const mm2 = String(localM % 60).padStart(2, "0");
-    const tickLabel = hasLabel ? (localM % 60 === 0 ? hh + ":00" : hh + ":" + mm2) : "";
+    // Ось графика всегда строго UTC 00:00–24:00, независимо от выбранного
+    // пользователем часового пояса (пояс влияет только на время поездов).
+    const utcM = m % (24 * 60);
+    const hh = String(Math.floor(utcM / 60)).padStart(2, "0");
+    const mm2 = String(utcM % 60).padStart(2, "0");
+    const tickLabel = hasLabel ? (utcM % 60 === 0 ? hh + ":00" : hh + ":" + mm2) : "";
     html += `<div class="tick ${isHour ? "tick-hour" : "tick-minor"}" style="left:${m * pxPerMin}px">${tickLabel}</div>`;
   }
   return html;
@@ -1430,6 +2023,8 @@ function renderDashboard(data) {
       if (!state._conflictedRoutes.has(rid)) state._conflictedRoutes.set(rid, new Set());
       state._conflictedRoutes.get(rid).add(sId);
     }
+    // Уведомления о конфликтах теперь строятся по фоновому обходу всей сети
+    // (см. runNotificationChecks), а не по одной открытой станции.
   }
 
   const byPlatform = new Map(visiblePlatforms.map((p) => [p, []]));
@@ -1477,9 +2072,9 @@ function renderDashboard(data) {
         return `<div class="entry-block ${devClass} ${conflictClass} ${editedClass} ${draftClass} ${movedClass} ${liveClass}" style="left:${leftPx}px;background:${e.color}" data-eidx="${idx}" data-route-id="${escapeHtml(e.routeId)}">
           ${dwellNub}
           <span class="eb-num">${escapeHtml(e.routeNumber || "•")}</span>
-          <span class="eb-time">${formatLocal(e.effArrival)}</span>
+          <span class="eb-time">${formatLocal(normalizeMs(e.effArrival - e.deviationMs))}</span>
           ${Math.abs(e.deviationMs) > 60000
-            ? `<span class="eb-actual-time" title="${escapeHtml(t("actualArrivalHint"))}">${e.deviationMs > 0 ? "▲" : "▼"}${formatLocal(normalizeMs(e.effArrival + e.deviationMs))}</span>`
+            ? `<span class="eb-actual-time" title="${escapeHtml(t("actualArrivalHint"))}">${e.deviationMs > 0 ? "▲" : "▼"}${formatLocal(e.effArrival)}</span>`
             : ""}
           ${warnIcon}${editedTag}
         </div>`;
@@ -1602,7 +2197,24 @@ function buildFormulaLines(rawDraft, routeId) {
  * отдельных рейсов. Это позволяет после Shift+drag всё равно показывать
  * красивую формулу D+X*I со сдвинутым временем начала, а не 24 отдельные строки.
  */
-function buildFormulaLinesFromTimes(t0List, routeId) {
+// Смещение от планового t0 (= отправление с ПОСЛЕДНЕЙ остановки у настоящих
+// маршрутов) к отправлению ИЗ ДЕПО (первая остановка), считается так же, как
+// колонка «отправление из депо» в шапке таблицы: плановое прибытие на первую
+// станцию минус минута. Постоянно для всего маршрута.
+function computeDepotOffsetMs(timetable) {
+  const tr = timetable && timetable.trips && timetable.trips[0];
+  const fs = tr && tr.times && tr.times[0];
+  if (!fs) return 0;
+  const plannedFirstArr = normalizeMs(fs.arrivalMs - (tr.deviationMs || 0));
+  const depotDepart = normalizeMs(plannedFirstArr - 60000);
+  let off = depotDepart - tr.tripOriginMs;
+  off = ((off % MS_PER_DAY) + MS_PER_DAY) % MS_PER_DAY;
+  if (off > MS_PER_DAY / 2) off -= MS_PER_DAY;
+  return off;
+}
+
+function buildFormulaLinesFromTimes(t0List, routeId, depotOffset) {
+  depotOffset = depotOffset || 0;
   const routeOffset = getRouteOverride(routeId); // равномерный сдвиг всего маршрута
   const sorted = Array.from(new Set(t0List)).sort((a, b) => a - b);
   const lines = [];
@@ -1616,7 +2228,7 @@ function buildFormulaLinesFromTimes(t0List, routeId) {
 
     if (tripDelta !== 0) {
       // Этот рейс сдвинут индивидуально — показываем отдельной строкой
-      lines.push({ type: "single", timeMs: normalizeMs(t0 + totalDelta), edited: true });
+      lines.push({ type: "single", timeMs: normalizeMs(t0 + totalDelta + depotOffset), edited: true });
       i++;
       continue;
     }
@@ -1634,8 +2246,8 @@ function buildFormulaLinesFromTimes(t0List, routeId) {
       j++;
     }
     const runLen = j - i + 1;
-    // Эффективное начальное время с учётом равномерного сдвига
-    const effT0 = normalizeMs(t0 + routeOffset);
+    // Эффективное начальное время с учётом равномерного сдвига и смещения депо
+    const effT0 = normalizeMs(t0 + routeOffset + depotOffset);
     if (runLen >= 2 && interval !== null) {
       const roundedInterval = roundMsTo30s(interval);
       lines.push({ type: "formula", dMs: effT0, x: runLen - 1, iMs: roundedInterval, count: runLen });
@@ -1860,7 +2472,7 @@ async function loadSchedule() {
   try {
     const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}/schedule`);
     const data = await res.json();
-    if (!res.ok) { scheduleMeta.textContent = data.error || "Error"; return; }
+    if (!res.ok) { scheduleMeta.textContent = tServerError(data.error) || "Error"; return; }
     loadArrivals(stationId).catch(() => {});
     state.lastScheduleData = data;
     // Диагностика пар прямой/обратный
@@ -1943,7 +2555,7 @@ async function buildGraph() {
   try {
     const res = await fetch(`/api/route-graph?from=${encodeURIComponent(fromId)}&to=${encodeURIComponent(toId)}`);
     const data = await res.json();
-    if (!res.ok) { graphWrap.innerHTML = `<div class="dashboard-empty">${escapeHtml(data.error)}</div>`; return; }
+    if (!res.ok) { graphWrap.innerHTML = `<div class="dashboard-empty">${escapeHtml(tServerError(data.error))}</div>`; return; }
     if (!data.routes || data.routes.length === 0) {
       graphWrap.innerHTML = `<div class="dashboard-empty">${escapeHtml(t("graphNoRoutes"))}</div>`;
       return;
@@ -1959,6 +2571,16 @@ async function buildGraph() {
 
 function renderGraphFromCache() {
   if (state.lastGraphData) renderGraph(state.lastGraphData);
+}
+
+// После создания/изменения/удаления пробного маршрута кешей дашборда и
+// графика уже недостаточно — они всё ещё содержат старые рейсы. Заново
+// запрашиваем данные с сервера (там черновик уже добавлен/удалён).
+async function refreshDataViews() {
+  const tasks = [];
+  if (state.currentStationId) tasks.push(loadSchedule().catch(() => {}));
+  if (state.lastGraphData) tasks.push(buildGraph().catch(() => {}));
+  await Promise.all(tasks);
 }
 
 function renderGraphStationFilterList(data) {
@@ -2071,15 +2693,13 @@ function renderGraph(data) {
   parts.push(`<g id="graphXAxisLabels">`);
   const { tick: tickMin, label: labelMin } = getTickSteps(state.graphPxPerHour);
   const pxPerMinGraph = state.graphPxPerHour / 60;
-  const _tzMinG = currentTzOffsetMin();
   for (let m = 0; m <= 24 * 60; m += tickMin) {
-    // Позиция тика = UTC позиция, метка = локальное время
-    const localMG = ((m + _tzMinG) % (24 * 60) + 24 * 60) % (24 * 60);
+    // Ось графика всегда строго UTC 00:00–24:00, независимо от часового пояса.
     const x = m * pxPerMinGraph;
     const isHour = m % 60 === 0;
     parts.push(`<line class="graph-gridline ${isHour ? "" : "graph-gridline-minor"}" x1="${x}" y1="${topMargin - 10}" x2="${x}" y2="${height - bottomMargin}"></line>`);
     if (m % labelMin === 0) {
-      parts.push(`<text class="graph-time-label" x="${x}" y="${topMargin - 14}" text-anchor="middle">${formatLocal(m * 60000)}</text>`);
+      parts.push(`<text class="graph-time-label" x="${x}" y="${topMargin - 14}" text-anchor="middle">${formatUtc(m * 60000)}</text>`);
     }
   }
   parts.push(`</g>`);
@@ -2387,8 +3007,7 @@ function renderRouteList(routes) {
       if (!confirm(t("draftConfirmDelete"))) return;
       await fetch(`/api/drafts/${btn.dataset.deleteDraft}`, { method: "DELETE" });
       await loadRoutes();
-      renderDashboardFromCache();
-      renderGraphFromCache();
+      await refreshDataViews();
     });
   });
 }
@@ -2436,7 +3055,7 @@ async function openRouteModal(routeId) {
       fetch(`/api/routes/${encodeURIComponent(routeId)}/timetable`),
     ]);
     const detail = await detailRes.json();
-    if (!detailRes.ok) { document.getElementById("routeModalBody").innerHTML = `<p>${escapeHtml(detail.error)}</p>`; return; }
+    if (!detailRes.ok) { document.getElementById("routeModalBody").innerHTML = `<p>${escapeHtml(tServerError(detail.error))}</p>`; return; }
     const timetable = timetableRes.ok ? await timetableRes.json() : null;
     // Загружаем arrivals для схемы состава (async, не блокируем рендер)
     if (detail?.stops?.length > 0) {
@@ -2568,12 +3187,56 @@ function buildLiveTripsSection(routeId, lang) {
 
 
 // Генерирует SVG-схему состава поезда (минималистичный стиль)
+// Значки нерельсовых/особых видов транспорта. Тип маршрута MTR может
+// содержать в названии bus/tram/boat/cable_car — тогда в карточке рисуем
+// соответствующий значок вместо схемы поезда. Стиль монохромный, в тон
+// схеме состава (нейтральный акцент, не цвет маршрута).
+function buildVehicleIconSvg(mode) {
+  const fill = "#e8e8e8", stroke = "#bbb", win = "#2a3a4a", winStroke = "#1a2a3a", accent = "#9aa4b0";
+  const W = 96, H = 48;
+  const p = [`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="display:block">`];
+  if (mode === "boat") {
+    p.push(`<path d="M4 38 q6 -4 12 0 t12 0 t12 0 t12 0 t12 0 t12 0" fill="none" stroke="#4a90d9" stroke-width="1.6"/>`);
+    p.push(`<path d="M14 25 L82 25 L74 37 L22 37 Z" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`);
+    p.push(`<rect x="14" y="25" width="68" height="4" fill="${accent}"/>`);
+    p.push(`<rect x="34" y="11" width="28" height="14" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`);
+    for (let i = 0; i < 2; i++) p.push(`<rect x="${39 + i * 12}" y="15" width="8" height="6" rx="1" fill="${win}" stroke="${winStroke}" stroke-width="0.5"/>`);
+    p.push(`<rect x="52" y="5" width="5" height="7" fill="${accent}"/>`);
+  } else if (mode === "cable_car") {
+    p.push(`<line x1="4" y1="8" x2="92" y2="16" stroke="#888" stroke-width="1.6"/>`);
+    p.push(`<rect x="42" y="10" width="12" height="4" rx="1.5" fill="#999" stroke="#777"/>`);
+    p.push(`<path d="M48 14 L44 24 M48 14 L52 24" stroke="#888" stroke-width="1.3" fill="none"/>`);
+    p.push(`<rect x="34" y="24" width="28" height="18" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`);
+    p.push(`<path d="M38 24 h20 a4 4 0 0 1 4 4 v0 h-28 v0 a4 4 0 0 1 4 -4 z" fill="${accent}"/>`);
+    p.push(`<rect x="39" y="31" width="18" height="8" rx="1.5" fill="${win}" stroke="${winStroke}" stroke-width="0.5"/>`);
+  }
+  p.push(`</svg>`);
+  return '<div class="train-diagram-wrap">' + p.join("") + '</div>';
+}
+
+function detectVehicleMode(routeType) {
+  const rt = (routeType || "").toLowerCase();
+  // Отдельные значки-«модели» трамваев и автобусов убраны: трамваи рисуются
+  // детальной схемой вагонов (см. isTram в buildTrainDiagramSvg). Особыми
+  // значками остаются только паром и канатная дорога.
+  if (rt.includes("cable")) return "cable_car";
+  if (rt.includes("boat")) return "boat";
+  return null;
+}
+
 function buildTrainDiagramSvg(routeName, routeType, carCount, color, cars) {
   if (!carCount || carCount < 1) return "";
 
-  function getCarType(idx) {
+  // Паром/канатка — рисуем значок вида транспорта, не поезд. Трамваи рисуем
+  // обычной схемой вагонов, как поезда (отдельная трамвайная схема убрана).
+  const mode = detectVehicleMode(routeType);
+  if (mode) return buildVehicleIconSvg(mode);
+
+  function getBaseCarType(idx) {
     if (cars && cars[idx]) {
       const vid = (cars[idx].vehicleId || "").toLowerCase();
+      // Локомотив
+      if (vid.includes("locomotive")) return "loco";
       // Головной: cab_foward (опечатка в MTR API), cab_forward, cab_1, cab_cab_1
       if (vid.includes("cab_foward") || vid.includes("cab_forward") ||
           vid.endsWith("_cab_1") || vid.endsWith("_cab_foward") ||
@@ -2582,8 +3245,8 @@ function buildTrainDiagramSvg(routeName, routeType, carCount, color, cars) {
       if (vid.includes("cab_backward") ||
           vid.endsWith("_cab_2") || vid.endsWith("_cab_backward") ||
           vid.endsWith("_cab_open_2") || vid.includes("head_rear")) return "tail";
-      // Локомотив
-      if (vid.includes("locomotive")) return "loco";
+      // Кабина без явного направления (просто "cab" в id)
+      if (vid.includes("cab")) return "cab";
       // Промежуточные: carriage, trailer, scarriage, panto и т.д.
       return "middle";
     }
@@ -2593,9 +3256,28 @@ function buildTrainDiagramSvg(routeName, routeType, carCount, color, cars) {
     const isEMU = /s[0-9]|s-bahn|sbahn|metro|u-bahn|ubahn|stadtbahn|tram/i.test(n);
     const hasLoco = !isICE && !isEMU && /\bic\b|\brb\b|\bre\b|flixtrain|flx|irex|jnr/i.test(routeName || "");
     if (idx === 0 && hasLoco) return "loco";
-    if (idx === 0) return "head";
-    if (idx === carCount - 1) return "tail";
     return "middle";
+  }
+
+  // Итоговые типы вагонов: не у всех поездов в id вагонов есть "cab",
+  // поэтому первый/последний вагоны по умолчанию рисуем со скосом (если это
+  // не локомотив), а пару соседних кабин в середине состава (две сцепленные
+  // секции) — скосами друг к другу.
+  const carTypes = [];
+  for (let ci = 0; ci < carCount; ci++) carTypes.push(getBaseCarType(ci));
+  const isCabish = (t) => t === "head" || t === "tail" || t === "cab";
+  if (carTypes[0] !== "loco") carTypes[0] = "head";
+  if (carCount > 1 && carTypes[carCount - 1] !== "loco") carTypes[carCount - 1] = "tail";
+  for (let ci = 1; ci < carCount - 2; ci++) {
+    if (isCabish(carTypes[ci]) && isCabish(carTypes[ci + 1])) {
+      carTypes[ci] = "tail";     // скос вправо — «нос» к соседу
+      carTypes[ci + 1] = "head"; // скос влево — «нос» навстречу
+      ci++;
+    }
+  }
+  // Одиночная кабина без направления в середине — рисуем обычным вагоном
+  for (let ci = 1; ci < carCount - 1; ci++) {
+    if (carTypes[ci] === "cab") carTypes[ci] = "middle";
   }
 
   const W = 44, H = 22, GAP = 2, NOSE = 10, PAD = 12;
@@ -2608,7 +3290,7 @@ function buildTrainDiagramSvg(routeName, routeType, carCount, color, cars) {
 
   for (let i = 0; i < carCount; i++) {
     const x = PAD + i * (W + GAP), y = PANTO_H + 2; // сдвиг вниз под пантограф
-    const type = getCarType(i);
+    const type = carTypes[i];
 
     if (type === "loco") {
       // Локомотив: 6-угольник — верх скошен (NOSE), нижние скосы у самого дна
@@ -2713,7 +3395,12 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
       <li><span class="meta-label">${t("modalActiveTrips")}:</span> ${data.activeTripCount}</li>
       ${(() => {
         const trips = _depIdxCache.get(data.id);
-        const counts = trips ? [...new Set(trips.filter(t=>t.carCount!=null).map(t=>t.carCount))] : [];
+        let counts = trips ? [...new Set(trips.filter(t=>t.carCount!=null).map(t=>t.carCount))] : [];
+        // Fallback на кешированный состав, если live-данных сейчас нет.
+        if (counts.length === 0) {
+          const cars = _carsCache.get(data.number);
+          if (Array.isArray(cars) && cars.length) counts = [cars.length];
+        }
         if (counts.length === 0) return "";
         const label = currentLang() === "ru" ? "Вагонов в составе" : "Cars per train";
         const val = counts.length === 1 ? counts[0] : counts.join(" / ");
@@ -2741,11 +3428,14 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
         // trips[] уже отсортированы по tripOriginMs (мс от полуночи UTC),
         // поэтому i напрямую соответствует departureIndex из MTR.
         const tripLabel = `#${i + 1}`;
-        // Расчётное время отправления из депо: arrival_first - dwell_first - 1мин
+        // Расчётное время отправления из депо: arrival_first - dwell_first - 1мин.
+        // trip.times уже включают live-отклонение — вычитаем его, чтобы в таблице
+        // стояло ПЛАНОВОЕ время, а отклонение показываем отдельно в скобках.
         const firstStop = trip.times && trip.times[0];
         const depotDepartMs = firstStop
-          ? normalizeMs(firstStop.arrivalMs - (firstStop.dwellTimeMs || 0) - 60000 + delta)
+          ? normalizeMs(firstStop.arrivalMs - (firstStop.dwellTimeMs || 0) - 60000 - (trip.deviationMs || 0) + delta)
           : effMs;
+        // В строке отправления из депо отклонение НЕ показываем (только плановое).
         return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}${tripLabel}<br>${formatUtc(depotDepartMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
       })
       .join("");
@@ -2765,11 +3455,18 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
             const delta = getOverride(data.id, trip.tripOriginMs);
             const edited = delta !== 0;
             const raw = trip.times[stIdx];
+            const dev = trip.deviationMs || 0;
+            // baseMs уже включает live-отклонение (см. buildRouteTimetable).
+            // Показываем ПЛАНОВОЕ время (base − dev) + ручную правку, а отклонение
+            // выносим в скобки. Для перехода на дашборд используем фактическое время.
             const baseMs = raw.departureMs !== null ? raw.departureMs : raw.arrivalMs;
-            const effMs = normalizeMs(baseMs + delta);
+            const plannedMs = normalizeMs(baseMs - dev + delta);
+            const actualMs = normalizeMs(baseMs + delta);
             const cellHasConflict = conflictedTrips.get ? conflictedTrips.get(trip.tripOriginMs)?.has(st.stationId) : false;
             const cellIcon = cellHasConflict ? `<span class="tt-conflict-icon" title="${escapeHtml(t("conflictLabel"))}">!</span>` : "";
-            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${effMs}" style="cursor:pointer">${cellIcon}${formatUtc(effMs)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
+            const devParen = formatDeviationParen(dev);
+            const devSpan = devParen ? ` <span class="${deviationClass(dev)} tt-dev">${devParen}</span>` : "";
+            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${actualMs}" style="cursor:pointer">${cellIcon}${formatUtc(plannedMs)}${devSpan}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
           })
           .join("");
         return `<tr><td class="station-col" data-goto-station="${escapeHtml(st.stationId)}">${escapeHtml(st.stationName)}</td>${cells}</tr>`;
@@ -2794,7 +3491,8 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     formulaHtml = renderFormulaLines(lines);
   } else if (showFormulasForReal) {
     const t0List = timetable.trips.map((tr) => tr.tripOriginMs);
-    const lines = buildFormulaLinesFromTimes(t0List, data.id);
+    const depotOffset = computeDepotOffsetMs(timetable);
+    const lines = buildFormulaLinesFromTimes(t0List, data.id, depotOffset);
     formulaHtml = renderFormulaLines(lines);
   }
 
@@ -3001,11 +3699,22 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     const myLast = myStations[myStations.length - 1];
     const mySet = new Set(myStations);
 
-    // Кандидаты: тот же тип, другой маршрут, не черновик
-    // НЕ фильтруем по цвету — у пар маршрутов цвет может совпадать или нет
-    const candidates = state.routes
-      .filter(r => r.id !== data.id && !r.isDraft && r.type === data.type)
-      .slice(0, 20);
+    // Депо ТЕКУЩЕГО маршрута. Обратный маршрут должен обслуживаться из депо
+    // с абсолютно тем же названием — это главный (жёсткий) критерий.
+    const myDepots = (data.depots || []).filter(Boolean);
+    const REQUIRE_DEPOT = myDepots.length > 0;
+
+    // Кандидаты: тот же тип, другой маршрут, не черновик.
+    // Если у маршрута есть депо — сразу сужаем до маршрутов с ТЕМ ЖЕ депо
+    // (listRoutes теперь отдаёт depots), иначе не пришлось бы грузить детали
+    // сотен маршрутов и можно было бы пропустить нужный из-за лимита.
+    let candidates = state.routes
+      .filter(r => r.id !== data.id && !r.isDraft && r.type === data.type);
+    if (REQUIRE_DEPOT) {
+      candidates = candidates.filter(r => (r.depots || []).some(d => myDepots.includes(d)));
+    } else {
+      candidates = candidates.slice(0, 20);
+    }
     if (candidates.length === 0) return;
 
     (async () => {
@@ -3017,21 +3726,25 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
           const cs = (det.stops || []).map(s => s.stationId);
           if (cs.length < 2) continue;
 
+          // Жёсткое требование: то же депо (совпадение по названию 1-в-1).
+          const candDepots = (det.depots || []).filter(Boolean);
+          const depotMatch = myDepots.some(d => candDepots.includes(d));
+          if (REQUIRE_DEPOT && !depotMatch) continue;
+
           let score = 0;
-          // Главный признак: первая и последняя станции поменялись местами
+          // Разворот направления: первая и последняя станции поменялись местами
           if (cs[0] === myLast && cs[cs.length - 1] === myFirst) score += 100;
           else if (cs[0] === myLast || cs[cs.length - 1] === myFirst) score += 30;
-          else continue; // нет ни одного совпадения — пропускаем
+          // Без депо (у маршрута его нет) требуем хотя бы разворот направления
+          if (!REQUIRE_DEPOT && score === 0) continue;
+
+          // То же депо — определяющий вес
+          if (depotMatch) score += 1000;
 
           // Бонус: общие станции (в любом порядке)
           const csSet = new Set(cs);
           const commonCount = [...mySet].filter(s => csSet.has(s)).length;
           score += commonCount * 2;
-
-          // Бонус: совпадение депо
-          const myDepots = new Set(data.depots || []);
-          const candDepots = new Set(det.depots || []);
-          if ([...myDepots].some(d => candDepots.has(d))) score += 20;
 
           // Штраф: цвет не совпадает (но не блокируем)
           if (data.color && det.color && det.color !== data.color) score -= 10;
@@ -3043,7 +3756,8 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
       if (scored.length === 0) return;
       scored.sort((a, b) => b.score - a.score);
       const best = scored[0];
-      if (best.score >= 30) {
+      const threshold = REQUIRE_DEPOT ? 1000 : 30;
+      if (best.score >= threshold) {
         reverseBtn.disabled = false;
         reverseBtn.style.opacity = "";
         reverseBtn.onclick = () => openRouteModal(best.id);
@@ -3070,8 +3784,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
       await fetch(`/api/drafts/${data.id}`, { method: "DELETE" });
       closeRouteModal();
       await loadRoutes();
-      renderDashboardFromCache();
-      renderGraphFromCache();
+      await refreshDataViews();
     });
   }
   const templateBtn = document.getElementById("createDraftFromRouteBtn");
@@ -3506,7 +4219,7 @@ document.getElementById("saveDraftBtn").addEventListener("click", async () => {
     const method = editingDraftId ? "PUT" : "POST";
     const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const data = await res.json();
-    if (!res.ok) { alert(data.error || "Error"); return; }
+    if (!res.ok) { alert(tServerError(data.error) || "Error"); return; }
     closeDraftForm();
     await loadRoutes();
     renderDashboardFromCache();
@@ -3573,15 +4286,29 @@ function initSettingsUI() {
       settings.serverUrl = url;
       savePrefsToServer();
       if (serverUrlHint) { serverUrlHint.textContent = t("serverUrlSaved"); serverUrlHint.style.color = "var(--green)"; }
-      setTimeout(async () => {
-        // Сбрасываем кеш станций перед загрузкой с нового сервера
-        state.stations = [];
-        state.routes = [];
-        state.lastScheduleData = null;
-        await loadStations();
-        if (state.stations.length > 0) loadSchedule();
-        if (serverUrlHint) { serverUrlHint.textContent = ""; serverUrlHint.style.color = ""; }
-      }, 1500);
+      // POST /api/server-url уже дождался первого опроса нового сервера
+      // (см. server.js/poller.restart), поэтому данные готовы — сбрасываем
+      // ВСЕ клиентские кеши и перезагружаем и станции, и маршруты.
+      state.stations = [];
+      state.routes = [];
+      state.routesById = new Map();
+      state.lastScheduleData = null;
+      state.lastGraphData = null;
+      state.currentStationId = null;
+      state.lastAnalytics = [];
+      state._conflictedStations = new Map();
+      state._conflictedRoutes = new Map();
+      _conflictScan = { at: 0, stations: [], running: null };
+      loadCarsCacheFromStorage(); // кеш составов — свой на каждый сервер
+      // Старый выбранный текст в полях больше не соответствует новому серверу
+      ["stationInput", "graphFromInput", "graphToInput"].forEach((id) => {
+        const inp = document.getElementById(id);
+        if (inp) inp.value = "";
+      });
+      await Promise.all([loadStations(), loadRoutes()]);
+      renderFavoritesBar();
+      refreshAllViews();
+      if (serverUrlHint) { serverUrlHint.textContent = ""; serverUrlHint.style.color = ""; }
     } catch (e) {
       if (serverUrlHint) { serverUrlHint.textContent = t("serverUrlError") + ": " + e.message; serverUrlHint.style.color = "var(--red)"; }
     }
@@ -3716,6 +4443,7 @@ const INSTRUCTIONS = [
   { id: "problems" },
   { id: "settings" },
   { id: "schedule_formula" },
+  { id: "board-editor" },
 ];
 
 function renderInstructions() {
@@ -3762,6 +4490,20 @@ function _shouldPollArrivals() {
 
 // Сохраняем настройки при закрытии окна (sendBeacon работает даже при выгрузке страницы)
 // Сохранение при закрытии через ipcRenderer (Electron) или XHR sync (браузер)
+// BoardEditor (вкладка "Aushangfahrplan") хранит свои пресеты и последний
+// холст внутри общего prefs.json — отдельного бэкенда/файла для этого нет,
+// POST /api/prefs перезаписывает файл целиком, так что эти поля обязаны
+// попадать в КАЖДЫЙ payload наравне с остальными настройками.
+function boardEditorPrefsFields() {
+  try {
+    if (window.BoardEditor && typeof window.BoardEditor.getPersistedState === "function") {
+      const s = window.BoardEditor.getPersistedState();
+      return { boardEditorPresets: s.presets || [], boardEditorLastCanvas: s.lastCanvas || null, boardEditorUi: s.ui || null };
+    }
+  } catch (e) {}
+  return {};
+}
+
 function buildPrefsPayload() {
   return JSON.stringify({
     favorites, favoriteRoutes,
@@ -3773,11 +4515,13 @@ function buildPrefsPayload() {
     routeOverrides: routeOverridesMap,
     platformOverrides: platformOverridesMap,
     notifConflict: settings.notifConflict,
-    notifOnlyFav: settings.notifOnlyFav,
     notifDelay: settings.notifDelay,
+    notifOnlyFav: settings.notifOnlyFav,
+    notifCooldownMin: settings.notifCooldownMin,
     delayThresholdMin: settings.delayThresholdMin,
     serverUrl: settings.serverUrl,
     serverList: settings.serverList || [],
+    ...boardEditorPrefsFields(),
   });
 }
 window.addEventListener("beforeunload", () => {
@@ -3834,10 +4578,12 @@ if (window.electronAPI && window.electronAPI.onChangelog) {
     if (_clr.ok) { var _cl = await _clr.json(); if (_cl && _cl.version) setTimeout(function(){ showChangelogModal(_cl.version, _cl.translations || _cl.notes); }, 800); }
   } catch(_cle) {}
   await loadPrefsFromServer();
+  try { loadCarsCacheFromStorage(); } catch (e) {}
   try { applyI18n(); } catch (e) { console.error("applyI18n failed:", e); }
   try { initSettingsUI(); } catch (e) { console.error("initSettingsUI failed:", e); }
   try { initNotifSettings(); } catch (e) { console.warn("initNotifSettings failed (non-critical):", e); }
   try { renderInstructions(); } catch (e) { console.error("renderInstructions failed:", e); }
+  try { window.BoardEditor && window.BoardEditor.init(); } catch (e) { console.error("BoardEditor.init failed:", e); }
   try {
     document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
   } catch (e) {}
@@ -3848,6 +4594,9 @@ if (window.electronAPI && window.electronAPI.onChangelog) {
   setInterval(refreshStatus, 15000);
   setInterval(() => { if (_shouldPoll() && state.currentStationId) loadSchedule(); }, 60000);
   setInterval(() => { if (_shouldPollArrivals()) loadArrivals(state.currentStationId).catch(()=>{}); }, 60000);
+  // Фоновые уведомления о конфликтах/опозданиях (проверяет флаги внутри).
+  setInterval(() => { runNotificationChecks().catch(() => {}); }, 90000);
+  setTimeout(() => { runNotificationChecks().catch(() => {}); }, 8000);
 })();
 
 // ============================================================
@@ -3947,6 +4696,15 @@ async function savePrefsToServer() {
         platformOverrides: platformOverridesMap,
         serverUrl: settings.serverUrl,
         serverList: settings.serverList || [],
+        // Настройки уведомлений: раньше их тут не было — POST /api/prefs
+        // перезаписывает файл целиком, и галочки «слетали» при обычном
+        // сохранении (см. гочу про buildPrefsPayload в CLAUDE.md).
+        notifConflict: settings.notifConflict,
+        notifDelay: settings.notifDelay,
+        notifOnlyFav: settings.notifOnlyFav,
+        notifCooldownMin: settings.notifCooldownMin,
+        delayThresholdMin: settings.delayThresholdMin,
+        ...boardEditorPrefsFields(),
       }),
     });
   } catch (e) { console.warn("savePrefsToServer failed:", e.message); }
@@ -3967,6 +4725,20 @@ async function loadPrefsFromServer() {
     if (p.platformOverrides) platformOverridesMap = p.platformOverrides;
     if (p.serverUrl) settings.serverUrl = p.serverUrl;
     if (Array.isArray(p.serverList)) settings.serverList = p.serverList;
+    if (typeof p.notifConflict === "boolean") settings.notifConflict = p.notifConflict;
+    if (typeof p.notifDelay === "boolean") settings.notifDelay = p.notifDelay;
+    if (typeof p.notifOnlyFav === "boolean") settings.notifOnlyFav = p.notifOnlyFav;
+    if (Number.isFinite(Number(p.notifCooldownMin))) settings.notifCooldownMin = Number(p.notifCooldownMin);
+    if (Number.isFinite(Number(p.delayThresholdMin))) settings.delayThresholdMin = Number(p.delayThresholdMin);
+    try {
+      if (window.BoardEditor && typeof window.BoardEditor.applyPersistedState === "function") {
+        window.BoardEditor.applyPersistedState({
+          presets: Array.isArray(p.boardEditorPresets) ? p.boardEditorPresets : [],
+          lastCanvas: p.boardEditorLastCanvas || null,
+          ui: p.boardEditorUi || null,
+        });
+      }
+    } catch (e) {}
   } catch (e) { console.warn("loadPrefsFromServer failed:", e.message); }
 }
 
@@ -4028,10 +4800,11 @@ function renderFavoritesBar() {
     return `<button class="fav-chip ${active ? "fav-active" : ""}" data-fav-id="${escapeHtml(f.id)}" title="${escapeHtml(t("favStationHint"))}">${escapeHtml(f.name)}</button>`;
   }).join("");
 
+  // Крестик "очистить всё избранное" убран по запросу — отдельные станции
+  // снимаются с избранного кнопкой ☆ рядом с полем поиска.
   bar.innerHTML =
     `<span class="fav-label">${escapeHtml(t("favoritesLabel"))}</span>` +
-    stationChips +
-    `<button class="fav-chip fav-clear" id="clearFavoritesBtn" title="${escapeHtml(t("clearFavorites"))}">✕</button>`;
+    stationChips;
 
   bar.querySelectorAll("[data-fav-id]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -4045,16 +4818,6 @@ function renderFavoritesBar() {
       updateUrlHash();
     });
   });
-
-  const clearBtn = document.getElementById("clearFavoritesBtn");
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => {
-      favorites = [];
-      saveFavorites();
-      renderFavoritesBar();
-      updateFavoriteBtn();
-    });
-  }
 }
 
 document.getElementById("toggleFavoriteStationBtn").addEventListener("click", () => {
@@ -4160,6 +4923,34 @@ const _arrivalsCache = new Map();
 const _depIdxCache = new Map();
 const _carsCache = new Map(); // routeNumber → cars[] из arrivals
 
+// Составность (cars[]) приходит только из live-arrivals. Чтобы схема поезда
+// в карточке маршрута показывалась и без активного подключения, кешируем
+// последний известный состав в localStorage (по каждому серверу отдельно —
+// номера маршрутов на разных серверах разные).
+function _carsCacheStorageKey() {
+  return "mtrCarsCache:" + (settings.serverUrl || "default");
+}
+function loadCarsCacheFromStorage() {
+  _carsCache.clear();
+  try {
+    const raw = localStorage.getItem(_carsCacheStorageKey());
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    for (const k in obj) if (Array.isArray(obj[k])) _carsCache.set(k, obj[k]);
+  } catch (e) {}
+}
+let _carsCacheSaveTimer = null;
+function saveCarsCacheToStorage() {
+  clearTimeout(_carsCacheSaveTimer);
+  _carsCacheSaveTimer = setTimeout(() => {
+    try {
+      const obj = {};
+      for (const [k, v] of _carsCache) obj[k] = v;
+      localStorage.setItem(_carsCacheStorageKey(), JSON.stringify(obj));
+    } catch (e) {}
+  }, 800);
+}
+
 function _int64DecimalToHex(decStr) {
   let n = BigInt(decStr);
   if (n < 0n) n = n + (1n << 64n);
@@ -4177,6 +4968,7 @@ async function loadArrivals(stationId) {
       const hexId = _int64DecimalToHex(String(a.routeId));
       if (Array.isArray(a.cars) && a.cars.length > 0 && a.routeNumber) {
         _carsCache.set(a.routeNumber, a.cars);
+        saveCarsCacheToStorage();
       }
       // _arrivalsCache: только ближайший рейс (для виджета и дашборда)
       const existing = _arrivalsCache.get(hexId);
@@ -4301,15 +5093,24 @@ function getEffectiveDeviation(routeId, plannedDeviationMs) {
       items.push({ label: `⚠ ${t("conflictLabel")}`, header: true });
       for (const other of conflicts) {
         const minIntervalMs = state.minIntervalMin * 60000;
-        // Интервал считаем между отправлением другого и прибытием текущего
-        // (или между прибытиями если отправление недоступно)
-        const otherEnd = other.effDeparture ?? other.effArrival;
-        const gap = ctxEntry.effArrival - otherEnd;
-        // +1000мс буфер чтобы после сдвига интервал был строго > minIntervalMs
-        const BUFFER = 1000;
-        const rawShift = gap >= 0 ? (minIntervalMs - gap + BUFFER) : -(minIntervalMs + gap + BUFFER);
-        // Округляем вверх до полных минут чтобы показать пользователю целое число
-        const shiftMs = Math.sign(rawShift) * Math.ceil(Math.abs(rawShift) / 60000) * 60000;
+        const BUFFER = 1000; // чтобы после сдвига интервал был строго > minIntervalMs
+        // Конец занятости платформы = max(отправление, прибытие + стоянка) —
+        // так же, как в computeConflicts.
+        const endOf = (e) => Math.max(e.effDeparture ?? e.effArrival, e.effArrival + (e.dwellTimeMs || 0));
+        let shiftMs;
+        if (other.effArrival <= ctxEntry.effArrival) {
+          // other идёт ПЕРЕД текущим → двигаем текущий ВПРАВО (позже),
+          // увеличивая интервал между концом other и прибытием текущего.
+          const gap = ctxEntry.effArrival - endOf(other);
+          shiftMs = Math.ceil((minIntervalMs - gap + BUFFER) / 60000) * 60000;
+        } else {
+          // other идёт ПОСЛЕ текущего → двигаем текущий ВЛЕВО (раньше),
+          // увеличивая интервал между концом текущего и прибытием other.
+          // Раньше здесь использовались неверные точки отсчёта, из-за чего
+          // сдвиг «− X мин» не устранял конфликт (та же бага, что чинили для «+»).
+          const gap = other.effArrival - endOf(ctxEntry);
+          shiftMs = -Math.ceil((minIntervalMs - gap + BUFFER) / 60000) * 60000;
+        }
         const shiftMin = Math.abs(shiftMs) / 60000;
         const dir = shiftMs > 0 ? "+" : "−";
         items.push({

@@ -66,6 +66,18 @@ function setDeparturesError(message) {
   state.lastDeparturesError = { message, at: Date.now() };
 }
 
+// Полный сброс данных при смене MTR-сервера: иначе до завершения нового
+// опроса API продолжает отдавать станции/маршруты СТАРОГО сервера, и клиент
+// «замораживал» старые списки (см. смену сервера в настройках).
+function clearData() {
+  state.topology = null;
+  state.departures = null;
+  state.lastTopologyError = null;
+  state.lastDeparturesError = null;
+  _scheduleCache.clear();
+  _routeCache.clear();
+}
+
 function getTopology() {
   return state.topology;
 }
@@ -185,6 +197,7 @@ const _origSetDepartures = module.exports?.setDepartures;
 
 module.exports = {
   loadFromDisk,
+  clearData,
   setTopology,
   setTopologyError,
   setDepartures,

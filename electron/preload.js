@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Синхронная отправка prefs при закрытии окна
   savePrefsSync: (payload) => ipcRenderer.send("save-prefs-sync", payload),
   onChangelog: (cb) => ipcRenderer.on("show-changelog", (_, data) => cb(data)),
+  // Развернуть/сфокусировать окно приложения (клик по уведомлению)
+  focusWindow: () => ipcRenderer.send("focus-window"),
 });

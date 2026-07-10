@@ -10,7 +10,12 @@ const drafts = require("./src/drafts");
 const { listStations, listRoutes, getRouteDetail, buildStationSchedule } = schedule;
 
 const app = express();
-app.use(express.json());
+// Дефолтный лимит express.json() — 100kb. Пресеты/автосохранение конструктора
+// расписаний (вкладка "Редактор") сериализуют canvas.toJSON() со всеми объектами
+// (например ~490 текстовых блоков у вставленного расписания загруженной станции)
+// и легко превышают этот лимит — POST /api/prefs молча падал с 413, из-за чего
+// правки пользователя не сохранялись на диск. Поднимаем лимит с запасом.
+app.use(express.json({ limit: "25mb" }));
 app.use(express.static(path.join(__dirname, "public"), { etag: false, lastModified: false, cacheControl: false, setHeaders: (res) => { res.setHeader("Cache-Control", "no-store"); } }));
 
 // ---- API ----
@@ -79,6 +84,32 @@ app.get("/api/analytics/all-conflicts", (req, res) => {
     _allConflictsCache = stations;
     _allConflictsCacheAt = now;
     res.json(stations);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Чанковое сканирование конфликтов по всей сети: фронтенд опрашивает
+// срезами (offset/limit) и показывает прогресс «просмотрено X/Y станций».
+app.get("/api/analytics/conflict-scan", (req, res) => {
+  const minMs = (Number(req.query.minIntervalMin) || 3) * 60000;
+  const offset = Math.max(0, Number(req.query.offset) || 0);
+  const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
+  try {
+    const ids = schedule.conflictCandidateIds();
+    const slice = ids.slice(offset, offset + limit);
+    const conflicts = schedule.scanStationsForConflicts(slice, minMs);
+    res.json({ total: ids.length, offset, limit, scanned: slice.length, conflicts });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Маршруты, опаздывающие прямо сейчас больше порога (для уведомлений).
+app.get("/api/analytics/live-delays", (req, res) => {
+  const minMs = (Number(req.query.thresholdMin) || 3) * 60000;
+  try {
+    res.json(schedule.getLiveDelays(minMs));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -319,8 +350,9 @@ app.post("/api/server-url", async (req, res) => {
     prefs.serverUrl = normalized;
     savePrefs(prefs);
   } catch {}
-  // Перезапускаем поллер с новым URL
-  try { poller.restart(); } catch {}
+  // Перезапускаем поллер с новым URL и ЖДЁМ первого опроса, чтобы клиент
+  // перезагружал списки уже с данными нового сервера, а не старого.
+  try { await poller.restart(); } catch {}
   res.json({ ok: true, url: normalized });
 });
 

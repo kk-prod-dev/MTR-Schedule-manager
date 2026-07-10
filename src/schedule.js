@@ -356,6 +356,9 @@ function listRoutes() {
         color: colorToHex(r.color),
         type: r.type,
         stopCount: (r.stations || []).length,
+        depots: r.depots || [],
+        firstStationId: (r.stations || [])[0] ? r.stations[0].id : null,
+        lastStationId: (r.stations || []).slice(-1)[0] ? r.stations.slice(-1)[0].id : null,
         terminus: (() => {
           const last = (r.stations || []).slice(-1)[0];
           if (!last) return null;
@@ -905,72 +908,129 @@ module.exports = {
 };
 
 /**
- * Сканирует все станции сети и возвращает те, на которых есть конфликты платформ.
- * Ограничиваем обход: только станции с 2+ маршрутами (исключаем незначительные).
+ * Порядок обхода станций сети для поиска конфликтов: ВСЕ станции сети,
+ * но «занятые» (по числу проходящих маршрутов) идут первыми — там конфликты
+ * вероятнее, и при чанковом сканировании они находятся раньше.
+ * Порядок детерминирован в пределах одной топологии, поэтому чанки по
+ * offset/limit стабильны между запросами.
  */
-function getAllConflictingStations(minIntervalMs) {
+function conflictCandidateIds() {
   const topology = store.getTopology();
   if (!topology) return [];
-  const interval = minIntervalMs || 3 * 60000;
-
-  // Строим карту: stationId → количество маршрутов
-  const stationRouteCount = new Map();
+  const routeCount = new Map();
   for (const route of topology.routes) {
     for (const s of route.stations || []) {
-      stationRouteCount.set(s.id, (stationRouteCount.get(s.id) || 0) + 1);
+      routeCount.set(s.id, (routeCount.get(s.id) || 0) + 1);
     }
   }
+  return topology.stations
+    .map((s) => s.id)
+    .sort((a, b) => (routeCount.get(b) || 0) - (routeCount.get(a) || 0));
+}
 
-  // Берём только 100 самых "занятых" станций (с наибольшим числом маршрутов)
-  // чтобы не сканировать весь граф за один запрос
-  const candidates = Array.from(stationRouteCount.entries())
-    .filter(([, n]) => n >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 120)
-    .map(([id]) => id);
+/**
+ * Проверяет одну станцию на конфликты платформ. Возвращает
+ * { stationId, stationName, conflictCount, routeIds } либо null.
+ * Планируем по arrivalMs/departureMs (реальное расписание сервера);
+ * ручные правки пользователя существуют только на клиенте и здесь не видны.
+ */
+function stationConflictInfo(stationId, intervalMs) {
+  const sched = buildStationSchedule(stationId);
+  if (!sched || !sched.entries || !sched.entries.length) return null;
 
-  const result = [];
-  for (const stationId of candidates) {
-    const sched = buildStationSchedule(stationId);
-    if (!sched || !sched.entries.length) continue;
-    const byPlatform = new Map();
-    for (const e of sched.entries) {
-      const pk = e.platformName || "—";
-      if (!byPlatform.has(pk)) byPlatform.set(pk, []);
-      byPlatform.get(pk).push(e);
-    }
-    let hasConflict = false;
-    const conflictRouteIds = new Set();
-    for (const list of byPlatform.values()) {
-      const sorted = list.slice().sort((a, b) => a.effArrival - b.effArrival);
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const cur = sorted[i], nxt = sorted[i + 1];
-        const isTurn = (cur.isTerminus && nxt.isOrigin) || (nxt.isTerminus && cur.isOrigin);
-        if (isTurn) continue;
-        const dwellEnd = cur.effArrival + (cur.dwellTimeMs || 0);
-        const curEnd = Math.max(cur.effDeparture ?? cur.effArrival, dwellEnd);
-        const isPhysicalOverlap = nxt.effArrival < curEnd;
-        const isTooClose = nxt.effArrival < curEnd + interval;
-        if (isPhysicalOverlap || isTooClose) {
-          hasConflict = true;
-          conflictRouteIds.add(cur.routeId);
-          conflictRouteIds.add(nxt.routeId);
-        }
+  const byPlatform = new Map();
+  for (const e of sched.entries) {
+    if (e.hiddenByReverse) continue; // оборотную половину пары не считаем
+    const pk = e.platformName || "—";
+    if (!byPlatform.has(pk)) byPlatform.set(pk, []);
+    byPlatform.get(pk).push(e);
+  }
+
+  const conflictRouteIds = new Set();
+  // Считаем ЧИСЛО КОНФЛИКТНЫХ РЕЙСОВ (блоков), а не число задействованных
+  // маршрутов — так же, как клиент на вкладке станции (conflictKeys.size).
+  // Иначе при «слипании» рейсов одного маршрута сервер схлопывал бы счётчик
+  // до 1, и на «Проблемных местах» показывалось неверное число, которое
+  // «исправлялось» только после открытия самой станции.
+  const conflictEntries = new Set();
+  for (const list of byPlatform.values()) {
+    const sorted = list.slice().sort((a, b) => a.arrivalMs - b.arrivalMs);
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const cur = sorted[i], nxt = sorted[i + 1];
+      const isTurn = (cur.isTerminus && nxt.isOrigin) || (nxt.isTerminus && cur.isOrigin);
+      if (isTurn) continue;
+      const dwellEnd = cur.arrivalMs + (cur.dwellTimeMs || 0);
+      const curEnd = Math.max(cur.departureMs ?? cur.arrivalMs, dwellEnd);
+      const isPhysicalOverlap = nxt.arrivalMs < curEnd;
+      const isTooClose = nxt.arrivalMs < curEnd + intervalMs;
+      if (isPhysicalOverlap || isTooClose) {
+        conflictEntries.add(cur);
+        conflictEntries.add(nxt);
+        conflictRouteIds.add(cur.routeId);
+        conflictRouteIds.add(nxt.routeId);
       }
     }
-    if (hasConflict) {
-      result.push({
-        stationId,
-        stationName: sched.stationName,
-        conflictCount: conflictRouteIds.size,
-        routeIds: Array.from(conflictRouteIds),
-      });
-    }
   }
-  return result.sort((a, b) => b.conflictCount - a.conflictCount);
+  if (!conflictEntries.size) return null;
+  return {
+    stationId,
+    stationName: sched.stationName,
+    conflictCount: conflictEntries.size,
+    routeIds: Array.from(conflictRouteIds),
+  };
+}
+
+/** Сканирует заданный список станций (чанк) и возвращает конфликтные. */
+function scanStationsForConflicts(stationIds, minIntervalMs) {
+  const interval = minIntervalMs || 3 * 60000;
+  const result = [];
+  for (const stationId of stationIds || []) {
+    const info = stationConflictInfo(stationId, interval);
+    if (info) result.push(info);
+  }
+  return result;
+}
+
+/** Полный обход всей сети (для обратной совместимости/фоновых уведомлений). */
+function getAllConflictingStations(minIntervalMs) {
+  return scanStationsForConflicts(conflictCandidateIds(), minIntervalMs)
+    .sort((a, b) => b.conflictCount - a.conflictCount);
+}
+
+/**
+ * Маршруты, которые ПРЯМО СЕЙЧАС опаздывают больше порога. deviation берём
+ * из свежих отправлений (departures cache), название/номер — из топологии.
+ */
+function getLiveDelays(minDeviationMs) {
+  const topology = store.getTopology();
+  const departuresCache = store.getDepartures();
+  if (!topology || !departuresCache) return [];
+  const threshold = minDeviationMs || 3 * 60000;
+  const routeById = new Map(topology.routes.map((r) => [r.id, r]));
+  const out = [];
+  for (const entry of departuresCache.departures || []) {
+    let maxDev = -Infinity;
+    for (const g of entry.departures || []) {
+      if (typeof g.deviation === "number" && g.deviation > maxDev) maxDev = g.deviation;
+    }
+    if (!Number.isFinite(maxDev) || maxDev < threshold) continue;
+    const route = routeById.get(entry.id);
+    if (!route || route.hidden) continue;
+    const { displayName, shortCode } = splitRouteName(route.name);
+    out.push({
+      routeId: entry.id,
+      routeName: displayName,
+      routeNumber: route.number || shortCode,
+      maxDeviationMs: maxDev,
+    });
+  }
+  return out.sort((a, b) => b.maxDeviationMs - a.maxDeviationMs);
 }
 
 module.exports = {
   ...module.exports,
   getAllConflictingStations,
+  conflictCandidateIds,
+  scanStationsForConflicts,
+  getLiveDelays,
 };
