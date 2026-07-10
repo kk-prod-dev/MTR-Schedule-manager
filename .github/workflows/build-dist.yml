@@ -15,6 +15,11 @@ on:
     tags:
       - "v*"
 
+# electron-builder --publish создаёт/дополняет GitHub Release —
+# дефолтному GITHUB_TOKEN нужны права на запись содержимого репозитория
+permissions:
+  contents: write
+
 jobs:
   linux:
     runs-on: ubuntu-latest
@@ -39,6 +44,7 @@ jobs:
 
   mac:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runner: macos-13     # Intel x64
