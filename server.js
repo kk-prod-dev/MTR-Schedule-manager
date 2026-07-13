@@ -7,7 +7,7 @@ const store = require("./src/store");
 const schedule = require("./src/schedule");
 const analytics = require("./src/analytics");
 const drafts = require("./src/drafts");
-const { listStations, listRoutes, getRouteDetail, buildStationSchedule } = schedule;
+const { listStations, listRoutes, getRouteDetail, buildStationSchedule, getTurnaroundChain } = schedule;
 
 const app = express();
 // Дефолтный лимит express.json() — 100kb. Пресеты/автосохранение конструктора
@@ -57,6 +57,18 @@ app.get("/api/stations/:id/schedule", (req, res) => {
 
 app.get("/api/routes", (req, res) => {
   res.json(listRoutes());
+});
+
+// Цепочка оборота рейса: все рейсы прямого/обратного маршрутов, связанные
+// через развороты на конечных, — при ручном сдвиге двигаются вместе
+app.get("/api/turnaround-chain", (req, res) => {
+  const routeId = req.query.routeId;
+  const t0 = Number(req.query.t0);
+  if (!routeId || !Number.isFinite(t0)) return res.status(400).json({ error: "Нужны параметры routeId и t0." });
+  const result = getTurnaroundChain(routeId, t0);
+  if (!result) return res.status(503).json({ error: "Данные ещё не получены от сервера MTR, подождите немного." });
+  if (result.notFound) return res.status(404).json({ error: "Маршрут с таким id не найден." });
+  res.json(result);
 });
 
 app.get("/api/routes/:id", (req, res) => {

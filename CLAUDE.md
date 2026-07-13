@@ -72,11 +72,12 @@ npm run build         # alias for dist:win
 
 ### Time handling
 - All internal calculations use **UTC milliseconds from midnight**
-- `effArrival` / `tripOriginMs` are UTC ms — position blocks at `(ms / MS_PER_DAY) * TIMELINE_WIDTH`
-- Axis ticks (dashboard ruler + train graph): **strictly UTC 00:00–24:00**, regardless of user timezone — tz affects only train time labels (`formatLocal`)
+- `effArrival` / `tripOriginMs` are UTC ms; blocks are positioned at `(toDisplayMs(ms) / MS_PER_DAY) * TIMELINE_WIDTH`
+- Since v1.1.1 graphs render **from local midnight to local midnight**: axis ticks 00:00–24:00 mean user-local time, positions are shifted by `displayShiftMs()` = `(currentTzOffsetMin() − serverTzOffsetMin) * 60000` (same transform as `formatLocal`, so the axis label under a train matches its displayed time)
+- Train graph: shift applied inside `xScale` WITHOUT normalization (paths must stay monotonic); midnight wrap = extra path copy at ±MS_PER_DAY. "Now" line and scroll-to-now go through `toDisplayMs`; drag deltas are relative — no shift
 - `formatLocal(ms)` adds `currentTzOffsetMin() * 60000` for display only
-- `formatUtc(ms)` — pure UTC display, used in timetable cells and axis labels
-- **Never** shift block positions by tzOffset
+- `formatUtc(ms)` — pure UTC display, used in timetable cells and axis tick labels
+- Nearest-trains widget: `effArrival` already includes deviation — to show actual time with live deviation use `effArrival − e.deviationMs + effectiveDev`, never add deviation on top
 - Route timetable cells: `trip.times` from the API already include live deviation — display planned time as `base − trip.deviationMs`, deviation separately in parens (`formatDeviationParen`)
 
 ### MTR API quirks
@@ -115,6 +116,19 @@ npm run build         # alias for dist:win
 - Minimum interval configurable via slider (`state.minIntervalMin`)
 - Turnaround pairs of same route: skip (check `reverseRouteId`/`pairedForwardRouteId`)
 - Problem areas tab: lazy accumulation via `state._conflictedStations` / `state._conflictedRoutes`
+
+### Turnaround chain (linked edits)
+- Forward/reverse routes are linked through termini: arriving trip ≈ departing reverse trip (pairs built by `buildStationSchedule` at each terminus, 5 min tolerance + same platform)
+- `GET /api/turnaround-chain?routeId=&t0=` (`getTurnaroundChain` in schedule.js) walks pairs at BOTH termini → full chain of trips that must move together; S19-like routes (never enter depot) chain the whole day and may close into a cycle (guarded by seen-set)
+- Client `applyReverseShift` fetches the chain and applies the SAME absolute override to every trip (batched: `setOverride(..., true)` + one `persistOverrides`), then re-renders; falls back to one-hop pair link if server unreachable
+- Shift-drag (whole route) uses `bumpRouteOverrideWithReverse` — bumps `reverseRouteId` too (from `/api/routes`, or lazily from the chain endpoint when `state.routes` not yet loaded)
+- `getReverseRouteMap` is cached by (topology.fetchedAt + routes count) — it used to be recomputed O(n²) inside every `buildStationSchedule`
+- Ctrl+click a dashboard block / graph line (or context menu item) highlights the whole chain: `state.chainHl` Set of `routeId:t0`, CSS classes `chain-hl`/`chain-dim`, Esc clears
+- Train graph extras (renderGraph): turnaround connectors (`.graph-turnaround-link`, forward trip end → reverse trip start at same station, base-time tolerance 6 min) and conflict markers (`.graph-conflict-marker`): (a) same station+platform closer than minInterval (connector pairs excluded via `linkedPairs`), (b) overtakes — same-DIRECTION trips whose drawn polylines cross between stations, detected by segment-vs-segment intersection in (time, pixelY) space (`segIntersect`, using `yScale`-mapped Y so it's robust to different stopping patterns); one marker per trip pair at the crossing. Opposite-direction crossings are normal and never flagged. Conflicts collected into `state._graphConflicts` (kind station|overtake, `problem`/`solution` text); markers carry `data-cidx`, station conflicts also draw a faint `.graph-conflict-link`; graph mousemove shows a problem+solution tooltip on marker hover (priority over the trip-line tooltip). Needs `stationId`/`platformName` in graph points and `reverseRouteId` on graph routes (both served by `buildRouteGraph`)
+- `#entryTooltip` is re-parented to `document.body` at startup — inside the schedule section it would be invisible on other tabs (hidden parent); it serves the dashboard blocks, graph trip lines AND graph conflict markers
+- Dashboard route filter: `state.routeFilter` (Set of routeId, forward/reverse are separate routeIds = direction filter), applied alongside platform filter incl. conflict counting
+- Dashboard hover: hovering a block adds `.eb-hover-focus` to it and `.eb-hover-pair` to its conflict partners (found via `state.conflictDetails` + `data-entry-key`), elevating z-index so a densely-packed pair pops out immediately; switches on every mousemove, cleared on mouseleave
+- Conflict auto-resolve: `solveStationConflicts(rawEntries, minIntervalMs)` is a bounded greedy solver (MAX_ITER 300, per-trip cap ±20 min) that repeatedly shifts the LATER train of the earliest conflict right to exactly minInterval, freezing pairs it can't clear within the cap; `autoResolveStation(stationId)` fetches the schedule, runs it, and commits PER-TRIP overrides WITHOUT turnaround-chain alignment (chain alignment would overwrite independent shifts and blow up on S19 whole-day chains). Exposed as a "Resolve by shifting" button on Problem-areas station cards. Problem-areas also has a "Currently delayed" section from `/api/analytics/live-delays`
 
 ### Reverse route detection (scoring)
 - +100: first station of candidate = last of mine AND last = first

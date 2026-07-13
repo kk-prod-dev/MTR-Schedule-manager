@@ -241,6 +241,16 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 }
 .entry-block:active { cursor: grabbing; }
 .entry-block:hover { transform: scale(1.12); z-index: 10; }
+/* Приоритетное выделение наведённого блока и его конфликтной пары */
+.entry-block.eb-hover-focus {
+  z-index: 30;
+  box-shadow: 0 0 0 2px #fff, 0 0 8px 2px rgba(255,255,255,0.5);
+}
+.entry-block.eb-hover-pair {
+  z-index: 25;
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px var(--amber), 0 0 8px 2px rgba(245,158,11,0.55);
+}
 .entry-block .eb-time { font-size: 10px; }
 .entry-block .eb-num { font-size: 11px; }
 .entry-block.dev-late { box-shadow: inset 0 0 0 2px var(--red); }
@@ -371,6 +381,63 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
 .graph-trip-hit:hover + .graph-trip-path,
 .graph-trip-path.hovered { stroke-width: 3.2; opacity: 1; }
 .graph-edited-tag { font-size: 9px; fill: var(--text); }
+
+/* Подсветка цепочки оборота (Ctrl+клик по блоку/линии, Esc — снять) */
+.entry-block.chain-dim { opacity: 0.22; }
+.entry-block.chain-hl {
+  box-shadow: 0 0 0 2px #fff, 0 0 10px 2px rgba(255, 255, 255, 0.45);
+  z-index: 5;
+}
+.graph-trip-path.chain-dim { opacity: 0.1; }
+.graph-trip-path.chain-hl {
+  stroke-width: 4;
+  opacity: 1;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.7));
+}
+
+/* Перемычка оборота: конец прямого рейса → начало обратного (один состав) */
+.graph-turnaround-link {
+  fill: none;
+  stroke-width: 2.5;
+  stroke-dasharray: 3 3;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.graph-turnaround-link.chain-dim { opacity: 0.1; }
+
+/* Маркер конфликта на графике движения */
+.graph-conflict-marker {
+  fill: #e5484d;
+  stroke: #ffffff;
+  stroke-width: 1.2;
+  cursor: help;
+  pointer-events: all;
+}
+.graph-conflict-marker:hover { fill: #ff6369; stroke-width: 2; }
+/* Слабо-прозрачная пунктирная связь между конфликтующими поездами */
+.graph-conflict-link {
+  stroke: #e5484d;
+  stroke-width: 1.4;
+  stroke-dasharray: 4 4;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Кнопка автоустранения конфликтов на карточке станции (Проблемные места) */
+.problem-fix-btn {
+  margin-top: 6px;
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
+}
+.problem-fix-btn:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); }
+.problem-fix-btn:disabled { opacity: 0.6; cursor: default; }
 
 /* ===== Модальное окно маршрута ===== */
 .modal-overlay {
@@ -677,12 +744,12 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
    overflow:hidden обрезает остальные ряды независимо от числа колонок. */
 .problems-section-body { display: block; padding: 12px; }
 .problems-section:not(.open) .problems-grid {
-  grid-auto-rows: 58px;
-  max-height: 58px;
+  grid-auto-rows: min-content;
+  max-height: 96px;
   overflow: hidden;
   margin-bottom: 0;
 }
-.problems-section:not(.open) .problem-card { height: 58px; overflow: hidden; }
+.problems-section:not(.open) .problem-card { overflow: hidden; }
 .fav-filter-btn.active { background: rgba(251,191,36,.15) !important; border-color: #fbbf24 !important; }
 .fav-inline-btn { font-size: 14px !important; }
 

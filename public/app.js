@@ -57,6 +57,20 @@ const I18N = {
     minIntervalLabel: "Мин. интервал для конфликта",
     minIntervalValue: "{m} мин",
     platformsFilterLabel: "Платформы",
+    routesFilterLabel: "Маршруты",
+    ctxHighlightChain: "Подсветить цепочку оборота",
+    chainHighlightHint: "Esc — снять подсветку цепочки",
+    gcStationProblem: "{r1} ({t1}) и {r2} ({t2}) на одной платформе, интервал {gap} мин",
+    gcStationSolution: "Развести не меньше чем на {need} мин",
+    gcOvertakeProblem: "{r1} обгоняет {r2} на перегоне (≈{tm}) — задний упрётся в хвост переднему",
+    gcOvertakeSolution: "Увеличить интервал между поездами на перегоне",
+    gcOvertakeLabel: "Обгон на перегоне",
+    gcProblemLabel: "Проблема",
+    gcSolutionLabel: "Решение",
+    problemsTitleDelayed: "Опаздывают сейчас",
+    problemsFixConflict: "Устранить сдвигом",
+    problemsFixDone: "Сдвинуто рейсов: {n}",
+    problemsFixNone: "Нечего сдвигать",
     selectAll: "Все",
     selectNone: "Ничего",
     resetEdits: "Сбросить ручные правки",
@@ -332,7 +346,7 @@ const I18N = {
     boardPresetSaved: "Пресет «{name}» сохранён.",
     boardShareExportTitle: "Код для шаринга",
     boardShareExportHint: "Скопируйте код и отправьте его в чат — получатель сможет импортировать этот холст кнопкой «Импорт кода».",
-    boardShareImagesStripped: "Картинки не попадают в код (он раздувается) — в коде они заменены серыми плейсхолдерами.",
+    boardShareImagesIncluded: "Картинки включены в код — с ними он может получиться очень длинным.",
     boardShareCopyBtn: "Скопировать",
     boardShareImportTitle: "Импорт кода",
     boardShareImportHint: "Вставьте код, полученный от другого игрока, и нажмите «Импортировать».",
@@ -393,6 +407,20 @@ const I18N = {
     minIntervalLabel: "Min. interval for conflict",
     minIntervalValue: "{m} min",
     platformsFilterLabel: "Platforms",
+    routesFilterLabel: "Routes",
+    ctxHighlightChain: "Highlight turnaround chain",
+    chainHighlightHint: "Esc — clear chain highlight",
+    gcStationProblem: "{r1} ({t1}) and {r2} ({t2}) share a platform, gap {gap} min",
+    gcStationSolution: "Separate by at least {need} min",
+    gcOvertakeProblem: "{r1} overtakes {r2} on the segment (≈{tm}) — the rear train bumps into the tail of the front one",
+    gcOvertakeSolution: "Increase the headway between the trains on the segment",
+    gcOvertakeLabel: "Overtake on the segment",
+    gcProblemLabel: "Problem",
+    gcSolutionLabel: "Solution",
+    problemsTitleDelayed: "Currently delayed",
+    problemsFixConflict: "Resolve by shifting",
+    problemsFixDone: "Trips shifted: {n}",
+    problemsFixNone: "Nothing to shift",
     selectAll: "All",
     selectNone: "None",
     resetEdits: "Reset manual edits",
@@ -669,7 +697,7 @@ const I18N = {
     boardPresetSaved: "Preset “{name}” saved.",
     boardShareExportTitle: "Share code",
     boardShareExportHint: "Copy this code and send it in chat — the recipient can import this canvas with the “Import code” button.",
-    boardShareImagesStripped: "Images are not included in the code (it would get too large) — they're replaced with gray placeholders in the code.",
+    boardShareImagesIncluded: "Images are included in the code — it can get very long with them.",
     boardShareCopyBtn: "Copy",
     boardShareImportTitle: "Import code",
     boardShareImportHint: "Paste the code you got from another player and click “Import”.",
@@ -829,6 +857,20 @@ function formatLocal(msUtc, withSeconds) {
   const pad = (n) => String(n).padStart(2, "0");
   return withSeconds ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(h)}:${pad(m)}`;
 }
+/**
+ * Сдвиг (мс), переводящий «сырое» время расписания в отображаемое локальное
+ * время суток. Графики рендерятся от локальной полуночи до полуночи:
+ * этим сдвигом позиционируются блоки дашборда, линии рейсов на графике
+ * движения и линия «сейчас». Совпадает с преобразованием formatLocal(),
+ * поэтому подпись оси под поездом всегда равна его локальному времени.
+ */
+function displayShiftMs() {
+  const serverOffset = (typeof settings !== "undefined") ? (settings.serverTzOffsetMin || 0) : 0;
+  return (currentTzOffsetMin() - serverOffset) * 60000;
+}
+/** «Сырое» время расписания → отображаемое время суток (0..24 ч). */
+function toDisplayMs(ms) { return normalizeMs(ms + displayShiftMs()); }
+
 function formatEpochLocal(ts) {
   const d = new Date(ts + currentTzOffsetMin() * 60000);
   const pad = (n) => String(n).padStart(2, "0");
@@ -976,6 +1018,22 @@ function draftFlagHtml() {
 // ============================================================
 const OVERRIDE_MATCH_TOLERANCE_MS = 90000; // 90 секунд
 
+// Пересечение двух отрезков в осях (t = X, d = Y). Возвращает {t, d} в точке
+// СТРОГО внутреннего пересечения (общие концы на станциях не считаются —
+// это норма, не обгон) либо null. Используется для маркеров обгона на графике.
+function segIntersect(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2) {
+  const d1x = ax2 - ax1, d1y = ay2 - ay1;
+  const d2x = bx2 - bx1, d2y = by2 - by1;
+  const denom = d1x * d2y - d1y * d2x;
+  if (denom === 0) return null; // параллельны/коллинеарны
+  const ux = bx1 - ax1, uy = by1 - ay1;
+  const s = (ux * d2y - uy * d2x) / denom; // параметр на отрезке A
+  const r = (ux * d1y - uy * d1x) / denom; // параметр на отрезке B
+  const EPS = 0.001; // отсекаем совпадения ровно в концах (станциях)
+  if (s <= EPS || s >= 1 - EPS || r <= EPS || r >= 1 - EPS) return null;
+  return { t: ax1 + s * d1x, d: ay1 + s * d1y };
+}
+
 let overridesList = JSON.parse(localStorage.getItem("mtr_overrides_v2") || "[]");
 
 function circularDiff(a, b) {
@@ -996,7 +1054,35 @@ function getOverride(routeId, tripOriginMs) {
   const tripDelta = idx === -1 ? 0 : overridesList[idx].deltaMs;
   return tripDelta + getRouteOverride(routeId);
 }
-function applyReverseShift(routeId, tripOriginMs, deltaMs) {
+// Распространяет сдвиг рейса на ВСЮ цепочку оборота: прямой рейс на конечной
+// становится обратным, обратный на другой конечной — следующим прямым и т.д.
+// Маршруты типа S19 не заезжают в депо и катаются туда-сюда весь день — у них
+// связаны все рейсы, и сдвиг одного блока двигает все остальные. Цепочку
+// считает сервер (/api/turnaround-chain) по парам оборота на обеих конечных;
+// каждому рейсу цепочки ставится ТО ЖЕ абсолютное значение правки, что и
+// сдвинутому (лесенка сохраняется, как раньше у пары). Если сервер недоступен —
+// fallback на старую связь только с парным рейсом на открытой станции.
+async function applyReverseShift(routeId, tripOriginMs, deltaMs) {
+  try {
+    const res = await fetch(`/api/turnaround-chain?routeId=${encodeURIComponent(routeId)}&t0=${encodeURIComponent(tripOriginMs)}`);
+    if (res.ok) {
+      const data = await res.json();
+      let changed = false;
+      for (const n of (data && data.chain) || []) {
+        if (n.routeId === routeId && n.tripOriginMs === tripOriginMs) continue;
+        setOverride(n.routeId, n.tripOriginMs, deltaMs, true);
+        changed = true;
+      }
+      if (changed) {
+        persistOverrides();
+        // Вызывающий код уже перерисовал вид с правкой самого рейса —
+        // после прихода цепочки перерисовываем ещё раз с остальными
+        renderDashboardFromCache();
+        renderGraphFromCache();
+      }
+      return;
+    }
+  } catch (e) { /* оффлайн/ошибка — используем fallback ниже */ }
   if (!state.lastScheduleData) return;
   const entry = state.lastScheduleData.entries.find(
     e => e.routeId === routeId && e.tripOriginMs === tripOriginMs
@@ -1009,13 +1095,39 @@ function applyReverseShift(routeId, tripOriginMs, deltaMs) {
   }
 }
 
-function setOverride(routeId, tripOriginMs, deltaMs) {
+// ── Подсветка цепочки оборота ────────────────────────────────────────
+// Ctrl+клик по блоку дашборда / линии графика (или пункт контекстного меню)
+// подсвечивает все рейсы, связанные оборотами на конечных, — именно они
+// двигаются вместе при ручной правке. Повторный Ctrl+клик или Esc снимает.
+async function toggleChainHighlight(routeId, tripOriginMs) {
+  const key = `${routeId}:${tripOriginMs}`;
+  if (state.chainHl && state.chainHl.has(key)) { clearChainHighlight(); return; }
+  try {
+    const res = await fetch(`/api/turnaround-chain?routeId=${encodeURIComponent(routeId)}&t0=${encodeURIComponent(tripOriginMs)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const keys = ((data && data.chain) || []).map((n) => `${n.routeId}:${n.tripOriginMs}`);
+    state.chainHl = new Set(keys.length ? keys : [key]);
+    renderDashboardFromCache();
+    renderGraphFromCache();
+  } catch (e) { /* сервер недоступен — просто не подсвечиваем */ }
+}
+function clearChainHighlight() {
+  if (!state.chainHl) return;
+  state.chainHl = null;
+  renderDashboardFromCache();
+  renderGraphFromCache();
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") clearChainHighlight(); });
+
+function setOverride(routeId, tripOriginMs, deltaMs, skipPersist) {
   const idx = findOverrideIndex(routeId, tripOriginMs);
   if (idx === -1) overridesList.push({ routeId, t0: tripOriginMs, deltaMs });
   // Обновляем и "якорь" t0 на актуальный — если значение реально немного
   // сдвинулось, следующий поиск будет ещё точнее.
   else overridesList[idx] = { routeId, t0: tripOriginMs, deltaMs };
-  persistOverrides();
+  // skipPersist: при массовой правке (цепочка оборота) сохраняем один раз в конце
+  if (!skipPersist) persistOverrides();
 }
 function clearOverrides() {
   overridesList = [];
@@ -1049,6 +1161,25 @@ function getRouteOverride(routeId) { return routeOverridesMap[routeId] || 0; }
 function bumpRouteOverride(routeId, deltaMs) {
   routeOverridesMap[routeId] = getRouteOverride(routeId) + deltaMs;
   // persisted via savePrefsToServer
+}
+// Сдвиг всего маршрута + синхронный сдвиг его обратного маршрута:
+// прямой и обратный связаны оборотами на конечных, двигаются вместе.
+async function bumpRouteOverrideWithReverse(routeId, deltaMs) {
+  bumpRouteOverride(routeId, deltaMs);
+  let revId = (state.routes || []).find((r) => r.id === routeId)?.reverseRouteId;
+  if (revId === undefined) {
+    // Список маршрутов ещё не загружен (свежий запуск) — reverseRouteId
+    // отдаёт и endpoint цепочки (t0 не важен, нужен только сам маршрут)
+    try {
+      const res = await fetch(`/api/turnaround-chain?routeId=${encodeURIComponent(routeId)}&t0=0`);
+      if (res.ok) revId = (await res.json()).reverseRouteId;
+    } catch (e) { /* оффлайн — обратный не сдвигаем */ }
+  }
+  if (revId) {
+    bumpRouteOverride(revId, deltaMs);
+    renderDashboardFromCache();
+    renderGraphFromCache();
+  }
 }
 function clearAllOverrides() {
   overridesList = [];
@@ -1267,6 +1398,11 @@ async function renderProblems() {
     });
     // Пользователь мог уйти с вкладки — но перерисовка скрытого блока безвредна
   }
+  // Текущие опаздывающие поезда (live) — обновляем перед рендером секций
+  try {
+    const res = await fetch(`/api/analytics/live-delays?thresholdMin=1`);
+    state._liveDelays = res.ok ? await res.json() : [];
+  } catch (e) { state._liveDelays = []; }
   renderProblemsSections(el);
 }
 
@@ -1325,6 +1461,7 @@ function renderProblemsSections(el) {
         `<div class="problem-card" data-goto-station="${escapeHtml(st.stationId)}" style="cursor:pointer;">
           <div class="problem-card-name">${favStationIds.has(st.stationId) ? "★ " : ""}${escapeHtml(st.stationName)}</div>
           <div class="problem-card-sub">${st.conflictCount} ${escapeHtml(pluralWord(st.conflictCount, "conflict"))}</div>
+          <button class="problem-fix-btn" data-fix-station="${escapeHtml(st.stationId)}">${escapeHtml(t("problemsFixConflict"))}</button>
         </div>`).join("")}</div>`
     : "";
 
@@ -1347,6 +1484,29 @@ function renderProblemsSections(el) {
       }).join("")}</div>`
     : "";
 
+  // Текущие опаздывающие (live-отклонение прямо сейчас). Та же логика
+  // отображения, что у остальных блоков: избранные — первыми, затем по
+  // убыванию задержки; маршруты с других серверов отфильтрованы.
+  const favRouteIdsD = favRouteIds;
+  const liveDelayed = (state._liveDelays || [])
+    .filter((d) => state.routesById.has(d.routeId))
+    .sort((a, b) => {
+      const fa = favRouteIdsD.has(a.routeId) ? 0 : 1, fb = favRouteIdsD.has(b.routeId) ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      return b.maxDeviationMs - a.maxDeviationMs;
+    })
+    .slice(0, 40);
+  const liveDelayedHtml = liveDelayed.length
+    ? `<div class="problems-grid">${liveDelayed.map((d) => {
+        const r = state.routesById.get(d.routeId);
+        const label = r ? (r.name + (r.number ? ` · ${r.number}` : "")) : (d.routeName || d.routeId);
+        return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(d.routeId)}" style="border-left:3px solid ${r?.color || "#888"}">
+          <div class="problem-card-name">${favRouteIdsD.has(d.routeId) ? "★ " : ""}${escapeHtml(label)}</div>
+          <div class="problem-card-sub ${deviationClass(d.maxDeviationMs)}">${formatDeviation(d.maxDeviationMs)}</div>
+        </div>`;
+      }).join("")}</div>`
+    : "";
+
   const delayHtml = byDelay.length
     ? `<div class="problems-grid">${byDelay.map((a) => {
         const r = state.routesById.get(a.routeId);
@@ -1361,6 +1521,7 @@ function renderProblemsSections(el) {
   el.innerHTML =
     makeSection("conflicts-st", t("problemsTitleConflicts") + " — " + t("colStation"), stItems.length, stHtml) +
     makeSection("conflicts-rt", t("problemsTitleConflicts") + " — " + t("tabRoutes"), rtItems.length, rtHtml) +
+    makeSection("delayed-now", t("problemsTitleDelayed"), liveDelayed.length, liveDelayedHtml) +
     makeSection("delays", t("problemsTitleDelays"), byDelay.length, delayHtml);
 
   el.querySelectorAll(".problems-section-header").forEach((h) => {
@@ -1368,7 +1529,7 @@ function renderProblemsSections(el) {
   });
   el.querySelectorAll("[data-goto-station]").forEach((card) => {
     card.addEventListener("click", (ev) => {
-      if (ev.target.closest("[data-route-id]")) return;
+      if (ev.target.closest("[data-route-id]") || ev.target.closest("[data-fix-station]")) return;
       const sid = card.dataset.gotoStation;
       const st = state.stations.find((s) => s.id === sid);
       if (!st) return;
@@ -1377,6 +1538,26 @@ function renderProblemsSections(el) {
       state.currentStationId = st.id;
       state._dashboardScrolled = false;
       renderFavoritesBar(); updateFavoriteBtn(); updateUrlHash(); loadSchedule();
+    });
+  });
+  // Кнопка «Применить сдвиг»: автоустранение конфликтов станции
+  el.querySelectorAll("[data-fix-station]").forEach((btn) => {
+    btn.addEventListener("click", async (ev) => {
+      ev.stopPropagation();
+      const sid = btn.dataset.fixStation;
+      btn.disabled = true;
+      const prevText = btn.textContent;
+      btn.textContent = "…";
+      try {
+        const { shifted } = await autoResolveStation(sid);
+        btn.textContent = shifted > 0 ? t("problemsFixDone", { n: shifted }) : t("problemsFixNone");
+        // Пересканируем сеть, чтобы счётчики обновились
+        _conflictScan.at = 0;
+        setTimeout(() => renderProblems(), 400);
+      } catch (e) {
+        btn.textContent = t("problemsFixNone");
+        btn.disabled = false;
+      }
     });
   });
   el.querySelectorAll("[data-route-id]").forEach((card) => {
@@ -1735,6 +1916,114 @@ function computeConflicts(entries, minIntervalMs) {
   return { conflictKeys, details };
 }
 
+// ── Автоустранение конфликтов на станции ────────────────────────────────
+// Простой жадный солвер: пока есть конфликты, берём самую раннюю пару и
+// сдвигаем ПОЗЖНИЙ поезд ровно настолько, чтобы интервал стал = minInterval
+// (перебор округляем до минуты). Ограничения: не больше MAX_ITER итераций и
+// сдвиг одного рейса не больше MAX_SHIFT (мега-хабы с сотнями конфликтов не
+// «расшатываем» до бесконечности). Возвращает Map<routeId:t0 → доп.сдвиг мс>.
+// Сдвиг на конечных распространяется по цепочке оборота при применении.
+function solveStationConflicts(rawEntries, minIntervalMs) {
+  const MAX_ITER = 300, MAX_SHIFT = 20 * 60000;
+  // Начальный эффективный сдвиг каждого рейса = уже существующий override
+  const extra = new Map();  // key → добавленный солвером сдвиг
+  const baseDelta = new Map();
+  const keyOf = (e) => `${e.routeId}:${e.tripOriginMs}`;
+  for (const e of rawEntries) {
+    const k = keyOf(e);
+    if (!baseDelta.has(k)) baseDelta.set(k, getOverride(e.routeId, e.tripOriginMs));
+    if (!extra.has(k)) extra.set(k, 0);
+  }
+  const buildEff = () => rawEntries.map((e) => {
+    const k = keyOf(e);
+    const d = baseDelta.get(k) + extra.get(k);
+    return {
+      routeId: e.routeId, tripOriginMs: e.tripOriginMs, platformName: e.platformName,
+      dwellTimeMs: e.dwellTimeMs, isOrigin: e.isOrigin, isTerminus: e.isTerminus,
+      reverseRouteId: e.reverseRouteId, pairedForwardRouteId: e.pairedForwardRouteId,
+      entryKey: `${e.routeId}:${e.tripOriginMs}:${e.platformName}`,
+      effArrival: normalizeMs(e.arrivalMs + d),
+      effDeparture: e.departureMs == null ? null : normalizeMs(e.departureMs + d),
+      _key: k,
+    };
+  });
+
+  let resolved = 0;
+  const frozen = new Set(); // пары, которые нельзя устранить в пределах MAX_SHIFT
+  for (let iter = 0; iter < MAX_ITER; iter++) {
+    const eff = buildEff();
+    // Ищем первую (ещё не «замороженную») конфликтную пару на платформе
+    const byPlatform = new Map();
+    for (const e of eff) {
+      const p = e.platformName || "—";
+      if (!byPlatform.has(p)) byPlatform.set(p, []);
+      byPlatform.get(p).push(e);
+    }
+    let pair = null;
+    for (const list of byPlatform.values()) {
+      list.sort((a, b) => a.effArrival - b.effArrival);
+      for (let i = 0; i < list.length && !pair; i++) {
+        const cur = list[i];
+        const curEnd = Math.max(cur.effDeparture ?? cur.effArrival, cur.effArrival + (cur.dwellTimeMs || 0));
+        for (let j = i + 1; j < list.length; j++) {
+          const nx = list[j];
+          if (nx.effArrival >= curEnd + minIntervalMs) break;
+          const isTurn = (cur.isTerminus && nx.isOrigin) || (nx.isTerminus && cur.isOrigin);
+          const isRevPair = cur.reverseRouteId === nx.routeId || nx.reverseRouteId === cur.routeId ||
+            cur.pairedForwardRouteId === nx.routeId || nx.pairedForwardRouteId === cur.routeId;
+          if (isTurn && isRevPair) continue;
+          const pk = cur._key + "|" + nx._key;
+          if (frozen.has(pk)) continue;
+          pair = { earlier: cur, later: nx, curEnd, pk };
+          break;
+        }
+      }
+      if (pair) break;
+    }
+    if (!pair) break; // устранимых конфликтов больше нет
+    // Минимальный сдвиг позднего поезда вправо до интервала = minInterval
+    const need = Math.ceil((pair.curEnd + minIntervalMs - pair.later.effArrival) / 60000) * 60000;
+    const k = pair.later._key;
+    if (need <= 0 || extra.get(k) + need > MAX_SHIFT) {
+      frozen.add(pair.pk); // не устранить в пределах допуска — пропускаем, идём дальше
+      continue;
+    }
+    extra.set(k, extra.get(k) + need);
+    resolved++;
+  }
+  // Возвращаем только реально сдвинутые рейсы (routeId, t0, итоговый абсолютный override)
+  const plan = [];
+  for (const e of rawEntries) {
+    const k = keyOf(e);
+    const add = extra.get(k) || 0;
+    if (add !== 0 && !plan.some((p) => p.key === k)) {
+      plan.push({ key: k, routeId: e.routeId, tripOriginMs: e.tripOriginMs, absDelta: baseDelta.get(k) + add });
+    }
+  }
+  return { plan, iterations: resolved };
+}
+
+// Загружает расписание станции, прогоняет солвер и применяет сдвиги
+// (с распространением по цепочке оборота). Возвращает число сдвинутых рейсов.
+async function autoResolveStation(stationId) {
+  const res = await fetch(`/api/stations/${encodeURIComponent(stationId)}/schedule`);
+  if (!res.ok) return { shifted: 0 };
+  const data = await res.json();
+  const entries = (data.entries || []);
+  if (!entries.length) return { shifted: 0 };
+  const minIntervalMs = state.minIntervalMin * 60000;
+  const { plan } = solveStationConflicts(entries, minIntervalMs);
+  if (!plan.length) return { shifted: 0 };
+  pushUndoSnapshot();
+  // Применяем сдвиги ПОРЕЙСНО (без выравнивания всей цепочки оборота: у S19
+  // вся линия — одна цепочка, и общий сдвиг перетёр бы независимые правки
+  // солвера). Небольшие сдвиги укладываются в запас оборота на конечной.
+  for (const p of plan) setOverride(p.routeId, p.tripOriginMs, p.absDelta, true);
+  persistOverrides();
+  if (state.currentStationId === stationId) { renderDashboardFromCache(); renderGraphFromCache(); }
+  return { shifted: plan.length };
+}
+
 // ============================================================
 // Дашборд расписания по станции
 // ============================================================
@@ -1747,6 +2036,9 @@ const rulerScroll = document.getElementById("rulerScroll");
 const gridScroll = document.getElementById("gridScroll");
 const scheduleMeta = document.getElementById("scheduleMeta");
 const entryTooltip = document.getElementById("entryTooltip");
+// Тултип общий для дашборда И графика движения — выносим в body: внутри
+// секции расписания он невидим на других вкладках (родитель display:none)
+document.body.appendChild(entryTooltip);
 
 gridScroll.addEventListener("scroll", () => {
   rulerScroll.scrollLeft = gridScroll.scrollLeft;
@@ -1776,8 +2068,8 @@ function buildRulerHtml(pxPerHour) {
   for (let m = 0; m <= 24 * 60; m += tick) {
     const hasLabel = m % label === 0;
     const isHour = m % 60 === 0;
-    // Ось графика всегда строго UTC 00:00–24:00, независимо от выбранного
-    // пользователем часового пояса (пояс влияет только на время поездов).
+    // Ось 00:00–24:00 в ЛОКАЛЬНОМ времени пользователя: блоки сдвигаются
+    // на displayShiftMs(), поэтому подпись под поездом совпадает с formatLocal.
     const utcM = m % (24 * 60);
     const hh = String(Math.floor(utcM / 60)).padStart(2, "0");
     const mm2 = String(utcM % 60).padStart(2, "0");
@@ -1823,6 +2115,53 @@ document.getElementById("platformsSelectNone").addEventListener("click", () => {
   renderPlatformFilterList();
   renderDashboardFromCache();
 });
+
+// ── Фильтр дашборда по маршрутам ─────────────────────────────────────
+// Пункт списка = конкретный routeId, а прямой и обратный — это разные
+// routeId, поэтому фильтр работает и «по маршруту», и «по направлению».
+function renderRouteFilterList() {
+  const data = state.lastScheduleData;
+  const container = document.getElementById("routeFilterList");
+  if (!container) return;
+  if (!data || !data.entries || data.entries.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+  if (state.routeFilterStationId !== data.stationId) {
+    // Новая станция — по умолчанию включены все маршруты (включая скрытые
+    // оборотные половины пар, чтобы конфликты считались как раньше)
+    state.routeFilter = new Set(data.entries.map((e) => e.routeId));
+    state.routeFilterStationId = data.stationId;
+  }
+  const uniq = new Map();
+  for (const e of data.entries) {
+    if (e.hiddenByReverse) continue;
+    if (!uniq.has(e.routeId)) uniq.set(e.routeId, e);
+  }
+  const items = [...uniq.values()].sort((a, b) =>
+    String(a.routeNumber || a.routeName).localeCompare(String(b.routeNumber || b.routeName), "ru", { numeric: true }));
+  container.innerHTML = items
+    .map((e) => `<label title="${escapeHtml(e.routeName || "")}"><input type="checkbox" data-route-id="${escapeHtml(e.routeId)}" ${state.routeFilter.has(e.routeId) ? "checked" : ""}> <span class="dot" style="background:${e.color}"></span> ${escapeHtml(e.routeNumber || e.routeName || "?")}</label>`)
+    .join("");
+  container.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const id = cb.dataset.routeId;
+      if (cb.checked) state.routeFilter.add(id);
+      else state.routeFilter.delete(id);
+      renderDashboardFromCache();
+    });
+  });
+}
+document.getElementById("routesFilterSelectAll")?.addEventListener("click", () => {
+  if (state.lastScheduleData) state.routeFilter = new Set(state.lastScheduleData.entries.map((e) => e.routeId));
+  renderRouteFilterList();
+  renderDashboardFromCache();
+});
+document.getElementById("routesFilterSelectNone")?.addEventListener("click", () => {
+  state.routeFilter = new Set();
+  renderRouteFilterList();
+  renderDashboardFromCache();
+});
 document.getElementById("resetDashOverridesBtn").addEventListener("click", () => {
   pushUndoSnapshot();
   clearAllOverrides();
@@ -1837,6 +2176,8 @@ document.getElementById("resetGraphOverridesBtn").addEventListener("click", () =
 });
 document.getElementById("resetDashFiltersBtn").addEventListener("click", () => {
   if (state.lastScheduleData) state.platformFilter = new Set(state.lastScheduleData.platforms);
+  if (state.lastScheduleData) state.routeFilter = new Set(state.lastScheduleData.entries.map((e) => e.routeId));
+  renderRouteFilterList();
   state.minIntervalMin = 3;
   minIntervalSlider.value = "3";
   document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
@@ -1903,9 +2244,11 @@ function renderDashboard(data) {
   }
 
   renderPlatformFilterList();
+  renderRouteFilterList();
 
   const TIMELINE_WIDTH = dashTimelineWidth();
   const visiblePlatforms = data.platforms.filter((p) => state.platformFilter.has(p));
+  const routeVisible = (rid) => !state.routeFilter || state.routeFilter.has(rid);
 
   if (visiblePlatforms.length === 0) {
     dashboardEl.style.display = "none";
@@ -1980,7 +2323,7 @@ function renderDashboard(data) {
         isLiveData,
       };
     })
-    .filter((e) => visiblePlatforms.includes(e.effPlatform));
+    .filter((e) => visiblePlatforms.includes(e.effPlatform) && routeVisible(e.routeId));
 
   // Видимые блоки — без скрытых обратных маршрутов
   const processed = allProcessed.filter(e => !e.hiddenByReverse);
@@ -2038,13 +2381,16 @@ function renderDashboard(data) {
     const blocks = list
       .map((e) => {
         const idx = state.currentDashboardEntries.indexOf(e);
-        const leftPx = (e.effArrival / MS_PER_DAY) * TIMELINE_WIDTH - 28;
+        const leftPx = (toDisplayMs(e.effArrival) / MS_PER_DAY) * TIMELINE_WIDTH - 28;
         const devClass = Math.abs(e.deviationMs) <= 60000 ? "" : e.deviationMs > 0 ? "dev-late" : "dev-early";
         const liveClass = e.isLiveData ? "is-live" : "";
         const conflictClass = conflictKeys.has(e.entryKey) ? "has-conflict" : "";
         const editedClass = e.isEdited ? "is-edited" : "";
         const draftClass = e.isDraft ? "is-draft" : "";
         const movedClass = e.isPlatformMoved ? "is-platform-moved" : "";
+        const chainClass = state.chainHl
+          ? (state.chainHl.has(`${e.routeId}:${e.tripOriginMs}`) ? "chain-hl" : "chain-dim")
+          : "";
         const warnIcon = conflictKeys.has(e.entryKey) ? '<span class="eb-warning">!</span>' : "";
         const editedTag = e.isEdited
           ? `<span class="eb-edited-tag">${escapeHtml(t("editedLabel"))}</span>`
@@ -2069,7 +2415,7 @@ function renderDashboard(data) {
         const dwellNub = nubHeight > 0
           ? `<span class="eb-dwell-nub" style="height:${nubHeight}px;width:${nubWidth}px;top:-${nubHeight}px" title="${formatSecondsShort(Math.round(dwellSec))}"></span>`
           : "";
-        return `<div class="entry-block ${devClass} ${conflictClass} ${editedClass} ${draftClass} ${movedClass} ${liveClass}" style="left:${leftPx}px;background:${e.color}" data-eidx="${idx}" data-route-id="${escapeHtml(e.routeId)}">
+        return `<div class="entry-block ${devClass} ${conflictClass} ${editedClass} ${draftClass} ${movedClass} ${liveClass} ${chainClass}" style="left:${leftPx}px;background:${e.color}" data-eidx="${idx}" data-entry-key="${escapeHtml(e.entryKey)}" data-route-id="${escapeHtml(e.routeId)}">
           ${dwellNub}
           <span class="eb-num">${escapeHtml(e.routeNumber || "•")}</span>
           <span class="eb-time">${formatLocal(normalizeMs(e.effArrival - e.deviationMs))}</span>
@@ -2103,7 +2449,7 @@ function getNowMsOfDay() { return Date.now() % MS_PER_DAY; }
 
 /** Двигает линию "сейчас" на дашборде и графике движения без полной перерисовки. */
 function positionNowLines() {
-  const nowMs = getNowMsOfDay();
+  const nowMs = toDisplayMs(getNowMsOfDay());
   const dashLine = document.getElementById("dashNowLine");
   if (dashLine) dashLine.style.left = (nowMs / MS_PER_DAY) * dashTimelineWidth() + "px";
   const graphLine = document.getElementById("graphNowLine");
@@ -2117,7 +2463,7 @@ setInterval(positionNowLines, 30000);
 
 /** Скроллирует дашборд/граф к текущему серверному времени, оставляя 30 мин слева для контекста. */
 function scrollToNow() {
-  const nowMs = getNowMsOfDay();
+  const nowMs = toDisplayMs(getNowMsOfDay());
   const MARGIN_MS = 30 * 60000; // 30 мин слева для контекста
   const pxPerMs = state.dashPxPerHour / 3600000;
   const targetPx = Math.max(0, (nowMs - MARGIN_MS) * pxPerMs);
@@ -2127,7 +2473,7 @@ function scrollToNow() {
   if (rs) rs.scrollLeft = targetPx;
 }
 function scrollGraphToNow() {
-  const nowMs = getNowMsOfDay();
+  const nowMs = toDisplayMs(getNowMsOfDay());
   const MARGIN_MS = 30 * 60000;
   const pxPerMs = state.graphPxPerHour / 3600000;
   const targetPx = Math.max(0, (nowMs - MARGIN_MS) * pxPerMs);
@@ -2343,19 +2689,42 @@ function buildEntryTooltipHtml(e) {
   return html;
 }
 
+// Приоритетная подсветка при наведении: наведённый блок и его конфликтные
+// партнёры поднимаются наверх (z-index) и обводятся, чтобы пара читалась
+// сразу — даже когда поезда идут плотно и прячутся друг за другом.
+let _hoverHlEls = [];
+function clearHoverHighlight() {
+  for (const el of _hoverHlEls) el.classList.remove("eb-hover-focus", "eb-hover-pair");
+  _hoverHlEls = [];
+}
+function setHoverHighlight(target, entry) {
+  clearHoverHighlight();
+  target.classList.add("eb-hover-focus");
+  _hoverHlEls.push(target);
+  // Партнёры по конфликту — из накопленных деталей текущего дашборда
+  const partners = state.conflictDetails.get(entry.entryKey) || [];
+  for (const p of partners) {
+    const el = dashboardGrid.querySelector(`.entry-block[data-entry-key="${CSS.escape(p.entryKey)}"]`);
+    if (el && el !== target) { el.classList.add("eb-hover-pair"); _hoverHlEls.push(el); }
+  }
+}
+
 dashboardGrid.addEventListener("mousemove", (e) => {
   if (dragState.active) return;
   const target = e.target.closest(".entry-block");
-  if (!target) { entryTooltip.style.display = "none"; return; }
+  if (!target) { entryTooltip.style.display = "none"; clearHoverHighlight(); return; }
   const idx = Number(target.dataset.eidx);
   const entry = state.currentDashboardEntries[idx];
   if (!entry) return;
+  // Приоритет наведения переключается СРАЗУ на текущий блок (не ждём ухода
+  // курсора с предыдущего) — важно для плотно стоящих блоков.
+  if (_hoverHlEls[0] !== target) setHoverHighlight(target, entry);
   entryTooltip.style.display = "block";
   entryTooltip.style.left = e.clientX + 16 + "px";
   entryTooltip.style.top = e.clientY + 16 + "px";
   entryTooltip.innerHTML = buildEntryTooltipHtml(entry);
 });
-dashboardGrid.addEventListener("mouseleave", () => { entryTooltip.style.display = "none"; });
+dashboardGrid.addEventListener("mouseleave", () => { entryTooltip.style.display = "none"; clearHoverHighlight(); });
 
 // ---- Drag для блоков дашборда (по горизонтали — время; Alt + вертикаль — платформа) ----
 const dragState = { active: false };
@@ -2377,6 +2746,7 @@ dashboardGrid.addEventListener("mousedown", (e) => {
   dragState.moved = 0;
   dragState.movedY = 0;
   dragState.shiftMode = e.shiftKey;
+  dragState.ctrlAtStart = e.ctrlKey || e.metaKey;
   dragState.platformIndex = state.currentDashboardPlatforms.indexOf(entry.effPlatform);
   dragState.groupEls = dragState.shiftMode
     ? Array.from(dashboardGrid.querySelectorAll(`.entry-block[data-route-id="${CSS.escape(entry.routeId)}"]`))
@@ -2412,7 +2782,9 @@ document.addEventListener("mouseup", (e) => {
   if (dragState.kind === "dashboard") {
     dragState.groupEls.forEach((el) => { el.style.transform = ""; });
     if (wasClick) {
-      openRouteModal(dragState.entry.routeId);
+      // Ctrl+клик — подсветка цепочки оборота вместо карточки маршрута
+      if (dragState.ctrlAtStart) toggleChainHighlight(dragState.entry.routeId, dragState.entry.tripOriginMs);
+      else openRouteModal(dragState.entry.routeId);
     } else {
       pushUndoSnapshot();
       if (rowDelta !== 0) {
@@ -2427,7 +2799,7 @@ document.addEventListener("mouseup", (e) => {
         const TIMELINE_WIDTH = dashTimelineWidth();
         const deltaMs = (dx / TIMELINE_WIDTH) * MS_PER_DAY;
         if (dragState.shiftMode) {
-          bumpRouteOverride(dragState.entry.routeId, deltaMs);
+          bumpRouteOverrideWithReverse(dragState.entry.routeId, deltaMs);
         } else {
           const prev = getOverride(dragState.entry.routeId, dragState.entry.tripOriginMs);
           const nd = prev + deltaMs;
@@ -2441,13 +2813,14 @@ document.addEventListener("mouseup", (e) => {
   } else if (dragState.kind === "graph") {
     dragState.groupEls.forEach((el) => { el.style.transform = ""; });
     if (wasClick) {
-      openRouteModal(dragState.routeId);
+      if (dragState.ctrlAtStart) toggleChainHighlight(dragState.routeId, dragState.tripOriginMs);
+      else openRouteModal(dragState.routeId);
     } else {
       const TIMELINE_WIDTH = state.graphPxPerHour * 24;
       const deltaMs = (dx / TIMELINE_WIDTH) * MS_PER_DAY;
       pushUndoSnapshot();
       if (dragState.shiftMode) {
-        bumpRouteOverride(dragState.routeId, deltaMs);
+        bumpRouteOverrideWithReverse(dragState.routeId, deltaMs);
       } else {
         const prev = getOverride(dragState.routeId, dragState.tripOriginMs);
         const nd2 = prev + deltaMs;
@@ -2656,8 +3029,13 @@ function renderGraph(data) {
     return adjY[closest];
   };
   // Подписи станций теперь в graphYPanel (отдельный DOM-элемент слева),
-  // поэтому xScale начинается с x=0 (без leftMargin-смещения)
-  const xScale = (ms) => (ms / MS_PER_DAY) * TIMELINE_WIDTH;
+  // поэтому xScale начинается с x=0 (без leftMargin-смещения).
+  // tzShift переводит сырое время в локальное: график рендерится от
+  // локальной полуночи до полуночи. Сдвиг НЕ нормализуется внутри xScale,
+  // чтобы линия рейса оставалась монотонной — перенос через полночь
+  // рисуется отдельной копией пути (см. ниже).
+  const tzShiftMs = displayShiftMs();
+  const xScale = (ms) => ((ms + tzShiftMs) / MS_PER_DAY) * TIMELINE_WIDTH;
 
   const routesToShow = data.routes.filter((r) => isGraphRouteVisible(r) && r.tripCount > 0);
   state.currentGraphRoutes = routesToShow;
@@ -2683,6 +3061,9 @@ function renderGraph(data) {
     return { s, trueY, labelY };
   });
 
+  // Карта «Y → станция» для тултипа при наведении на линию рейса
+  state._graphYMap = stationsForAxis.map((s, i) => ({ y: adjY[i], name: s.name, distance: s.distance }));
+
   for (const s of stationsForAxis) {
     const y = yScale(s.distance);
     parts.push(`<line class="graph-station-line" x1="0" y1="${y}" x2="${TIMELINE_WIDTH}" y2="${y}"></line>`);
@@ -2694,7 +3075,7 @@ function renderGraph(data) {
   const { tick: tickMin, label: labelMin } = getTickSteps(state.graphPxPerHour);
   const pxPerMinGraph = state.graphPxPerHour / 60;
   for (let m = 0; m <= 24 * 60; m += tickMin) {
-    // Ось графика всегда строго UTC 00:00–24:00, независимо от часового пояса.
+    // Ось 00:00–24:00 в ЛОКАЛЬНОМ времени: линии рейсов сдвинуты на tzShiftMs.
     const x = m * pxPerMinGraph;
     const isHour = m % 60 === 0;
     parts.push(`<line class="graph-gridline ${isHour ? "" : "graph-gridline-minor"}" x1="${x}" y1="${topMargin - 10}" x2="${x}" y2="${height - bottomMargin}"></line>`);
@@ -2706,6 +3087,12 @@ function renderGraph(data) {
 
   parts.push(`<g clip-path="url(#${clipId})">`);
   const tripRefs = []; // index -> {routeId, route, trip}
+  // Начала/концы рейсов (для соединителей оборота) и остановки по
+  // платформам (для маркеров конфликтов) — собираются в основном цикле
+  const tripStarts = [];
+  const tripEnds = [];
+  const conflictEvents = [];
+  const tripsGeo = []; // геометрия рейсов (движущиеся перегоны) — для детекта обгонов
   for (const route of routesToShow) {
     for (const trip of route.trips) {
       const delta = getOverride(route.routeId, trip.tripOriginMs);
@@ -2719,7 +3106,49 @@ function renderGraph(data) {
         // нормализацию — здесь она не нужна и даже вредна.
         arrivalMs: p.arrivalMs + delta,
         departureMs: p.departureMs === null ? null : p.departureMs + delta,
+        stationId: p.stationId,
+        platformName: p.platformName,
       }));
+      // points отсортированы по времени: [0] — начало рейса, [last] — конец
+      const pFirst = effPoints[0], pLast = effPoints[effPoints.length - 1];
+      if (pFirst && pFirst.stationId) {
+        tripStarts.push({ routeId: route.routeId, t0: trip.tripOriginMs, stationId: pFirst.stationId, dist: pFirst.distance, effMs: pFirst.arrivalMs, baseMs: pFirst.arrivalMs - delta });
+        tripEnds.push({ routeId: route.routeId, revId: route.reverseRouteId, color: route.color, t0: trip.tripOriginMs, stationId: pLast.stationId, dist: pLast.distance, effMs: pLast.arrivalMs, baseMs: pLast.arrivalMs - delta });
+        for (const p of effPoints) {
+          conflictEvents.push({
+            key: p.stationId + "|" + (p.platformName || "?"),
+            routeId: route.routeId, routeNumber: route.routeNumber || route.routeName, t0: trip.tripOriginMs,
+            arr: p.arrivalMs, end: Math.max(p.departureMs ?? p.arrivalMs, p.arrivalMs), dist: p.distance,
+          });
+        }
+        // Геометрия движущихся перегонов рейса (для детекта обгонов через
+        // пересечение линий, а НЕ через совпадение ключа станций — у
+        // маршрутов разный набор промежуточных остановок).
+        // Отрезки в осях (t = сырое ms, y = ПИКСЕЛЬ через yScale) — так
+        // пересечение совпадает с нарисованными линиями (yScale нелинейна).
+        const dir = Math.sign((pLast.distance - pFirst.distance) || 1);
+        const movingSegs = [];
+        let yLo = Infinity, yHi = -Infinity;
+        for (let pi = 0; pi < effPoints.length - 1; pi++) {
+          const a = effPoints[pi], b = effPoints[pi + 1];
+          if (a.distance === b.distance) continue; // стоянка — не перегон
+          const ya = yScale(a.distance), yb = yScale(b.distance);
+          movingSegs.push({
+            t1: a.departureMs !== null ? a.departureMs : a.arrivalMs, y1: ya,
+            t2: b.arrivalMs, y2: yb,
+          });
+          yLo = Math.min(yLo, ya, yb); yHi = Math.max(yHi, ya, yb);
+        }
+        if (movingSegs.length) {
+          tripsGeo.push({
+            routeId: route.routeId, routeNumber: route.routeNumber || route.routeName, t0: trip.tripOriginMs,
+            dir, movingSegs,
+            tMin: Math.min(effPoints[0].arrivalMs, pLast.arrivalMs),
+            tMax: Math.max(effPoints[0].arrivalMs, pLast.arrivalMs),
+            yMin: yLo, yMax: yHi,
+          });
+        }
+      }
       // ВАЖНО: точки в trip.points идут в порядке ВОЗРАСТАНИЯ РАССТОЯНИЯ
       // (так нужно для оси Y), но для обратных маршрутов это НЕ совпадает
       // с хронологическим порядком движения поезда (он едет от станции
@@ -2754,28 +3183,163 @@ function renderGraph(data) {
       const dirClass = route.direction === "backward" ? "backward" : "";
       const editedClass = isEdited ? "is-edited" : "";
       const draftClass = route.isDraft ? "is-draft" : "";
+      const chainClass = state.chainHl
+        ? (state.chainHl.has(`${route.routeId}:${trip.tripOriginMs}`) ? "chain-hl" : "chain-dim")
+        : "";
       parts.push(`<path class="graph-trip-hit" d="${d}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
-      parts.push(`<path class="graph-trip-path ${dirClass} ${editedClass} ${draftClass}" d="${d}" stroke="${route.color}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
-      if (events[events.length - 1].ms >= MS_PER_DAY) {
+      parts.push(`<path class="graph-trip-path ${dirClass} ${editedClass} ${draftClass} ${chainClass}" d="${d}" stroke="${route.color}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
+      // Перенос через полночь В ЛОКАЛЬНОМ времени: если рейс (со сдвигом
+      // tzShiftMs) выходит за правый край — рисуем копию на сутки раньше,
+      // если за левый — копию на сутки позже. Основной путь клипается.
+      if (events[events.length - 1].ms + tzShiftMs >= MS_PER_DAY) {
         let dYesterday = "";
         events.forEach((ev, i) => {
           dYesterday += (i === 0 ? "M" : "L") + `${xScale(ev.ms - MS_PER_DAY)},${yScale(ev.distance)} `;
         });
         parts.push(`<path class="graph-trip-hit" d="${dYesterday}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
-        parts.push(`<path class="graph-trip-path ${dirClass} ${editedClass} ${draftClass}" d="${dYesterday}" stroke="${route.color}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
+        parts.push(`<path class="graph-trip-path ${dirClass} ${editedClass} ${draftClass} ${chainClass}" d="${dYesterday}" stroke="${route.color}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
+      }
+      if (events[0].ms + tzShiftMs < 0) {
+        let dTomorrow = "";
+        events.forEach((ev, i) => {
+          dTomorrow += (i === 0 ? "M" : "L") + `${xScale(ev.ms + MS_PER_DAY)},${yScale(ev.distance)} `;
+        });
+        parts.push(`<path class="graph-trip-hit" d="${dTomorrow}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
+        parts.push(`<path class="graph-trip-path ${dirClass} ${editedClass} ${draftClass} ${chainClass}" d="${dTomorrow}" stroke="${route.color}" data-tref="${refIdx}" data-route-id="${escapeHtml(route.routeId)}"></path>`);
       }
       if (isEdited || route.isDraft) {
-        const midX = xScale(effPoints[0].arrivalMs);
+        const midX = (toDisplayMs(effPoints[0].arrivalMs) / MS_PER_DAY) * TIMELINE_WIDTH;
         const midY = yScale(effPoints[0].distance) - 6;
         parts.push(`<text class="graph-edited-tag" x="${midX}" y="${midY}">${escapeHtml(route.isDraft ? t("draftBadge") : t("editedLabel"))}</text>`);
       }
     }
   }
+
+  // ── Соединители оборота: конец прямого рейса стыкуется с началом
+  // обратного на конечной (тот же состав) — рисуем перемычку, чтобы
+  // линии читались как один непрерывный путь поезда ──
+  // Заодно запоминаем такие пары: для маркеров конфликтов оборот — не конфликт.
+  const linkedPairs = new Set();
+  {
+    const TURN_TOL = 6 * 60000;
+    const startsByStation = new Map();
+    for (const s of tripStarts) {
+      if (!startsByStation.has(s.stationId)) startsByStation.set(s.stationId, []);
+      startsByStation.get(s.stationId).push(s);
+    }
+    // Сегмент короткий (минуты) — при выходе за края суток в локальном
+    // времени переносим его целиком на ±сутки
+    const daySnap = (ms) => {
+      const disp = ms + tzShiftMs;
+      return disp >= MS_PER_DAY ? -MS_PER_DAY : disp < 0 ? MS_PER_DAY : 0;
+    };
+    for (const en of tripEnds) {
+      if (!en.revId) continue;
+      let best = null, bestDiff = Infinity;
+      for (const st of (startsByStation.get(en.stationId) || [])) {
+        if (st.routeId !== en.revId) continue;
+        const diff = st.baseMs - en.baseMs;
+        if (diff < -60000 || diff > TURN_TOL) continue;
+        if (Math.abs(diff) < bestDiff) { bestDiff = Math.abs(diff); best = st; }
+      }
+      if (!best) continue;
+      linkedPairs.add(en.routeId + ":" + en.t0 + "|" + best.routeId + ":" + best.t0);
+      linkedPairs.add(best.routeId + ":" + best.t0 + "|" + en.routeId + ":" + en.t0);
+      const ds = daySnap((en.effMs + best.effMs) / 2);
+      const y = yScale(en.dist);
+      const chainCls = state.chainHl
+        ? (state.chainHl.has(`${en.routeId}:${en.t0}`) ? "chain-hl" : "chain-dim")
+        : "";
+      parts.push(`<line class="graph-turnaround-link ${chainCls}" x1="${xScale(en.effMs + ds)}" y1="${y}" x2="${xScale(best.effMs + ds)}" y2="${y}" stroke="${en.color}"></line>`);
+    }
+
+    // Собираем конфликты в state._graphConflicts — по ним рисуем маркеры
+    // (с data-cidx), слабо-прозрачные пунктирные связи между линиями и
+    // интерактивный тултип (проблема + решение) при наведении.
+    const conflicts = [];
+    const minIntervalMs = state.minIntervalMin * 60000;
+
+    // ── (1) Станционные конфликты: два поезда на одной платформе одной
+    // станции ближе минимального интервала (обороты состава пропускаем) ──
+    const groupsCf = new Map();
+    for (const ev of conflictEvents) {
+      if (!groupsCf.has(ev.key)) groupsCf.set(ev.key, []);
+      groupsCf.get(ev.key).push(ev);
+    }
+    for (const evs of groupsCf.values()) {
+      evs.sort((a, b) => a.arr - b.arr);
+      for (let i = 0; i < evs.length; i++) {
+        const cur = evs[i];
+        for (let j = i + 1; j < evs.length; j++) {
+          const nx = evs[j];
+          if (nx.arr >= cur.end + minIntervalMs) break;
+          if (cur.routeId === nx.routeId && cur.t0 === nx.t0) continue;
+          if (linkedPairs.has(cur.routeId + ":" + cur.t0 + "|" + nx.routeId + ":" + nx.t0)) continue;
+          const gapMin = Math.round((nx.arr - cur.end) / 60000);
+          const needMin = Math.ceil((minIntervalMs - (nx.arr - cur.end)) / 60000);
+          conflicts.push({
+            kind: "station",
+            x1: xScale(cur.arr + daySnap(cur.arr)), x2: xScale(nx.arr + daySnap(nx.arr)),
+            y1: yScale(cur.dist), y2: yScale(cur.dist),
+            mx: (cur.arr + nx.arr) / 2, my: yScale(cur.dist),
+            a: cur, b: nx,
+            problem: t("gcStationProblem", { r1: cur.routeNumber, t1: formatLocal(normalizeMs(cur.arr)), r2: nx.routeNumber, t2: formatLocal(normalizeMs(nx.arr)), gap: gapMin }),
+            solution: t("gcStationSolution", { need: Math.max(1, needMin) }),
+          });
+        }
+      }
+    }
+
+    // ── (2) Обгоны: два рейса В ОДНУ сторону, чьи линии ПЕРЕСЕКАЮТСЯ на
+    // перегоне — задний догнал переднего и «проехал сквозь» (физически
+    // встал бы ему в хвост). Считаем пересечением отрезков в осях (t,d),
+    // поэтому разный набор промежуточных станций не мешает. Максимум один
+    // маркер на пару рейсов (первое пересечение), встречные — не конфликт ──
+    const seenPair = new Set();
+    for (let ia = 0; ia < tripsGeo.length; ia++) {
+      const A = tripsGeo[ia];
+      for (let ib = ia + 1; ib < tripsGeo.length; ib++) {
+        const B = tripsGeo[ib];
+        if (A.dir !== B.dir) continue;                                 // встречные — норма
+        if (A.tMax <= B.tMin || B.tMax <= A.tMin) continue;            // не пересекаются по времени
+        if (A.yMax <= B.yMin || B.yMax <= A.yMin) continue;            // не пересекаются по вертикали
+        const pairKey = A.routeId + ":" + A.t0 + "|" + B.routeId + ":" + B.t0;
+        if (seenPair.has(pairKey)) continue;
+        let hit = null;
+        for (const sa of A.movingSegs) {
+          for (const sb of B.movingSegs) {
+            const x = segIntersect(sa.t1, sa.y1, sa.t2, sa.y2, sb.t1, sb.y1, sb.t2, sb.y2);
+            if (x) { hit = x; break; }
+          }
+          if (hit) break;
+        }
+        if (!hit) continue;
+        seenPair.add(pairKey);
+        conflicts.push({
+          kind: "overtake",
+          mx: hit.t, my: hit.d,
+          a: { routeId: A.routeId, routeNumber: A.routeNumber, t0: A.t0 },
+          b: { routeId: B.routeId, routeNumber: B.routeNumber, t0: B.t0 },
+          problem: t("gcOvertakeProblem", { r1: A.routeNumber, r2: B.routeNumber, tm: formatLocal(normalizeMs(hit.t)) }),
+          solution: t("gcOvertakeSolution"),
+        });
+      }
+    }
+
+    state._graphConflicts = conflicts;
+    conflicts.forEach((c, ci) => {
+      // Слабо-прозрачная пунктирная связь между линиями конфликтующих поездов
+      if (c.kind === "station") {
+        parts.push(`<line class="graph-conflict-link" x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}"></line>`);
+      }
+      parts.push(`<circle class="graph-conflict-marker" data-cidx="${ci}" cx="${xScale(c.mx + daySnap(c.mx))}" cy="${c.my}" r="5"></circle>`);
+    });
+  }
   parts.push("</g>");
 
   {
     const nowMs = getNowMsOfDay();
-    const nowX = xScale(nowMs);
+    const nowX = (toDisplayMs(nowMs) / MS_PER_DAY) * TIMELINE_WIDTH;
     parts.push(`<line id="graphNowLine" class="graph-now-line" x1="${nowX}" y1="${topMargin - 10}" x2="${nowX}" y2="${height - bottomMargin}"></line>`);
   }
 
@@ -2865,6 +3429,62 @@ function renderGraph(data) {
   });
 }
 
+// ── Тултип при наведении на линию рейса (как у блока на дашборде) ────
+graphWrap.addEventListener("mousemove", (e) => {
+  if (dragState.active) { entryTooltip.style.display = "none"; return; }
+  // Приоритет — маркер конфликта: показываем проблему и решение
+  const cMark = e.target.closest(".graph-conflict-marker");
+  if (cMark) {
+    const c = (state._graphConflicts || [])[Number(cMark.dataset.cidx)];
+    if (c) {
+      entryTooltip.style.display = "block";
+      entryTooltip.style.left = e.clientX + 16 + "px";
+      entryTooltip.style.top = e.clientY + 16 + "px";
+      const hdr = c.kind === "overtake" ? t("gcOvertakeLabel") : t("conflictLabel");
+      entryTooltip.innerHTML =
+        `<b>⚠ ${escapeHtml(hdr)}</b>` +
+        `<div><span class="dev-pos">${escapeHtml(t("gcProblemLabel"))}:</span> ${escapeHtml(c.problem)}</div>` +
+        `<div><span class="dev-early">${escapeHtml(t("gcSolutionLabel"))}:</span> ${escapeHtml(c.solution)}</div>`;
+      return;
+    }
+  }
+  const target = e.target.closest("[data-tref]");
+  if (!target) { entryTooltip.style.display = "none"; return; }
+  const ref = state.graphTripRefs[Number(target.dataset.tref)];
+  if (!ref) return;
+  // Ближайшая станция по вертикали курсора
+  const rect = graphWrap.getBoundingClientRect();
+  const yIn = e.clientY - rect.top + graphWrap.scrollTop;
+  let stn = null, bestDy = Infinity;
+  for (const m of state._graphYMap || []) {
+    const dy = Math.abs(m.y - yIn);
+    if (dy < bestDy) { bestDy = dy; stn = m; }
+  }
+  // Точка рейса на этой станции (по дистанции оси Y)
+  let pt = null, bestDd = Infinity;
+  for (const p of ref.effPoints) {
+    const dd = Math.abs(p.distance - (stn ? stn.distance : 0));
+    if (dd < bestDd) { bestDd = dd; pt = p; }
+  }
+  const r = ref.route;
+  let html = `<b>${r.isDraft ? draftFlagHtml() + " " : ""}${escapeHtml(r.routeName)}${r.routeNumber ? " · " + escapeHtml(r.routeNumber) : ""}</b>`;
+  if (stn) html += `<br>${escapeHtml(stn.name)}`;
+  if (pt) {
+    html += `<br>${t("arrivalLabel")}: ${formatLocal(normalizeMs(pt.arrivalMs))}` +
+      (pt.departureMs !== null ? " · " + t("departureLabel") + ": " + formatLocal(normalizeMs(pt.departureMs)) : "");
+  }
+  html += `<br>${t("deviationLabel")}: <span class="${deviationClass(ref.trip.deviationMs)}">${formatDeviation(ref.trip.deviationMs)}</span>`;
+  if (ref.isEdited) {
+    const sign = ref.delta > 0 ? "+" : "−";
+    html += `<br><i>${escapeHtml(t("editedNote"))} (${sign}${formatMinutesShort(Math.round(Math.abs(ref.delta) / 60000))})</i>`;
+  }
+  entryTooltip.style.display = "block";
+  entryTooltip.style.left = e.clientX + 16 + "px";
+  entryTooltip.style.top = e.clientY + 16 + "px";
+  entryTooltip.innerHTML = html;
+});
+graphWrap.addEventListener("mouseleave", () => { entryTooltip.style.display = "none"; });
+
 graphWrap.addEventListener("mousedown", (e) => {
   const target = e.target.closest(".graph-trip-hit");
   if (!target) return;
@@ -2878,6 +3498,7 @@ graphWrap.addEventListener("mousedown", (e) => {
   dragState.startX = e.clientX;
   dragState.moved = 0;
   dragState.shiftMode = e.shiftKey;
+  dragState.ctrlAtStart = e.ctrlKey || e.metaKey;
   dragState.groupEls = dragState.shiftMode
     ? Array.from(graphWrap.querySelectorAll(`[data-route-id="${CSS.escape(ref.route.routeId)}"]`))
     : Array.from(graphWrap.querySelectorAll(`[data-tref="${refIdx}"]`));
@@ -3227,8 +3848,16 @@ function detectVehicleMode(routeType) {
 function buildTrainDiagramSvg(routeName, routeType, carCount, color, cars) {
   if (!carCount || carCount < 1) return "";
 
-  // Паром/канатка — рисуем значок вида транспорта, не поезд. Трамваи рисуем
-  // обычной схемой вагонов, как поезда (отдельная трамвайная схема убрана).
+  // Тип отрисовки: трамвай / автобус / троллейбус (автобус с «рогами»,
+  // определяется по "trol" в vehicleId). Всё остальное — схема поездов ниже.
+  const _rt = (routeType || "").toLowerCase();
+  const isTram = _rt.includes("tram");
+  const isBus = _rt.includes("bus");
+  const isTrolley = isBus && (cars || []).some(c => ((c.vehicleId || "") + "").toLowerCase().includes("trol"));
+  if (isTram) return buildTramDiagramSvg(carCount);
+  if (isBus) return buildBusDiagramSvg(carCount, isTrolley);
+
+  // Паром/канатка — рисуем значок вида транспорта, не поезд.
   const mode = detectVehicleMode(routeType);
   if (mode) return buildVehicleIconSvg(mode);
 
@@ -3367,6 +3996,179 @@ function buildTrainDiagramSvg(routeName, routeType, carCount, color, cars) {
   // Одна линия рельса
   const railY = PANTO_H + 2 + H + 5;
   p.push('<line x1="' + (PAD-4) + '" y1="' + railY + '" x2="' + (totalW-PAD+4) + '" y2="' + railY + '" stroke="#555" stroke-width="2" stroke-linecap="round"/>');
+  p.push('</svg>');
+  return '<div class="train-diagram-wrap">' + p.join("") + '</div>';
+}
+
+// Схема трамвая: сетка как у поезда (W=46), пантографы только над первым
+// (разложенный ромб) и последним (сложенный) вагонами. Дверь у вагона i
+// (1-индексация, всего n) есть, если min(i, n+1-i) нечётное.
+function buildTramDiagramSvg(carCount) {
+  const W = 46, H = 22, GAP = 2, PAD = 12, PANTO_H = 14;
+  const totalW = carCount * W + (carCount - 1) * GAP + PAD * 2;
+  const totalH = PANTO_H + H + 14;
+  const p = [];
+  p.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + totalW + '" height="' + totalH + '" style="display:block">');
+
+  const winRect = (wx, wy) => '<rect x="' + wx + '" y="' + wy + '" width="9" height="9" rx="1.5" fill="#2a3a4a" stroke="#1a2a3a" stroke-width="0.5"/>';
+  const doorRect = (dx, dy) => '<rect x="' + dx + '" y="' + dy + '" width="9" height="18" rx="1" fill="#1a2a3a"/>';
+
+  for (let i = 0; i < carCount; i++) {
+    const x = PAD + i * (W + GAP), y = PANTO_H + 2;
+    const isFirst = i === 0, isLast = i === carCount - 1 && carCount > 1;
+    const hasDoor = Math.min(i + 1, carCount - i) % 2 === 1;
+
+    // Кузов: у головного скруглён верхний ЛЕВЫЙ угол (R=20), у хвостового —
+    // верхний ПРАВЫЙ, промежуточные — прямоугольник
+    if (isFirst) {
+      p.push('<path d="M ' + (x+20) + ' ' + y + ' L ' + (x+W) + ' ' + y +
+        ' L ' + (x+W) + ' ' + (y+H) + ' L ' + x + ' ' + (y+H) +
+        ' Q ' + x + ' ' + y + ' ' + (x+20) + ' ' + y + ' Z" fill="#e8e8e8" stroke="#bbb" stroke-width="1"/>');
+    } else if (isLast) {
+      p.push('<path d="M ' + x + ' ' + y + ' L ' + (x+W-20) + ' ' + y +
+        ' Q ' + (x+W) + ' ' + y + ' ' + (x+W) + ' ' + (y+H) +
+        ' L ' + x + ' ' + (y+H) + ' Z" fill="#e8e8e8" stroke="#bbb" stroke-width="1"/>');
+    } else {
+      p.push('<rect x="' + x + '" y="' + y + '" width="' + W + '" height="' + H + '" fill="#e8e8e8" stroke="#bbb" stroke-width="1"/>');
+    }
+
+    // Окна и двери
+    if (isFirst) {
+      // Кабинное окно: левый верхний угол с большим радиусом (параллельно кузову)
+      p.push('<path d="M ' + (x+10) + ' ' + (y+6.5) + ' Q ' + (x+4) + ' ' + (y+7) + ' ' + (x+4) + ' ' + (y+13) +
+        ' Q ' + (x+4) + ' ' + (y+15.5) + ' ' + (x+6) + ' ' + (y+15.5) +
+        ' L ' + (x+11.5) + ' ' + (y+15.5) + ' Q ' + (x+13) + ' ' + (y+15.5) + ' ' + (x+13) + ' ' + (y+14) +
+        ' L ' + (x+13) + ' ' + (y+8) + ' Q ' + (x+13) + ' ' + (y+6.5) + ' ' + (x+11.5) + ' ' + (y+6.5) +
+        ' Z" fill="#2a3a4a" stroke="#1a2a3a" stroke-width="0.5"/>');
+      p.push(doorRect(x+17, y+2));
+      p.push(winRect(x+30, y+6.5));
+    } else if (isLast) {
+      p.push(winRect(x+5, y+6.5));
+      p.push(doorRect(x+18.5, y+2));
+      // Кабинное окно: большой радиус в правом верхнем углу (зеркально первому)
+      p.push('<path d="M ' + (x+35) + ' ' + (y+6.5) + ' Q ' + (x+41) + ' ' + (y+7) + ' ' + (x+41) + ' ' + (y+13) +
+        ' Q ' + (x+41) + ' ' + (y+15.5) + ' ' + (x+39) + ' ' + (y+15.5) +
+        ' L ' + (x+33.5) + ' ' + (y+15.5) + ' Q ' + (x+32) + ' ' + (y+15.5) + ' ' + (x+32) + ' ' + (y+14) +
+        ' L ' + (x+32) + ' ' + (y+8) + ' Q ' + (x+32) + ' ' + (y+6.5) + ' ' + (x+33.5) + ' ' + (y+6.5) +
+        ' Z" fill="#2a3a4a" stroke="#1a2a3a" stroke-width="0.5"/>');
+    } else if (hasDoor) {
+      p.push(winRect(x+5, y+6.5));
+      p.push(doorRect(x+18.5, y+2));
+      p.push(winRect(x+32, y+6.5));
+    } else {
+      p.push(winRect(x+5, y+6.5));
+      p.push(winRect(x+18.5, y+6.5));
+      p.push(winRect(x+32, y+6.5));
+    }
+
+    // Пантографы: разложенный ромб над первым вагоном, сложенный над последним
+    const cx = x + W / 2;
+    if (isFirst) {
+      p.push('<polygon points="' + cx + ',' + (y-1) + ' ' + (cx+7) + ',' + (y-6) + ' ' + cx + ',' + (y-11) + ' ' + (cx-7) + ',' + (y-6) + '" fill="none" stroke="#888" stroke-width="1.4" stroke-linejoin="round"/>');
+    } else if (isLast) {
+      p.push('<polygon points="' + cx + ',' + (y-1) + ' ' + (cx+7) + ',' + (y-3) + ' ' + cx + ',' + (y-5) + ' ' + (cx-7) + ',' + (y-3) + '" fill="none" stroke="#888" stroke-width="1.4" stroke-linejoin="round"/>');
+    }
+  }
+
+  const railY = PANTO_H + 2 + H + 5;
+  p.push('<line x1="' + (PAD-4) + '" y1="' + railY + '" x2="' + (totalW-PAD+4) + '" y2="' + railY + '" stroke="#555" stroke-width="2" stroke-linecap="round"/>');
+  p.push('</svg>');
+  return '<div class="train-diagram-wrap">' + p.join("") + '</div>';
+}
+
+// Схема автобуса/троллейбуса: секций столько, сколько «вагонов» у маршрута
+// (1 — одиночный, 2 — сочленённый, 3+ — многосекционный), между секциями
+// гармошка, нос справа, внизу колёса и линия дороги вместо рельса.
+// У троллейбуса — две штанги над задней секцией.
+function buildBusDiagramSvg(sectionCount, isTrolley) {
+  const H = 28, ACC = 12, PAD = 12;
+  const y = 20; // сверху место под штанги троллейбуса
+  const single = sectionCount === 1;
+  const midCount = single ? 0 : Math.max(0, sectionCount - 2);
+  const busW = single ? 107 : 68 + 85 + midCount * 58 + (midCount + 1) * ACC;
+  const totalW = busW + PAD * 2;
+  const totalH = y + H + 12;
+  const p = [];
+  p.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + totalW + '" height="' + totalH + '" style="display:block">');
+
+  const body = '#e8e8e8', bodyStroke = '#bbb', winFill = '#2a3a4a', winStroke = '#1a2a3a';
+  const winRect = (wx) => '<rect x="' + wx + '" y="' + (y+3) + '" width="13" height="12" rx="1" fill="' + winFill + '" stroke="' + winStroke + '" stroke-width="0.5"/>';
+  const doorRect = (dx, dw) => '<rect x="' + dx + '" y="' + (y+3) + '" width="' + (dw || 13) + '" height="23" rx="1" fill="' + winFill + '"/>';
+  const wheel = (cx) => '<circle cx="' + cx + '" cy="' + (y+H) + '" r="6.5" fill="#222"/><circle cx="' + cx + '" cy="' + (y+H) + '" r="2.2" fill="#777"/>';
+  // Лобовое стекло: левый край fx, наклонная передняя кромка справа
+  const windshield = (fx) => '<path d="M ' + (fx+1) + ' ' + (y+3) + ' Q ' + (fx+5) + ' ' + (y+3) + ' ' + (fx+6) + ' ' + (y+9) +
+    ' L ' + (fx+6) + ' ' + (y+17) + ' L ' + fx + ' ' + (y+17) + ' L ' + fx + ' ' + (y+4) +
+    ' Q ' + fx + ' ' + (y+3) + ' ' + (fx+1) + ' ' + (y+3) + ' Z" fill="' + winFill + '" stroke="' + winStroke + '" stroke-width="0.5"/>';
+  // Штанги троллейбуса: пологий наклон назад-вверх, выходят за задний край
+  const poles = (px) => '<line x1="' + (px+42) + '" y1="' + y + '" x2="' + (px-6) + '" y2="' + (y-18) + '" stroke="#888" stroke-width="1.3" stroke-linecap="round"/>' +
+    '<line x1="' + (px+48) + '" y1="' + y + '" x2="' + px + '" y2="' + (y-18) + '" stroke="#888" stroke-width="1.3" stroke-linecap="round"/>';
+
+  let x = PAD;
+  if (single) {
+    // Одиночный автобус, ширина 107
+    p.push('<path d="M ' + (x+4) + ' ' + y + ' L ' + (x+98) + ' ' + y +
+      ' Q ' + (x+106) + ' ' + y + ' ' + (x+107) + ' ' + (y+8) +
+      ' L ' + (x+107) + ' ' + (y+28) + ' L ' + (x+2) + ' ' + (y+28) +
+      ' Q ' + x + ' ' + (y+28) + ' ' + x + ' ' + (y+26) +
+      ' L ' + x + ' ' + (y+6) + ' Q ' + x + ' ' + y + ' ' + (x+4) + ' ' + y + ' Z" fill="' + body + '" stroke="' + bodyStroke + '" stroke-width="1"/>');
+    p.push(winRect(x+4));
+    p.push(winRect(x+18));
+    p.push(doorRect(x+33));
+    p.push(winRect(x+50));
+    p.push(winRect(x+66));
+    p.push(doorRect(x+84, 10));
+    p.push(windshield(x+97));
+    p.push(wheel(x+20));
+    p.push(wheel(x+72));
+    if (isTrolley) p.push(poles(x));
+  } else {
+    // Задняя секция (слева), ширина 68
+    p.push('<path d="M ' + (x+4) + ' ' + y + ' L ' + (x+68) + ' ' + y +
+      ' L ' + (x+68) + ' ' + (y+28) + ' L ' + (x+2) + ' ' + (y+28) +
+      ' Q ' + x + ' ' + (y+28) + ' ' + x + ' ' + (y+26) +
+      ' L ' + x + ' ' + (y+6) + ' Q ' + x + ' ' + y + ' ' + (x+4) + ' ' + y + ' Z" fill="' + body + '" stroke="' + bodyStroke + '" stroke-width="1"/>');
+    p.push(winRect(x+5));
+    p.push(winRect(x+21));
+    p.push(winRect(x+37));
+    p.push(doorRect(x+53));
+    p.push(wheel(x+27));
+    if (isTrolley) p.push(poles(x));
+    x += 68;
+
+    // Гармошка + средние секции (58) + гармошка перед передней
+    const accordion = (ax) => {
+      p.push('<rect x="' + ax + '" y="' + (y+1) + '" width="12" height="26" fill="#2a2f35"/>');
+      [2, 4.5, 7, 9.5].forEach((off) => {
+        p.push('<line x1="' + (ax+off) + '" y1="' + (y+1) + '" x2="' + (ax+off) + '" y2="' + (y+27) + '" stroke="#555" stroke-width="0.8"/>');
+      });
+    };
+    for (let m = 0; m < midCount; m++) {
+      accordion(x); x += ACC;
+      p.push('<rect x="' + x + '" y="' + y + '" width="58" height="' + H + '" fill="' + body + '" stroke="' + bodyStroke + '" stroke-width="1"/>');
+      p.push(winRect(x+4));
+      p.push(winRect(x+21));
+      p.push(doorRect(x+41));
+      p.push(wheel(x+27));
+      x += 58;
+    }
+    accordion(x); x += ACC;
+
+    // Передняя секция (справа), ширина 85, нос со скруглением
+    p.push('<path d="M ' + x + ' ' + y + ' L ' + (x+76) + ' ' + y +
+      ' Q ' + (x+84) + ' ' + y + ' ' + (x+85) + ' ' + (y+8) +
+      ' L ' + (x+85) + ' ' + (y+28) + ' L ' + x + ' ' + (y+28) + ' Z" fill="' + body + '" stroke="' + bodyStroke + '" stroke-width="1"/>');
+    p.push(winRect(x+8));
+    p.push(doorRect(x+25));
+    p.push(winRect(x+45));
+    p.push(doorRect(x+61));
+    p.push(windshield(x+76));
+    p.push(wheel(x+14));
+    p.push(wheel(x+51));
+  }
+
+  // Линия дороги вместо рельса
+  const roadY = y + H + 8;
+  p.push('<line x1="' + (PAD-4) + '" y1="' + roadY + '" x2="' + (totalW-PAD+4) + '" y2="' + roadY + '" stroke="#555" stroke-width="2" stroke-linecap="round"/>');
   p.push('</svg>');
   return '<div class="train-diagram-wrap">' + p.join("") + '</div>';
 }
@@ -3686,11 +4488,16 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
   }
 
   // Кнопка «Обратный маршрут»
-  // Алгоритм: загружаем detail топ-кандидатов (одинаковый тип + цвет/номер),
-  // выбираем тот у которого совпадает ДЕПО и станции идут в обратном порядке.
-  // Всё делаем async — кнопка изначально disabled, включается когда нашли.
+  // Основной путь: сервер уже вычислил reverseRouteId (станции строго в
+  // обратном порядке + тот же цвет) — используем его сразу, без запросов.
+  // Фолбэк — старый клиентский скоринг по депо/конечным/общим станциям
+  // (ловит пары, где порядок станций не строго зеркальный).
   const reverseBtn = document.getElementById("reverseRouteBtn");
-  if (reverseBtn) {
+  if (reverseBtn && data.reverseRouteId) {
+    reverseBtn.disabled = false;
+    reverseBtn.style.opacity = "";
+    reverseBtn.onclick = () => openRouteModal(data.reverseRouteId);
+  } else if (reverseBtn) {
     reverseBtn.disabled = true;
     reverseBtn.style.opacity = "0.4";
     const myStations = (data.stops || []).map(s => s.stationId);
@@ -4869,7 +5676,10 @@ function renderNearestTrains() {
     }
     const effectiveDev = getEffectiveDeviation(e.routeId, e.deviationMs);
     const isLive = _arrivalsCache.get(e.routeId)?.realtime === true;
-    const actualMs = normalizeMs(e.effArrival + effectiveDev);
+    // effArrival УЖЕ содержит отклонение (времена из API приходят с учётом
+    // задержки). Заменяем вшитое e.deviationMs на актуальное effectiveDev,
+    // а не прибавляем поверх — иначе опоздание учитывается дважды.
+    const actualMs = normalizeMs(e.effArrival - (e.deviationMs || 0) + effectiveDev);
     const hasDelay = Math.abs(effectiveDev) > 60000;
     const delayHtml = hasDelay
       ? `<span class="${effectiveDev > 0 ? "dev-pos" : "dev-neg"}">${effectiveDev > 0 ? "+" : ""}${Math.round(effectiveDev / 60000)} ${t("nearestMin")}${isLive ? " 🔴" : ""}</span>`
@@ -4884,10 +5694,12 @@ function renderNearestTrains() {
     const liveEntry = _arrivalsCache.get(e.routeId);
     const livePlatform = liveEntry?.platformName;
     const platformLabel = livePlatform || e.platformName || "—";
+    // Отправление показываем ПЛАНОВОЕ: времена (и depData.departureMs, и
+    // e.effDeparture) приходят с уже вшитым отклонением — вычитаем его.
     const depData = getDepartureData(e.routeId, e.arrivalMs);
     const depTimeHtml = depData?.departureMs != null
-      ? formatLocal(depData.departureMs)
-      : (e.effDeparture !== null ? formatLocal(e.effDeparture) : `<span class="nb-muted">—</span>`);
+      ? formatLocal(normalizeMs(depData.departureMs - (depData.deviation || 0)))
+      : (e.effDeparture !== null ? formatLocal(normalizeMs(e.effDeparture - (e.deviationMs || 0))) : `<span class="nb-muted">—</span>`);
     return `<tr class="nb-row" data-route-id="${escapeHtml(e.routeId)}">
       <td><span class="dot nb-dot" style="background:${e.color}"></span><b>${escapeHtml(e.routeNumber || e.routeName)}</b></td>
       <td class="nb-terminus">${escapeHtml(terminus)}</td>
@@ -5077,6 +5889,7 @@ function getEffectiveDeviation(routeId, plannedDeviationMs) {
       { divider: true },
       { label: `${isFav ? "★ " + t("removeFavorite") : "☆ " + t("addFavorite")}`, action: "toggleFav" },
       { label: `ⓘ  ${t("ctxRouteInfo")}`, action: "openCard" },
+      { label: `⛓  ${t("ctxHighlightChain")}`, action: "highlightChain" },
       // copyShift removed
       ...(getOverride(ctxEntry.routeId, ctxEntry.tripOriginMs) !== 0 ||
           getRouteOverride(ctxEntry.routeId) !== 0 ? [
@@ -5136,6 +5949,7 @@ function getEffectiveDeviation(routeId, plannedDeviationMs) {
         const action = el.dataset.action;
         if (action === "toggleFav") { toggleFavoriteRoute(saved.routeId); applyRouteFilters(); }
         else if (action === "openCard") openRouteModal(saved.routeId);
+        else if (action === "highlightChain") toggleChainHighlight(saved.routeId, saved.tripOriginMs);
         else if (action === "copyShift") {
           state.lastCopiedRouteId = saved.routeId;
           try { clipboardRouteId = saved.routeId; clipboardDeltaMs = getRouteOverride(saved.routeId); } catch {}

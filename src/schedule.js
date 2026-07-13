@@ -98,6 +98,39 @@ function getMergedRoutesAndDepartures(topology, departuresCache) {
 }
 
 /**
+ * Карта обратных маршрутов: routeId → reverseRouteId. Пара = станции идут
+ * строго в обратном порядке + совпадает цвет (защита от случайных совпадений).
+ * Расчёт O(n²) по маршрутам, поэтому кешируется по (fetchedAt топологии +
+ * число маршрутов) — раньше этот цикл выполнялся на каждый buildStationSchedule.
+ */
+let _revMapCache = null;
+let _revMapCacheKey = "";
+function getReverseRouteMap(allRoutes, topologyFetchedAt) {
+  const key = (topologyFetchedAt || 0) + ":" + allRoutes.length;
+  if (_revMapCache && _revMapCacheKey === key) return _revMapCache;
+  const reverseRouteMap = new Map();
+  for (const route of allRoutes) {
+    if (reverseRouteMap.has(route.id)) continue;
+    const myStops = (route.stations || []).map((s) => s.id);
+    if (myStops.length < 2) continue;
+    for (const other of allRoutes) {
+      if (other.id === route.id || reverseRouteMap.has(other.id)) continue;
+      const otherStops = (other.stations || []).map((s) => s.id);
+      if (otherStops.length !== myStops.length) continue;
+      const isReverse = myStops.every((id, i) => otherStops[myStops.length - 1 - i] === id);
+      if (!isReverse) continue;
+      if (route.color !== other.color) continue;
+      reverseRouteMap.set(route.id, other.id);
+      reverseRouteMap.set(other.id, route.id);
+      break;
+    }
+  }
+  _revMapCache = reverseRouteMap;
+  _revMapCacheKey = key;
+  return reverseRouteMap;
+}
+
+/**
  * Строит расписание прибытий/отправлений по конкретной станции,
  * объединяя все маршруты, проходящие через неё.
  *
@@ -223,26 +256,8 @@ function buildStationSchedule(stationId) {
   //
   // Условия пары: одинаковое депо + станции B = reverse(A) + платформа совпадает
   // + время отправления A ≈ время прибытия B (в пределах dwellTime конечной).
-  // Строим карту обратных маршрутов: станции идут в обратном порядке + совпадение цвета
-  const reverseRouteMap = new Map(); // routeId → reverseRouteId
-  for (const route of allRoutes) {
-    if (reverseRouteMap.has(route.id)) continue;
-    const myStops = (route.stations || []).map(s => s.id);
-    if (myStops.length < 2) continue;
-    for (const other of allRoutes) {
-      if (other.id === route.id || reverseRouteMap.has(other.id)) continue;
-      const otherStops = (other.stations || []).map(s => s.id);
-      if (otherStops.length !== myStops.length) continue;
-      // Станции должны идти строго в обратном порядке
-      const isReverse = myStops.every((id, i) => otherStops[myStops.length - 1 - i] === id);
-      if (!isReverse) continue;
-      // Дополнительно: одинаковый цвет (защита от случайных совпадений)
-      if (route.color !== other.color) continue;
-      reverseRouteMap.set(route.id, other.id);
-      reverseRouteMap.set(other.id, route.id);
-      break;
-    }
-  }
+  // Карта обратных маршрутов — общая кешируемая (см. getReverseRouteMap)
+  const reverseRouteMap = getReverseRouteMap(allRoutes, topology.fetchedAt);
 
   // Находим пары прямой/обратный и скрываем прямой (тот у которого есть departureMs).
   // Обратный (конечная, departureMs === null) показываем — он содержит время прибытия
@@ -342,9 +357,86 @@ function listStations() {
     .sort((a, b) => a.name.localeCompare(b.name, "ru"));
 }
 
+/** buildStationSchedule с использованием серверного кеша расписаний. */
+function buildStationScheduleCached(stationId) {
+  const dep = store.getDepartures();
+  const fetchedAt = dep ? dep.fetchedAt : null;
+  if (fetchedAt) {
+    const cached = store.getScheduleCache(stationId, fetchedAt);
+    if (cached) return cached;
+  }
+  const result = buildStationSchedule(stationId);
+  if (result && !result.notFound && fetchedAt) store.setScheduleCache(stationId, result, fetchedAt);
+  return result;
+}
+
+/**
+ * Цепочка оборота для рейса: прямой рейс на конечной становится обратным
+ * (время прибытия ≈ времени отправления — пары уже находит
+ * buildStationSchedule на каждой конечной), обратный на другой конечной —
+ * следующим прямым и т.д. Маршруты типа S19 не заезжают в депо и катаются
+ * туда-сюда весь день — их цепочка охватывает все рейсы и может замыкаться
+ * в кольцо (обход защищён от циклов). Возвращает { chain: [{routeId,
+ * tripOriginMs}], reverseRouteId } — все рейсы, которые должны двигаться
+ * вместе при ручном сдвиге любого из них.
+ */
+function getTurnaroundChain(routeId, tripOriginMs) {
+  const topology = store.getTopology();
+  const departuresCache = store.getDepartures();
+  if (!topology || !departuresCache) return null;
+
+  const route = topology.routes.find((r) => r.id === routeId);
+  if (!route) return { notFound: true };
+
+  const { allRoutes } = getMergedRoutesAndDepartures(topology, departuresCache);
+  const reverseRouteId = getReverseRouteMap(allRoutes, topology.fetchedAt).get(routeId) || null;
+  const self = { routeId, tripOriginMs };
+  if (!reverseRouteId) return { chain: [self], reverseRouteId: null };
+
+  // Пары оборота живут в расписаниях ОБЕИХ конечных станций маршрута
+  const stops = route.stations || [];
+  const termini = [...new Set([stops[0] && stops[0].id, stops[stops.length - 1] && stops[stops.length - 1].id].filter(Boolean))];
+  const key = (r, t) => r + ":" + t;
+  const next = new Map(); // прибывший рейс → отправляющийся (оборот состава)
+  const prev = new Map();
+  for (const stId of termini) {
+    const sched = buildStationScheduleCached(stId);
+    if (!sched || !sched.entries) continue;
+    for (const e of sched.entries) {
+      if (e.pairedForwardRouteId == null || e.pairedForwardTripOriginMs == null) continue;
+      // e — отправляющийся рейс, e.pairedForward* — прибывший состав
+      next.set(key(e.pairedForwardRouteId, e.pairedForwardTripOriginMs), { routeId: e.routeId, tripOriginMs: e.tripOriginMs });
+      prev.set(key(e.routeId, e.tripOriginMs), { routeId: e.pairedForwardRouteId, tripOriginMs: e.pairedForwardTripOriginMs });
+    }
+  }
+
+  const seen = new Set([key(routeId, tripOriginMs)]);
+  const chain = [self];
+  let cur = key(routeId, tripOriginMs);
+  while (next.has(cur)) {
+    const n = next.get(cur);
+    const k = key(n.routeId, n.tripOriginMs);
+    if (seen.has(k)) break; // кольцо (S19) — цепочка замкнулась
+    seen.add(k);
+    chain.push(n);
+    cur = k;
+  }
+  cur = key(routeId, tripOriginMs);
+  while (prev.has(cur)) {
+    const n = prev.get(cur);
+    const k = key(n.routeId, n.tripOriginMs);
+    if (seen.has(k)) break;
+    seen.add(k);
+    chain.unshift(n);
+    cur = k;
+  }
+  return { chain, reverseRouteId };
+}
+
 function listRoutes() {
   const topology = store.getTopology();
   if (!topology) return [];
+  const revMap = getReverseRouteMap(topology.routes, topology.fetchedAt);
   const real = topology.routes
     .filter((r) => !r.hidden)
     .map((r) => {
@@ -356,6 +448,12 @@ function listRoutes() {
         color: colorToHex(r.color),
         type: r.type,
         stopCount: (r.stations || []).length,
+        // Упорядоченный список станций — нужен фронту для построения
+        // линейной схемы маршрутов станции (editor) без запроса деталей
+        stationIds: (r.stations || []).map((s) => s.id),
+        // Обратный маршрут (станции в обратном порядке, тот же цвет) —
+        // фронт синхронно сдвигает его при сдвиге всего маршрута
+        reverseRouteId: revMap.get(r.id) || null,
         depots: r.depots || [],
         firstStationId: (r.stations || [])[0] ? r.stations[0].id : null,
         lastStationId: (r.stations || []).slice(-1)[0] ? r.stations.slice(-1)[0].id : null,
@@ -375,6 +473,7 @@ function listRoutes() {
     color: colorToHex(d.color),
     type: d.type,
     stopCount: d.stops.length,
+    stationIds: (d.stops || []).map((s) => s.stationId),
     isDraft: true,
   }));
   return [...real, ...draftRows].sort((a, b) => a.name.localeCompare(b.name, "ru"));
@@ -421,6 +520,9 @@ function getRouteDetail(routeId) {
     circularState: route.circularState,
     hidden: !!route.hidden,
     isDraft: !!route.isDraft,
+    // Обратный маршрут (станции в обратном порядке + тот же цвет) — фронт
+    // использует для кнопки «Обратный маршрут» вместо клиентского скоринга
+    reverseRouteId: getReverseRouteMap(allRoutes, topology.fetchedAt).get(routeId) || null,
     depots: route.depots || [],
     stops,
     durationsMs: route.durations || [],
@@ -621,7 +723,13 @@ function buildRouteGraph(fromStationId, toStationId) {
             const arrivalMs = t0 + arrivalOffsets[sIdx] + _draftShift2 + group.deviation;
             const dep = departureOffsets[sIdx];
             const departureMs = dep === null ? null : t0 + dep + _draftShift2 + group.deviation;
-            rawPoints.push({ distance: dist, arrivalMs, departureMs });
+            // stationId/platformName нужны фронту для соединителей оборота
+            // и маркеров конфликтов прямо на графике движения
+            rawPoints.push({
+              distance: dist, arrivalMs, departureMs,
+              stationId: st.id,
+              platformName: normalizePlatformName(st.name, `#${sIdx + 1}`),
+            });
           }
           // Сортируем по времени чтобы линия шла слева→направо
           rawPoints.sort((a, b) => a.arrivalMs - b.arrivalMs);
@@ -645,6 +753,8 @@ function buildRouteGraph(fromStationId, toStationId) {
       direction,
       isDraft: !!route.isDraft,
       hasActiveService: !!departureInfo,
+      // Для соединителей оборота прямой↔обратный на графике движения
+      reverseRouteId: getReverseRouteMap(allRoutes, topology.fetchedAt).get(route.id) || null,
       totalDistance: totalSegmentDistance, // в мс времени пути
       tripCount: trips.length,
       trips,
@@ -850,6 +960,7 @@ module.exports = {
   buildRouteGraph,
   buildRouteTimetable,
   suggestDraftLeg,
+  getTurnaroundChain,
 };
 
 /**

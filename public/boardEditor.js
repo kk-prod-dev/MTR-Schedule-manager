@@ -43,7 +43,7 @@ const BoardEditor = (function () {
 
   // lineColor — подопция столбца "line": цветной квадратик маршрута.
   let colConfig = { arrival: true, departure: true, line: true, lineColor: true, dest: true, platform: true };
-  let sectionsMode = "auto"; // "auto" | "1".."4" — на сколько мини-колонок делить холст
+  let sectionsMode = "auto"; // "auto" | "1".."10" — на сколько мини-колонок делить холст
   let tableFontSize = 12;    // размер шрифта ячеек вставленного расписания (метрики масштабируются)
   let tableFontFamily = "Arial"; // шрифт вставленного расписания — переживает перестройки и рестарт
   let autoCanvasSize = false; // галочка: подгонять размер холста под вставленное расписание
@@ -479,7 +479,7 @@ const BoardEditor = (function () {
       const virtualRows = entries.length + (hourGapEnabled ? (hourBreaks * hourGap) / rowH : 0);
       const nSec = sectionsMode === "auto"
         ? Math.min(maxFit, Math.max(1, Math.ceil(virtualRows / maxRows)))
-        : Math.max(1, Math.min(8, Number(sectionsMode) || 1));
+        : Math.max(1, Math.min(10, Number(sectionsMode) || 1));
       const rowsPer = Math.ceil(entries.length / nSec);
 
       // Раскладка секций заранее: позиции строк с почасовыми пробелами
@@ -619,69 +619,172 @@ const BoardEditor = (function () {
     }
   }
 
-  // ── Схема маршрутов станции ─────────────────────────────────────────────
-  // Отдельный блок «картинка-в-картинке»: в центре — текущая станция, вверх и
-  // вниз тянутся вертикальные цветные линии самых «загруженных» маршрутов,
-  // проходящих через станцию. Добавляется как НАБОР отдельных объектов
-  // (линии/текст/плашка), чтобы пользователь мог править цвета поштучно;
-  // экспортируется в общую картинку вместе с остальным холстом.
+  // ── Схема маршрутов станции (линейная карта) ────────────────────────────
+  // Ствол — самый длинный маршрут через станцию, рисуется вертикально со
+  // всеми станциями. Остальные маршруты через станцию — ветки: общий со
+  // стволом участок не дублируется, после точки расхождения ветка уходит
+  // кривой в боковую «полосу» и рисуется до своей конечной. Красным с
+  // кружком выделяются пересадочные (через них проходит ≥2 маршрутов) и
+  // конечные станции; обычные — серые с прямоугольной засечкой. Добавляется
+  // как НАБОР отдельных объектов, чтобы пользователь мог править поштучно.
   async function insertStationScheme() {
     if (!selectedStationId) { setStatus(tt("boardSelectStationFirst")); return; }
     setStatus(tt("boardLoadingSchedule"));
     try {
-      const [schedRes, routes] = await Promise.all([
-        fetch(`/api/stations/${selectedStationId}/schedule`),
-        fetchRoutesCached(),
-      ]);
-      const data = await schedRes.json();
-      if (!schedRes.ok) throw new Error(data.error || ("HTTP " + schedRes.status));
+      const [routesMap, stations] = await Promise.all([fetchRoutesCached(), fetchStationsCached()]);
+      const stName = new Map(stations.map((s) => [s.id, s.name]));
 
-      // Считаем число рейсов на каждый маршрут — «загруженность».
-      const byRoute = new Map();
-      for (const e of data.entries || []) {
-        if (e.hiddenByReverse) continue;
-        const r = byRoute.get(e.routeId) || { routeId: e.routeId, count: 0, color: e.color, number: e.routeNumber, name: e.routeName };
-        r.count++;
-        byRoute.set(e.routeId, r);
+      // Маршруты с известным списком станций; прямой/обратный — одна линия
+      // (dedup по канонич. ключу последовательности станций).
+      const groups = new Map();
+      for (const r of routesMap.values()) {
+        const ids = r.stationIds || [];
+        if (ids.length < 2) continue;
+        const fwd = ids.join("|"), rev = ids.slice().reverse().join("|");
+        const key = fwd < rev ? fwd : rev;
+        if (!groups.has(key)) groups.set(key, { ids, route: r });
       }
-      const list = [...byRoute.values()].sort((a, b) => b.count - a.count).slice(0, 6);
-      if (!list.length) { setStatus(tt("boardNoDepartures")); return; }
+      const all = [...groups.values()];
 
-      const colGap = 52, x0 = 70, yTop = 70, yBottom = 330;
-      const yMid = (yTop + yBottom) / 2;
+      // Число линий через каждую станцию — для пометки пересадочных
+      const linesPerStation = new Map();
+      for (const g of all) {
+        for (const id of new Set(g.ids)) linesPerStation.set(id, (linesPerStation.get(id) || 0) + 1);
+      }
+
+      const through = all.filter((g) => g.ids.includes(selectedStationId));
+      if (!through.length) { setStatus(tt("boardSchemeError")); return; }
+      through.sort((a, b) => b.ids.length - a.ids.length);
+      const trunk = through[0].ids;
+      const trunkIdx = new Map(trunk.map((id, i) => [id, i]));
+
+      // Ветки: ориентируем по стволу, находим общий участок и хвосты
+      // до/после него (до конечной ветки).
+      const branches = [];
+      for (const g of through.slice(1)) {
+        let ids = g.ids;
+        const shared = ids.filter((id) => trunkIdx.has(id));
+        if (shared.length === ids.length) continue; // целиком внутри ствола
+        if (shared.length >= 2 && trunkIdx.get(shared[0]) > trunkIdx.get(shared[shared.length - 1])) {
+          ids = ids.slice().reverse();
+        }
+        let first = -1, last = -1;
+        ids.forEach((id, i) => { if (trunkIdx.has(id)) { if (first < 0) first = i; last = i; } });
+        if (first < 0) continue;
+        // Хвост после расхождения (вниз) и «голова» до входа на ствол (вверх)
+        if (last < ids.length - 1) branches.push({ junction: ids[last], tail: ids.slice(last + 1), dir: 1 });
+        if (first > 0) branches.push({ junction: ids[first], tail: ids.slice(0, first).reverse(), dir: -1 });
+      }
+
+      // ── Геометрия ──
+      const ROW = 36, LANE_GAP = 78, NAME_W = 170;
+      const stroke = "#3a3f45", grey = "#3f4348", red = "#c1272d";
       const items = [];
-      list.forEach((r, i) => {
-        const x = x0 + i * colGap;
-        // Вертикальная цветная линия маршрута (вверх и вниз от станции)
-        items.push(new fabric.Line([x, yTop, x, yBottom], { stroke: r.color || "#666666", strokeWidth: 8, strokeLineCap: "round" }));
-        // Номер маршрута сверху
-        items.push(new fabric.Textbox(r.number || r.name || "", {
-          left: x - 24, top: yTop - 26, width: 48, fontSize: 14, fontWeight: "bold",
-          fill: "#111111", textAlign: "center", fontFamily: tableFontFamily,
-        }));
-        // Конечная снизу
-        const route = routes.get(r.routeId);
-        const term = (route && route.terminus) || "";
-        items.push(new fabric.Textbox(term, {
-          left: x - 34, top: yBottom + 8, width: 68, fontSize: 10,
-          fill: "#333333", textAlign: "center", fontFamily: tableFontFamily,
-        }));
+      let minRow = 0, maxRow = trunk.length - 1;
+
+      // Распределение веток по боковым полосам без пересечений
+      const lanes = { 1: [], "-1": [] }; // side → массив занятых интервалов по полосам
+      const placed = [];
+      branches.forEach((b, bi) => {
+        const jRow = trunkIdx.get(b.junction);
+        const r0 = b.dir > 0 ? jRow : jRow - b.tail.length;
+        const r1 = b.dir > 0 ? jRow + b.tail.length : jRow;
+        const side = bi % 2 === 0 ? 1 : -1;
+        const sideLanes = lanes[side];
+        let lane = 0;
+        for (; lane < sideLanes.length; lane++) {
+          if (!sideLanes[lane].some(([a, z]) => r0 <= z + 1 && r1 >= a - 1)) break;
+        }
+        if (lane === sideLanes.length) sideLanes.push([]);
+        sideLanes[lane].push([r0, r1]);
+        placed.push({ ...b, side, lane, jRow });
+        minRow = Math.min(minRow, r0);
+        maxRow = Math.max(maxRow, r1);
       });
-      // Центральная плашка «текущая станция» поперёк всех линий
-      const barLeft = x0 - 26, barRight = x0 + (list.length - 1) * colGap + 26;
-      const barW = barRight - barLeft;
-      items.push(new fabric.Rect({ left: barLeft, top: yMid - 17, width: barW, height: 34, rx: 17, ry: 17, fill: "#ffffff", stroke: "#111111", strokeWidth: 2 }));
-      items.push(new fabric.Textbox(data.stationName || "", {
-        left: barLeft, top: yMid - 9, width: barW, fontSize: 15, fontWeight: "bold",
-        fill: "#111111", textAlign: "center", fontFamily: tableFontFamily,
+
+      // Ствол отступает от левого края на ширину подписей и левых полос
+      // веток; верхний отступ — по самой высокой ветке (minRow может быть <0)
+      const lanesL = lanes["-1"].length, lanesR = lanes["1"].length;
+      const TRUNK_X = 24 + NAME_W + 14 + lanesL * LANE_GAP;
+      const oy = 40 - minRow * ROW;
+      const rowY = (row) => oy + row * ROW;
+
+      // Фон-«зебра»: чередующиеся серые полосы каждые 5 рядов
+      const bgL = TRUNK_X - NAME_W - 14 - lanesL * LANE_GAP - 10;
+      const bgR = TRUNK_X + NAME_W + 14 + lanesR * LANE_GAP + 10;
+      for (let band = Math.floor(minRow / 5); band * 5 <= maxRow; band++) {
+        if (band % 2 === 0) continue;
+        items.push(new fabric.Rect({
+          left: bgL, top: rowY(band * 5) - ROW / 2, width: bgR - bgL, height: ROW * 5,
+          fill: "#d3d6da", selectable: true, strokeWidth: 0,
+        }));
+      }
+
+      // Станция: кружок (пересадка/конечная) или засечка + подпись
+      const isMajor = (id, isTerminus) => isTerminus || (linesPerStation.get(id) || 0) >= 2;
+      const addStation = (id, x, row, nameSide, isTerminus) => {
+        const y = rowY(row);
+        const major = isMajor(id, isTerminus);
+        if (major) {
+          items.push(new fabric.Circle({
+            left: x - 6.5, top: y - 6.5, radius: 6.5, fill: "#ffffff", stroke, strokeWidth: 3,
+          }));
+        } else {
+          items.push(new fabric.Rect({ left: x - 5, top: y - 2, width: 10, height: 4, fill: stroke, strokeWidth: 0 }));
+        }
+        const nm = stName.get(id) || "?";
+        items.push(new fabric.Textbox(nm, {
+          left: nameSide < 0 ? x - 14 - NAME_W : x + 14,
+          top: y - 7, width: NAME_W, fontSize: 12,
+          fontWeight: major ? "bold" : "normal",
+          fill: major ? red : grey,
+          textAlign: nameSide < 0 ? "right" : "left",
+          fontFamily: tableFontFamily,
+        }));
+      };
+
+      // Ствол: линия + станции (подписи слева)
+      items.push(new fabric.Line([TRUNK_X, rowY(0) - 14, TRUNK_X, rowY(trunk.length - 1) + 14], {
+        stroke, strokeWidth: 6, strokeLineCap: "round",
       }));
+      trunk.forEach((id, i) => addStation(id, TRUNK_X, i, -1, i === 0 || i === trunk.length - 1));
+
+      // Ветки: кривая от ствола в боковую полосу + станции до конечной
+      for (const b of placed) {
+        const bx = TRUNK_X + b.side * (LANE_GAP + b.lane * LANE_GAP);
+        const jy = rowY(b.jRow);
+        if (b.tail.length === 1) {
+          // Короткий отросток: горизонтально на ряду развилки (как тупик)
+          items.push(new fabric.Line([TRUNK_X, jy, bx, jy], { stroke, strokeWidth: 6, strokeLineCap: "round" }));
+          addStation(b.tail[0], bx, b.jRow, b.side, true);
+          continue;
+        }
+        const endRow = b.jRow + b.dir * b.tail.length;
+        const k = 18 * b.dir; // радиус скругления поворота
+        const d = "M " + TRUNK_X + " " + jy +
+          " L " + (bx - b.side * 18) + " " + jy +
+          " Q " + bx + " " + jy + " " + bx + " " + (jy + k) +
+          " L " + bx + " " + (rowY(endRow) + 8 * b.dir);
+        items.push(new fabric.Path(d, { fill: "", stroke, strokeWidth: 6, strokeLineCap: "round" }));
+        b.tail.forEach((id, ti) => {
+          const row = b.jRow + b.dir * (ti + 1);
+          addStation(id, bx, row, b.side, ti === b.tail.length - 1);
+        });
+      }
 
       items.forEach((o) => canvas.add(o));
+      // Если схема больше листа — ужимаем выделение целиком и центрируем
       const sel = new fabric.ActiveSelection(items, { canvas });
+      const k2 = Math.min(1, (pageH - 80) / (sel.height || 1), (pageW - 60) / (sel.width || 1));
+      if (k2 < 1) {
+        sel.scale(k2);
+        sel.set({ left: Math.max(10, (pageW - sel.getScaledWidth()) / 2), top: 30 });
+        sel.setCoords();
+      }
       canvas.setActiveObject(sel);
       canvas.requestRenderAll();
       requestHistoryPush();
-      setStatus(tt("boardSchemeInserted", { name: data.stationName }));
+      setStatus(tt("boardSchemeInserted", { name: stName.get(selectedStationId) || "" }));
     } catch (err) {
       setStatus(tt("boardSchemeError") + ": " + err.message);
     }
@@ -1651,19 +1754,21 @@ const BoardEditor = (function () {
   // ------------------------------------------------------------
   // Share-код: JSON -> LZString.compressToBase64. Версионирование +
   // валидация формы ДО loadFromJSON, ничего не исполняется из строки.
-  // Картинки (data: URL) заменяются плейсхолдером — не раздуваем код.
+  // Картинки (data: URL) включаются в код целиком — код получается
+  // длиннее, но холст переносится без потерь. При импорте пропускаем
+  // только встроенные data:image/* — image-объекты с внешними URL
+  // заменяются серым плейсхолдером (чужой код не должен заставлять
+  // приложение ходить на сторонние серверы).
   // ------------------------------------------------------------
-  function stripImagesForShare(data) {
-    let hadImages = false;
+  function sanitizeImagesForImport(data) {
     const objects = (data.objects || []).map((o) => {
-      if (o.type === "image") {
-        hadImages = true;
+      if (o && o.type === "image" && !(typeof o.src === "string" && /^data:image\//i.test(o.src))) {
         const { src, crossOrigin, filters, ...rest } = o;
         return { ...rest, type: "rect", fill: "#cccccc", stroke: "#999999", strokeWidth: 1 };
       }
       return o;
     });
-    return { data: { ...data, objects }, hadImages };
+    return { ...data, objects };
   }
 
   function showShareModal() { if (el.shareOverlay) el.shareOverlay.style.display = "flex"; }
@@ -1671,11 +1776,11 @@ const BoardEditor = (function () {
 
   function openShareExportModal() {
     const raw = serializeCanvas();
-    const { data: stripped, hadImages } = stripImagesForShare(raw);
-    const payload = { v: FORMAT_VERSION, canvas: stripped };
+    const hasImages = (raw.objects || []).some((o) => o && o.type === "image");
+    const payload = { v: FORMAT_VERSION, canvas: raw };
     const code = LZString.compressToBase64(JSON.stringify(payload));
     el.shareTitle.textContent = tt("boardShareExportTitle");
-    el.shareHint.textContent = hadImages ? tt("boardShareImagesStripped") : tt("boardShareExportHint");
+    el.shareHint.textContent = hasImages ? tt("boardShareImagesIncluded") : tt("boardShareExportHint");
     el.shareTextarea.value = code;
     el.shareTextarea.readOnly = true;
     el.shareAction.textContent = tt("boardShareCopyBtn");
@@ -1710,7 +1815,7 @@ const BoardEditor = (function () {
         Array.isArray(payload.canvas.objects);
       if (!valid) { setStatus(tt("boardShareInvalidCode")); return; }
       if (!confirmReplaceIfNotEmpty()) return;
-      loadSerializedCanvas(payload.canvas);
+      loadSerializedCanvas(sanitizeImagesForImport(payload.canvas));
       scheduleAutosave();
       hideShareModal();
       setStatus(tt("boardShareImported"));
