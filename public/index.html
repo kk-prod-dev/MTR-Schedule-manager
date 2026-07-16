@@ -9,7 +9,7 @@
 <body>
   <header class="topbar">
     <h1 data-i18n="appTitle">MTR Schedule Manager</h1>
-    <div id="statusBadge" class="status-badge">Подключение...</div>
+    <div id="statusBadge" class="status-badge" data-i18n="statusConnecting">Подключение...</div>
   </header>
 
   <nav class="tabs">
@@ -30,7 +30,7 @@
           <input type="text" id="stationInput" data-i18n-placeholder="stationPlaceholder" placeholder="Начните вводить название станции..." autocomplete="off">
           <div class="autocomplete-list" id="stationACList"></div>
         </div>
-        <span id="scheduleLiveDot" class="live-dot" title="Автообновление активно"></span>
+        <span id="scheduleLiveDot" class="live-dot" data-i18n-title="liveDotHint" title="Автообновление активно"></span>
         <button id="toggleFavoriteStationBtn" class="icon-btn" title="" style="font-size:16px;">☆</button>
         <button id="newDraftBtnSchedule" data-i18n="newDraftBtn">+ Создать пробный маршрут</button>
       </div>
@@ -118,7 +118,7 @@
           <input type="text" id="graphFromInput" data-i18n-placeholder="graphFromPlaceholder" placeholder="Станция А..." autocomplete="off">
           <div class="autocomplete-list" id="graphFromACList"></div>
         </div>
-        <button id="swapStationsBtn" class="icon-btn" type="button" title="Поменять местами А и Б">⇄</button>
+        <button id="swapStationsBtn" class="icon-btn" type="button" data-i18n-title="swapStationsHint" title="Поменять местами А и Б">⇄</button>
         <div class="autocomplete" id="graphToAC">
           <input type="text" id="graphToInput" data-i18n-placeholder="graphToPlaceholder" placeholder="Станция Б..." autocomplete="off">
           <div class="autocomplete-list" id="graphToACList"></div>
@@ -352,7 +352,7 @@
           <label class="board-sections">
             <input type="checkbox" id="boardHourGap">
             <span data-i18n="boardHourGapLabel">Пробел между часами</span>
-            <input type="number" id="boardHourGapSize" class="board-num-input" min="0" max="300" step="5" value="60" title="% высоты строки" style="width:56px;">
+            <input type="number" id="boardHourGapSize" class="board-num-input" min="0" max="300" step="5" value="60" data-i18n-title="boardHourGapTitle" title="% высоты строки" style="width:56px;">
           </label>
           <label class="board-sections">
             <span data-i18n="boardCanvasLangLabel">Язык холста</span>
