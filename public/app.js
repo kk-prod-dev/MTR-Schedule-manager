@@ -3545,6 +3545,12 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     ${formulaHtml}
   `;
 
+  // Переводим data-i18n элементы модалки СРАЗУ после вставки разметки —
+  // не полагаемся только на applyI18n() в конце функции: если любой код
+  // ниже выйдет раньше или упадёт, кнопки карточки («Действия» и т.п.)
+  // остались бы с русским текстом-заглушкой из шаблона.
+  applyI18n();
+
   document.querySelectorAll(".copy-icon-btn[data-coords]").forEach((btn) => {
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
@@ -3697,8 +3703,13 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
   // Алгоритм: загружаем detail топ-кандидатов (одинаковый тип + цвет/номер),
   // выбираем тот у которого совпадает ДЕПО и станции идут в обратном порядке.
   // Всё делаем async — кнопка изначально disabled, включается когда нашли.
+  // ВАЖНО: блок обёрнут в IIFE, чтобы его ранние return НЕ выходили из всего
+  // renderRouteModal — раньше они пропускали навешивание обработчиков ниже и
+  // финальный applyI18n(), из-за чего у части маршрутов (без кандидатов на
+  // обратный: пустой state.routes, уникальный тип/депо) кнопка «Действия» и
+  // подменю оставались на русском при любом языке интерфейса.
   const reverseBtn = document.getElementById("reverseRouteBtn");
-  if (reverseBtn) {
+  if (reverseBtn) (() => {
     reverseBtn.disabled = true;
     reverseBtn.style.opacity = "0.4";
     const myStations = (data.stops || []).map(s => s.stationId);
@@ -3771,7 +3782,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
         reverseBtn.onclick = () => openRouteModal(best.id);
       }
     })();
-  }
+  })();
 
   // Редактирование/удаление пробного маршрута прямо из карточки
   const editBtn = document.getElementById("editDraftInModalBtn");
