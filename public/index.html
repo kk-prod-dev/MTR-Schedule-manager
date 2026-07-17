@@ -134,6 +134,10 @@
               <input type="checkbox" id="showReverseToggle">
               <span data-i18n="showReverseLabel">Показывать обратные рейсы</span>
             </label>
+            <label class="switch-row" data-i18n-title="graphPartialHint" title="Маршруты, которые едут только по части выбранного участка">
+              <input type="checkbox" id="showPartialToggle" checked>
+              <span data-i18n="showPartialLabel">Показывать маршруты-соседи</span>
+            </label>
           </div>
 
           <div class="sidebar-section">
@@ -501,6 +505,15 @@
           <span class="hint small" style="margin:0;" data-i18n="formulaMinutesShort">мин</span>
         </div>
         <p class="hint small" id="notifPermissionHint" style="color:var(--amber);"></p>
+      </div>
+
+      <div class="settings-block">
+        <label data-i18n="updatesSectionLabel">Обновления</label>
+        <label class="switch-row">
+          <input type="checkbox" id="betaUpdatesToggle">
+          <span data-i18n="betaUpdatesLabel">Получать бета-версии</span>
+        </label>
+        <p class="hint small" data-i18n="betaUpdatesHint">Приложение будет обновляться на пре-релизы — новые функции раньше всех, но возможны ошибки. Выключите, чтобы вернуться к стабильным версиям (обновление придёт, когда стабильная станет новее беты).</p>
       </div>
 
       <div class="settings-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">

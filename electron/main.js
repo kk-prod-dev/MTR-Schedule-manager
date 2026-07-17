@@ -189,6 +189,19 @@ ipcMain.on("save-prefs-sync", (event, prefsJson) => {
   req.end();
 });
 
+// Читает betaUpdates из prefs.json (его пишет renderer через /api/prefs).
+// Отдельная функция, а не кеш: галочку могли поменять в прошлом запуске.
+function readBetaUpdatesPref() {
+  try {
+    const fs = require("fs");
+    const prefsFile = path.join(dataDir, "prefs.json");
+    if (!fs.existsSync(prefsFile)) return false;
+    return !!JSON.parse(fs.readFileSync(prefsFile, "utf8")).betaUpdates;
+  } catch {
+    return false;
+  }
+}
+
 function initAutoUpdate() {
   let autoUpdater;
   try {
@@ -198,6 +211,17 @@ function initAutoUpdate() {
   }
 
   autoUpdater.autoDownload = true;
+  // Бета-канал: с allowPrerelease=true updater видит пре-релизы GitHub.
+  // По умолчанию выключено — обычные пользователи получают только стабильные.
+  autoUpdater.allowPrerelease = readBetaUpdatesPref();
+
+  // Переключение канала из настроек — без перезапуска приложения
+  ipcMain.on("set-beta-updates", (_evt, enabled) => {
+    autoUpdater.allowPrerelease = !!enabled;
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.warn("[updater] recheck failed:", err.message);
+    });
+  });
 
   // Конвертируем HTML releaseNotes из GitHub в простой текст
   function parseReleaseNotes(notes) {

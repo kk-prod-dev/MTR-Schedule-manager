@@ -598,7 +598,7 @@ function buildRouteGraph(fromStationId, toStationId) {
     const segment = stops.slice(lo, hi + 1);
     const fromIsAtLo = idxFrom === lo;
     const segAtoB = fromIsAtLo ? segment : [...segment].reverse();
-    validSegments.push({ route, stops, segment, segAtoB, lo, hi, fromIsAtLo });
+    validSegments.push({ route, stops, segment, segAtoB, lo, hi, fromIsAtLo, overlap: "full" });
   }
 
   // Шаг 2: глобальный порядок станций по маршруту с наибольшим числом станций А→Б
@@ -619,6 +619,35 @@ function buildRouteGraph(fromStationId, toStationId) {
         distance: t,
       });
     });
+  }
+
+  // Шаг 2.5: маршруты-«соседи», совпадающие с коридором ЧАСТИЧНО — они не
+  // проходят через А и/или Б, но едут по каким-то промежуточным станциям
+  // коридора (например коридор A-B-C-D и маршрут, идущий только B→C).
+  // Берём их кусок от первой до последней станции, лежащей на коридоре.
+  // Требуем ≥2 общих станции: одна общая — это просто пересадка, а не
+  // совместный участок пути.
+  if (stationUnion.size) {
+    const corridorIds = new Set(stationUnion.keys());
+    const usedRouteIds = new Set(validSegments.map(v => v.route.id));
+    for (const route of allRoutes) {
+      if (route.hidden || usedRouteIds.has(route.id)) continue;
+      const stops = route.stations || [];
+      const onCorridor = [];
+      stops.forEach((s, i) => { if (corridorIds.has(s.id)) onCorridor.push(i); });
+      if (onCorridor.length < 2) continue;
+      const lo = onCorridor[0];
+      const hi = onCorridor[onCorridor.length - 1];
+      if (lo === hi) continue;
+      const segment = stops.slice(lo, hi + 1);
+      // Направление вдоль коридора: если расстояние (ось Y) растёт от lo к hi —
+      // маршрут едет в ту же сторону, что А→Б.
+      const dLo = stationUnion.get(stops[lo].id).distance;
+      const dHi = stationUnion.get(stops[hi].id).distance;
+      const fromIsAtLo = dLo <= dHi;
+      const segAtoB = fromIsAtLo ? segment : [...segment].reverse();
+      validSegments.push({ route, stops, segment, segAtoB, lo, hi, fromIsAtLo, overlap: "partial" });
+    }
   }
 
   // Шаг 3: добавляем пропущенные станции из других маршрутов — вставляем между соседями
@@ -645,7 +674,7 @@ function buildRouteGraph(fromStationId, toStationId) {
   }
 
   // Шаг 4: основной цикл — строим trips для каждого маршрута
-  for (const { route, stops, segment, segAtoB, lo, hi, fromIsAtLo } of validSegments) {
+  for (const { route, stops, segment, segAtoB, lo, hi, fromIsAtLo, overlap } of validSegments) {
     const totalSegmentDistance = stationUnion.get(toStationId)?.distance || 1;
 
     const departureInfo = allDeparturesByRouteId.get(route.id);
@@ -751,6 +780,9 @@ function buildRouteGraph(fromStationId, toStationId) {
       routeNumber: route.number || shortCode,
       color,
       direction,
+      // "full" — маршрут идёт через обе выбранные станции; "partial" — только
+      // по части коридора (маршрут-сосед на промежуточном участке)
+      overlap: overlap || "full",
       isDraft: !!route.isDraft,
       hasActiveService: !!departureInfo,
       // Для соединителей оборота прямой↔обратный на графике движения
