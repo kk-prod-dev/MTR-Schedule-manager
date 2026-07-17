@@ -130,6 +130,17 @@ npm run build         # alias for dist:win
 - Dashboard hover: hovering a block adds `.eb-hover-focus` to it and `.eb-hover-pair` to its conflict partners (found via `state.conflictDetails` + `data-entry-key`), elevating z-index so a densely-packed pair pops out immediately; switches on every mousemove, cleared on mouseleave
 - Conflict auto-resolve: `solveStationConflicts(rawEntries, minIntervalMs)` is a bounded greedy solver (MAX_ITER 300, per-trip cap ±20 min) that repeatedly shifts the LATER train of the earliest conflict right to exactly minInterval, freezing pairs it can't clear within the cap; `autoResolveStation(stationId)` fetches the schedule, runs it, and commits PER-TRIP overrides WITHOUT turnaround-chain alignment (chain alignment would overwrite independent shifts and blow up on S19 whole-day chains). Exposed as a "Resolve by shifting" button on Problem-areas station cards. Problem-areas also has a "Currently delayed" section from `/api/analytics/live-delays`
 
+### Partial-overlap routes on the train graph
+- `buildRouteGraph` returns `overlap: "full" | "partial"` per route. `full` = route passes through BOTH selected stations (the original behaviour). `partial` = "neighbour" route that misses A and/or B but runs along ≥2 stations of the corridor (step 2.5, after `stationUnion` is built from the full routes) — e.g. corridor A-B-C-D and a route running only B→C
+- A partial route's segment spans its own first→last corridor station; direction comes from comparing corridor `distance` at those two ends (not from A/B indices, which don't exist for it). Its non-corridor stops are interpolated onto the Y axis by the existing step 3
+- ≥2 shared stations is deliberate: a single shared station is just an interchange, not a shared stretch of track
+- Client: `state.showPartial` (default **true**), "Show neighbouring routes" sidebar toggle, tagged in the legend via `graphPartialShort`; `isGraphRouteVisible` and the legend filter both honour it
+
+### Beta (pre-release) updates
+- `settings.betaUpdates` (default false) → `autoUpdater.allowPrerelease` in electron/main.js. Read from `prefs.json` (`readBetaUpdatesPref`) at startup and flipped live via the `set-beta-updates` IPC channel, so no restart is needed
+- Must stay in BOTH `savePrefsToServer` and `buildPrefsPayload`, like every other setting (see the buildPrefsPayload gotcha)
+- The toggle is wired BEFORE `initSettingsUI`'s early `return` — that return only guards the notification block, and putting the toggle after it would silently kill the switch
+
 ### Reverse route detection (scoring)
 - +100: first station of candidate = last of mine AND last = first
 - +30: at least one endpoint matches
