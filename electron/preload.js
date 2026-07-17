@@ -9,4 +9,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onChangelog: (cb) => ipcRenderer.on("show-changelog", (_, data) => cb(data)),
   // Развернуть/сфокусировать окно приложения (клик по уведомлению)
   focusWindow: () => ipcRenderer.send("focus-window"),
+  // Переключить канал обновлений (бета/стабильный) без перезапуска
+  setBetaUpdates: (enabled) => ipcRenderer.send("set-beta-updates", !!enabled),
 });

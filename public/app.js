@@ -157,6 +157,9 @@ const I18N = {
     notifOnlyFav: "Уведомлять только по избранному",
     checkUpdateBtn: "Проверить обновления",
     supportBtn: "Поддержка",
+    updatesSectionLabel: "Обновления",
+    betaUpdatesLabel: "Получать бета-версии",
+    betaUpdatesHint: "Приложение будет обновляться на пре-релизы — новые функции раньше всех, но возможны ошибки. Выключите, чтобы вернуться к стабильным версиям (обновление придёт, когда стабильная станет новее беты).",
     liveDotHint: "Автообновление активно",
     swapStationsHint: "Поменять местами А и Б",
     boardHourGapTitle: "% высоты строки",
@@ -556,6 +559,9 @@ const I18N = {
     'instr_title_settings': 'Settings',
     checkUpdateBtn: "Check for updates",
     supportBtn: "Support",
+    updatesSectionLabel: "Updates",
+    betaUpdatesLabel: "Receive beta versions",
+    betaUpdatesHint: "The app will update to pre-releases — new features first, but bugs are possible. Turn this off to go back to stable builds (you'll get an update once a stable release is newer than the beta).",
     liveDotHint: "Auto-refresh is active",
     swapStationsHint: "Swap A and B",
     boardHourGapTitle: "% of row height",
@@ -719,6 +725,7 @@ const settings = {
   notifOnlyFav: false,    // уведомлять только по избранным станциям/маршрутам
   notifCooldownMin: 5,    // пауза между уведомлениями, минут
   delayThresholdMin: 5,   // порог опоздания для уведомления, минут
+  betaUpdates: false,     // ставить бета-версии (пре-релизы GitHub) автообновлением
 };
 function currentLang() {
   return settings.langMode === "auto" ? detectSystemLang() : settings.langMode;
@@ -1510,6 +1517,24 @@ function initNotifSettings() {
   const cooldownSel = document.getElementById("notifCooldownSelect");
   const delayThrSel = document.getElementById("notifDelayThreshold");
   const permHint = document.getElementById("notifPermissionHint");
+
+  // Бета-обновления. Инициализируем ДО раннего return ниже: галочка живёт в
+  // своём блоке настроек и не должна пропадать, если разметки уведомлений нет.
+  const betaCb = document.getElementById("betaUpdatesToggle");
+  if (betaCb) {
+    betaCb.checked = !!settings.betaUpdates;
+    if (!betaCb._hasListener) {
+      betaCb._hasListener = true;
+      betaCb.addEventListener("change", () => {
+        settings.betaUpdates = betaCb.checked;
+        savePrefsToServer();
+        // Применяем сразу, без перезапуска: main-процесс переключает
+        // allowPrerelease у electron-updater и проверяет обновления заново.
+        try { window.electronAPI?.setBetaUpdates?.(betaCb.checked); } catch (e) {}
+      });
+    }
+  }
+
   if (!conflictCb || !onlyFavCb || !cooldownSel) return;
 
   conflictCb.checked = !!settings.notifConflict;
@@ -4538,6 +4563,7 @@ function buildPrefsPayload() {
     notifOnlyFav: settings.notifOnlyFav,
     notifCooldownMin: settings.notifCooldownMin,
     delayThresholdMin: settings.delayThresholdMin,
+    betaUpdates: settings.betaUpdates,
     serverUrl: settings.serverUrl,
     serverList: settings.serverList || [],
     ...boardEditorPrefsFields(),
@@ -4723,6 +4749,7 @@ async function savePrefsToServer() {
         notifOnlyFav: settings.notifOnlyFav,
         notifCooldownMin: settings.notifCooldownMin,
         delayThresholdMin: settings.delayThresholdMin,
+        betaUpdates: settings.betaUpdates,
         ...boardEditorPrefsFields(),
       }),
     });

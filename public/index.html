@@ -487,6 +487,15 @@
         <p class="hint small" id="notifPermissionHint" style="color:var(--amber);"></p>
       </div>
 
+      <div class="settings-block">
+        <label data-i18n="updatesSectionLabel">Обновления</label>
+        <label class="switch-row">
+          <input type="checkbox" id="betaUpdatesToggle">
+          <span data-i18n="betaUpdatesLabel">Получать бета-версии</span>
+        </label>
+        <p class="hint small" data-i18n="betaUpdatesHint">Приложение будет обновляться на пре-релизы — новые функции раньше всех, но возможны ошибки. Выключите, чтобы вернуться к стабильным версиям (обновление придёт, когда стабильная станет новее беты).</p>
+      </div>
+
       <div class="settings-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <span class="hint small" id="appVersionLabel" style="opacity:0.6;"></span>
         <button class="secondary-btn" id="checkUpdateBtn" data-i18n="checkUpdateBtn">Проверить обновления</button>
