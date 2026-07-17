@@ -149,6 +149,17 @@ npm run build         # alias for dist:win
 ### Favorites
 - Routes are favourited as a PAIR with their reverse (`favoriteRoutePairIds` via `reverseRouteId`); removing either direction removes both. A route without a reverse is handled as a single entry
 
+### Route pairs in Problem areas
+- All three route lists (conflicts-by-route, "Currently delayed", "Largest average delay") collapse forward+reverse into ONE card via `routePairKey`/`routePairMemberIds`/`routePairLabel` — one train on a turnaround, so both directions are late by the same amount
+- Label = `name · ICE330/ICE332`, or a single number when both directions share it. The name is taken from one direction, so routes whose NAME encodes a direction ("A > B") show one of the two — the number rule is what the user specified
+- Delay values are merged by MAX (they should be equal anyway); conflict station sets are merged by union
+
+### Delay shown only ahead of the train (route card)
+- `buildRouteTimetable` adds `relArrivalMs` per station = `t0raw + arrivalOffsets[k] + deviation` — ms from the MTR poll moment to that arrival, negative = already passed. Derived from the RAW relative `t0raw`, so there is no time-of-day/midnight wrapping to get wrong. Drafts get `null` (their `t0raw` is absolute — see `isDraftEntry`)
+- The response also carries `polledAt` (= `departures.fetchedAt`, OUR clock), so the client compares `relArrivalMs < Date.now() - polledAt`
+- The client only applies this when the poll is FRESH (`LIVE_FRESH_MS` 5 min). With a stale cache (MTR offline, snapshot can be days old) every station would look passed and deviations would vanish entirely — then it falls back to showing them everywhere
+- `trip.deviationMs` must stay REAL for `plannedMs = base − dev`; only the rendered parenthetical is suppressed (`devShown`). Zeroing `dev` itself would shift the displayed planned time on passed stations
+
 ### Beta (pre-release) updates
 - `settings.betaUpdates` (default false) → `autoUpdater.allowPrerelease` in electron/main.js. Read from `prefs.json` (`readBetaUpdatesPref`) at startup and flipped live via the `set-beta-updates` IPC channel, so no restart is needed
 - Must stay in BOTH `savePrefsToServer` and `buildPrefsPayload`, like every other setting (see the buildPrefsPayload gotcha)

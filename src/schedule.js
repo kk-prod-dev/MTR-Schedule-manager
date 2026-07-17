@@ -876,7 +876,15 @@ function buildRouteTimetable(routeId) {
           const arrivalMs = normalizeTimeOfDay(t0 + arrivalOffsets[k] + _draftShiftT + group.deviation);
           const departureMs =
             departureOffsets[k] === null ? null : normalizeTimeOfDay(t0 + departureOffsets[k] + _draftShiftT + group.deviation);
-          return { arrivalMs, departureMs };
+          // relArrivalMs — сколько мс от МОМЕНТА ОПРОСА MTR до прибытия на эту
+          // станцию (отрицательное = поезд её уже проехал). Считаем из «сырого»
+          // t0raw, который у реальных маршрутов и есть относительное время, —
+          // так не нужно сравнивать времена суток и ломаться на полуночи.
+          // У черновиков t0raw абсолютный (см. isDraftEntry) — там смысла нет.
+          const relArrivalMs = departureInfo.isDraftEntry
+            ? null
+            : t0raw + arrivalOffsets[k] + group.deviation;
+          return { arrivalMs, departureMs, relArrivalMs };
         });
         trips.push({ tripOriginMs: t0, originalDepartureMs: t0raw, deviationMs: group.deviation, times });
         depotDepartures.push({
@@ -903,6 +911,9 @@ function buildRouteTimetable(routeId) {
     stations: stationsOut,
     depotDepartures,
     trips,
+    // Момент нашего опроса MTR — точка отсчёта для relArrivalMs.
+    // Клиент считает elapsed = Date.now() - polledAt (обе метки — наши часы).
+    polledAt: departuresCache ? departuresCache.fetchedAt : null,
   };
 }
 

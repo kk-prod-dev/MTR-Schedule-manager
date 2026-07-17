@@ -1436,6 +1436,32 @@ async function renderProblems() {
   renderProblemsSections(el);
 }
 
+// ── Пары маршрутов в «Проблемных местах» ────────────────────────────────
+// Прямой и обратный — один состав по обороту: если один опаздывает, второй
+// опаздывает так же. Показывать их двумя строками — шум, поэтому в списках
+// они схлопываются в одну запись «ICE330/ICE332» (или просто «ICE330»,
+// если номер у обоих одинаковый).
+function routePairKey(routeId) {
+  const rev = state.routesById.get(routeId)?.reverseRouteId;
+  if (!rev) return routeId;
+  return [routeId, rev].sort().join("+");
+}
+/** Все существующие id пары (1 или 2 шт.) в стабильном порядке. */
+function routePairMemberIds(routeId) {
+  const rev = state.routesById.get(routeId)?.reverseRouteId;
+  const ids = rev && state.routesById.has(rev) ? [routeId, rev].sort() : [routeId];
+  return ids;
+}
+/** Подпись пары: «Имя · ICE330/ICE332». Одинаковые номера не дублируем. */
+function routePairLabel(routeId) {
+  const ids = routePairMemberIds(routeId);
+  const routes = ids.map((id) => state.routesById.get(id)).filter(Boolean);
+  if (!routes.length) return routeId;
+  const nums = [...new Set(routes.map((r) => r.number).filter(Boolean))];
+  const name = routes[0].name;
+  return name + (nums.length ? ` · ${nums.join("/")}` : "");
+}
+
 function renderProblemsSections(el) {
   const favRouteIds = new Set(favoriteRoutes.map((r) => r.id));
   const favStationIds = new Set(favorites.map((s) => s.id));
@@ -1496,20 +1522,29 @@ function renderProblemsSections(el) {
     : "";
 
   // Маршруты с других серверов (ID нет в текущей топологии) не показываем.
-  const rtItems = Array.from(conflictsByRoute.entries())
-    .filter(([rid]) => state.routesById.has(rid))
-    .sort(([aId, aSt], [bId, bSt]) => {
-      const fa = favRouteIds.has(aId) ? 0 : 1, fb = favRouteIds.has(bId) ? 0 : 1;
+  // Прямой и обратный схлопываем в одну карточку-пару, станции объединяем.
+  const rtPairs = new Map(); // pairKey → { rid, stations:Set }
+  for (const [rid, sts] of conflictsByRoute.entries()) {
+    if (!state.routesById.has(rid)) continue;
+    const key = routePairKey(rid);
+    if (!rtPairs.has(key)) rtPairs.set(key, { rid, stations: new Set() });
+    for (const s of sts) rtPairs.get(key).stations.add(s);
+  }
+  const rtItems = Array.from(rtPairs.values())
+    .sort((a, b) => {
+      const fa = routePairMemberIds(a.rid).some((id) => favRouteIds.has(id)) ? 0 : 1;
+      const fb = routePairMemberIds(b.rid).some((id) => favRouteIds.has(id)) ? 0 : 1;
       if (fa !== fb) return fa - fb;
-      return bSt.length - aSt.length;
+      return b.stations.size - a.stations.size;
     });
   const rtHtml = rtItems.length
-    ? `<div class="problems-grid">${rtItems.slice(0, 20).map(([rid, sts]) => {
+    ? `<div class="problems-grid">${rtItems.slice(0, 20).map(({ rid, stations }) => {
         const r = state.routesById.get(rid);
-        const label = r ? (r.name + (r.number ? ` · ${r.number}` : "")) : rid;
+        const label = routePairLabel(rid);
+        const isFav = routePairMemberIds(rid).some((id) => favRouteIds.has(id));
         return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(rid)}" style="border-left:3px solid ${r?.color || "#888"}">
-          <div class="problem-card-name">${favRouteIds.has(rid) ? "★ " : ""}${escapeHtml(label)}</div>
-          <div class="problem-card-sub">${sts.length} ${escapeHtml(pluralWord(sts.length, "station"))}</div>
+          <div class="problem-card-name">${isFav ? "★ " : ""}${escapeHtml(label)}</div>
+          <div class="problem-card-sub">${stations.size} ${escapeHtml(pluralWord(stations.size, "station"))}</div>
         </div>`;
       }).join("")}</div>`
     : "";
@@ -1517,11 +1552,27 @@ function renderProblemsSections(el) {
   // Текущие опаздывающие (live-отклонение прямо сейчас). Та же логика
   // отображения, что у остальных блоков: избранные — первыми, затем по
   // убыванию задержки; маршруты с других серверов отфильтрованы.
-  const favRouteIdsD = favRouteIds;
-  const liveDelayed = (state._liveDelays || [])
-    .filter((d) => state.routesById.has(d.routeId))
+  // Схлопывает список маршрутов в пары (прямой+обратный): берём максимум по
+  // указанному полю — по обороту оба направления опаздывают одинаково, и
+  // максимум = то самое общее опоздание.
+  const groupByPair = (list, getId, pickMax) => {
+    const byPair = new Map();
+    for (const item of list) {
+      const key = routePairKey(getId(item));
+      const prev = byPair.get(key);
+      if (!prev || pickMax(item) > pickMax(prev)) byPair.set(key, item);
+    }
+    return Array.from(byPair.values());
+  };
+  const isFavPair = (rid) => routePairMemberIds(rid).some((id) => favRouteIds.has(id));
+
+  const liveDelayed = groupByPair(
+    (state._liveDelays || []).filter((d) => state.routesById.has(d.routeId)),
+    (d) => d.routeId,
+    (d) => d.maxDeviationMs,
+  )
     .sort((a, b) => {
-      const fa = favRouteIdsD.has(a.routeId) ? 0 : 1, fb = favRouteIdsD.has(b.routeId) ? 0 : 1;
+      const fa = isFavPair(a.routeId) ? 0 : 1, fb = isFavPair(b.routeId) ? 0 : 1;
       if (fa !== fb) return fa - fb;
       return b.maxDeviationMs - a.maxDeviationMs;
     })
@@ -1529,20 +1580,19 @@ function renderProblemsSections(el) {
   const liveDelayedHtml = liveDelayed.length
     ? `<div class="problems-grid">${liveDelayed.map((d) => {
         const r = state.routesById.get(d.routeId);
-        const label = r ? (r.name + (r.number ? ` · ${r.number}` : "")) : (d.routeName || d.routeId);
         return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(d.routeId)}" style="border-left:3px solid ${r?.color || "#888"}">
-          <div class="problem-card-name">${favRouteIdsD.has(d.routeId) ? "★ " : ""}${escapeHtml(label)}</div>
+          <div class="problem-card-name">${isFavPair(d.routeId) ? "★ " : ""}${escapeHtml(routePairLabel(d.routeId))}</div>
           <div class="problem-card-sub ${deviationClass(d.maxDeviationMs)}">${formatDeviation(d.maxDeviationMs)}</div>
         </div>`;
       }).join("")}</div>`
     : "";
 
-  const delayHtml = byDelay.length
-    ? `<div class="problems-grid">${byDelay.map((a) => {
+  const byDelayPaired = groupByPair(byDelay, (a) => a.routeId, (a) => a.avgDeviationMs);
+  const delayHtml = byDelayPaired.length
+    ? `<div class="problems-grid">${byDelayPaired.map((a) => {
         const r = state.routesById.get(a.routeId);
-        const label = r ? (r.name + (r.number ? ` · ${r.number}` : "")) : a.routeId;
         return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(a.routeId)}" style="border-left:3px solid ${r?.color || "#888"}">
-          <div class="problem-card-name">${favRouteIds.has(a.routeId) ? "★ " : ""}${escapeHtml(label)}</div>
+          <div class="problem-card-name">${isFavPair(a.routeId) ? "★ " : ""}${escapeHtml(routePairLabel(a.routeId))}</div>
           <div class="problem-card-sub ${deviationClass(a.avgDeviationMs)}">${formatDeviation(a.avgDeviationMs)} · ${a.sampleCount} ${escapeHtml(t("colSamples")).toLowerCase()}</div>
         </div>`;
       }).join("")}</div>`
@@ -1552,7 +1602,7 @@ function renderProblemsSections(el) {
     makeSection("conflicts-st", t("problemsTitleConflicts") + " — " + t("colStation"), stItems.length, stHtml) +
     makeSection("conflicts-rt", t("problemsTitleConflicts") + " — " + t("tabRoutes"), rtItems.length, rtHtml) +
     makeSection("delayed-now", t("problemsTitleDelayed"), liveDelayed.length, liveDelayedHtml) +
-    makeSection("delays", t("problemsTitleDelays"), byDelay.length, delayHtml);
+    makeSection("delays", t("problemsTitleDelays"), byDelayPaired.length, delayHtml);
 
   el.querySelectorAll(".problems-section-header").forEach((h) => {
     h.addEventListener("click", () => document.getElementById(h.dataset.toggle)?.classList.toggle("open"));
@@ -4363,6 +4413,15 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
         return `<td class="${deviationClass(trip.deviationMs)} ${edited ? "timetable-cell-edited" : ""}">${formatDeviation(trip.deviationMs)}</td>`;
       })
       .join("");
+    // Сколько прошло с момента опроса MTR — на столько «уехали» относительные
+    // времена relArrivalMs. Так определяем, какие станции поезд уже проехал.
+    // ВАЖНО: логика имеет смысл только на СВЕЖИХ данных. Если связи с MTR нет
+    // и показан кеш (он может быть многодневным), все станции выглядели бы
+    // пройденными и отклонения исчезли бы вовсе — тогда ведём себя как раньше
+    // и показываем отклонение везде. Поллер опрашивает раз в минуту.
+    const LIVE_FRESH_MS = 5 * 60000;
+    const elapsedSincePoll = timetable.polledAt ? Date.now() - timetable.polledAt : Infinity;
+    const liveFresh = elapsedSincePoll >= 0 && elapsedSincePoll < LIVE_FRESH_MS;
     const bodyRows = timetable.stations
       .map((st, stIdx) => {
         const cells = timetable.trips
@@ -4370,7 +4429,17 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
             const delta = getOverride(data.id, trip.tripOriginMs);
             const edited = delta !== 0;
             const raw = trip.times[stIdx];
+            // Опоздание показываем ТОЛЬКО там, куда поезд ещё не доехал: на
+            // пройденных станциях время уже состоялось, и «(+5)» там врёт.
+            // relArrivalMs отсчитывается от опроса MTR, поэтому сравниваем с
+            // временем, прошедшим с опроса. У черновиков relArrivalMs = null —
+            // у них нет живых отклонений, ведём себя как раньше.
+            const rel = raw.relArrivalMs;
+            const reached = liveFresh && rel != null && rel < elapsedSincePoll;
+            // ВАЖНО: dev остаётся настоящим — из него считается ПЛАНОВОЕ время
+            // (base − dev). Скрываем только показ отклонения в скобках.
             const dev = trip.deviationMs || 0;
+            const devShown = reached ? 0 : dev;
             // baseMs уже включает live-отклонение (см. buildRouteTimetable).
             // Показываем ПЛАНОВОЕ время (base − dev) + ручную правку, а отклонение
             // выносим в скобки. Для перехода на дашборд используем фактическое время.
@@ -4379,8 +4448,8 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
             const actualMs = normalizeMs(baseMs + delta);
             const cellHasConflict = conflictedTrips.get ? conflictedTrips.get(trip.tripOriginMs)?.has(st.stationId) : false;
             const cellIcon = cellHasConflict ? `<span class="tt-conflict-icon" title="${escapeHtml(t("conflictLabel"))}">!</span>` : "";
-            const devParen = formatDeviationParen(dev);
-            const devSpan = devParen ? ` <span class="${deviationClass(dev)} tt-dev">${devParen}</span>` : "";
+            const devParen = formatDeviationParen(devShown);
+            const devSpan = devParen ? ` <span class="${deviationClass(devShown)} tt-dev">${devParen}</span>` : "";
             return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${actualMs}" style="cursor:pointer">${cellIcon}${formatUtc(plannedMs)}${devSpan}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
           })
           .join("");
