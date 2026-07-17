@@ -96,6 +96,9 @@ const I18N = {
     buildGraphBtn: "Построить график",
     showReverseLabel: "Показывать обратные рейсы",
     showPartialLabel: "Показывать маршруты-соседи",
+    showConflictsLabel: "Показывать конфликты",
+    graphConflictsHint: "Красные точки конфликтов и обгонов на графике",
+    graphTypesFilterLabel: "Типы поездов",
     graphPartialHint: "Маршруты, которые едут только по части выбранного участка",
     graphPartialShort: "участок",
     stationsFilterLabel: "Станции на графике",
@@ -455,6 +458,9 @@ const I18N = {
     buildGraphBtn: "Build graph",
     showReverseLabel: "Show reverse trips",
     showPartialLabel: "Show neighbouring routes",
+    showConflictsLabel: "Show conflicts",
+    graphConflictsHint: "Red conflict and overtake markers on the graph",
+    graphTypesFilterLabel: "Train types",
     graphPartialHint: "Routes that run along only part of the selected section",
     graphPartialShort: "section",
     stationsFilterLabel: "Stations on graph",
@@ -1314,6 +1320,8 @@ const state = {
   graphPxPerHour: 110,
   showReverse: false,
   showPartial: true, // маршруты-соседи, совпадающие с коридором частично
+  showGraphConflicts: true, // маркеры конфликтов/обгонов на графике движения
+  graphTypeFilter: null,    // Set типов поездов на графике (null = ещё не построен)
   graphStationFilter: new Set(),
   graphFilterKey: null,
   graphRouteOverrides: new Map(),
@@ -2230,10 +2238,17 @@ document.getElementById("resetGraphFiltersBtn").addEventListener("click", () => 
   if (state.lastGraphData) state.graphStationFilter = new Set(state.lastGraphData.stations.map((s) => s.stationId));
   state.showReverse = false;
   state.showPartial = true;
+  state.showGraphConflicts = true;
   state.graphRouteOverrides = new Map();
   document.getElementById("showReverseToggle").checked = false;
   const partialCb = document.getElementById("showPartialToggle");
   if (partialCb) partialCb.checked = true;
+  const conflictsCb = document.getElementById("showGraphConflictsToggle");
+  if (conflictsCb) conflictsCb.checked = true;
+  if (state.lastGraphData) {
+    state.graphTypeFilter = new Set((state.lastGraphData.routes || []).map((r) => r.type).filter(Boolean));
+    renderGraphTypeFilterList(state.lastGraphData);
+  }
   state.graphPxPerHour = 110;
   document.getElementById("graphZoomValue").textContent = "100%";
   renderGraphStationFilterList(state.lastGraphData || { stations: [], fromStationId: "", toStationId: "" });
@@ -3035,14 +3050,55 @@ document.getElementById("graphStationsSelectNone").addEventListener("click", () 
 });
 
 function isGraphRouteVisible(route) {
+  // Фильтр типов действует всегда — даже на маршруты, включённые вручную
+  // кликом по легенде (иначе скрытый тип возвращался бы через override).
+  if (state.graphTypeFilter && route.type && !state.graphTypeFilter.has(route.type)) return false;
   if (state.graphRouteOverrides.has(route.routeId)) return state.graphRouteOverrides.get(route.routeId);
   // Маршрут-сосед (совпадает с коридором лишь частично) — только если включён фильтр
   if (route.overlap === "partial" && !state.showPartial) return false;
   return state.showReverse || route.direction === "forward";
 }
 
+// Фильтр типов поездов на графике: список строится из типов текущего графика
+function renderGraphTypeFilterList(data) {
+  const container = document.getElementById("graphTypeFilterList");
+  if (!container || !data) return;
+  const types = Array.from(new Set((data.routes || []).map((r) => r.type).filter(Boolean))).sort();
+  // Новый график (другая пара станций) — включаем все типы заново
+  if (state.graphTypeFilterKey !== state.graphFilterKey || !state.graphTypeFilter) {
+    state.graphTypeFilter = new Set(types);
+    state.graphTypeFilterKey = state.graphFilterKey;
+  }
+  container.innerHTML = types
+    .map((ty) => `<label><input type="checkbox" data-ty="${escapeHtml(ty)}" ${state.graphTypeFilter.has(ty) ? "checked" : ""}> ${escapeHtml(ty)}</label>`)
+    .join("");
+  container.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      if (cb.checked) state.graphTypeFilter.add(cb.dataset.ty);
+      else state.graphTypeFilter.delete(cb.dataset.ty);
+      renderGraphFromCache();
+    });
+  });
+}
+document.getElementById("graphTypesSelectAll")?.addEventListener("click", () => {
+  const d = state.lastGraphData;
+  if (d) state.graphTypeFilter = new Set((d.routes || []).map((r) => r.type).filter(Boolean));
+  renderGraphTypeFilterList(d);
+  renderGraphFromCache();
+});
+document.getElementById("graphTypesSelectNone")?.addEventListener("click", () => {
+  state.graphTypeFilter = new Set();
+  renderGraphTypeFilterList(state.lastGraphData);
+  renderGraphFromCache();
+});
+document.getElementById("showGraphConflictsToggle")?.addEventListener("change", (e) => {
+  state.showGraphConflicts = e.target.checked;
+  renderGraphFromCache();
+});
+
 function renderGraph(data) {
   renderGraphStationFilterList(data);
+  renderGraphTypeFilterList(data);
 
   const leftMargin = 170;
   const topMargin = 30;
@@ -3168,6 +3224,7 @@ function renderGraph(data) {
             key: p.stationId + "|" + (p.platformName || "?"),
             routeId: route.routeId, routeNumber: route.routeNumber || route.routeName, t0: trip.tripOriginMs,
             arr: p.arrivalMs, end: Math.max(p.departureMs ?? p.arrivalMs, p.arrivalMs), dist: p.distance,
+            stationId: p.stationId, // нужен контекстному меню графика: где именно конфликт
           });
         }
         // Геометрия движущихся перегонов рейса (для детекта обгонов через
@@ -3375,14 +3432,18 @@ function renderGraph(data) {
       }
     }
 
+    // Конфликты считаем всегда (нужны контекстному меню и тултипам),
+    // а рисуем — только если включён фильтр «Показывать конфликты»
     state._graphConflicts = conflicts;
-    conflicts.forEach((c, ci) => {
-      // Слабо-прозрачная пунктирная связь между линиями конфликтующих поездов
-      if (c.kind === "station") {
-        parts.push(`<line class="graph-conflict-link" x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}"></line>`);
-      }
-      parts.push(`<circle class="graph-conflict-marker" data-cidx="${ci}" cx="${xScale(c.mx + daySnap(c.mx))}" cy="${c.my}" r="5"></circle>`);
-    });
+    if (state.showGraphConflicts) {
+      conflicts.forEach((c, ci) => {
+        // Слабо-прозрачная пунктирная связь между линиями конфликтующих поездов
+        if (c.kind === "station") {
+          parts.push(`<line class="graph-conflict-link" x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}"></line>`);
+        }
+        parts.push(`<circle class="graph-conflict-marker" data-cidx="${ci}" cx="${xScale(c.mx + daySnap(c.mx))}" cy="${c.my}" r="5"></circle>`);
+      });
+    }
   }
   parts.push("</g>");
 
@@ -3444,6 +3505,7 @@ function renderGraph(data) {
 
   graphLegend.innerHTML = data.routes
     .filter((r) => {
+      if (state.graphTypeFilter && r.type && !state.graphTypeFilter.has(r.type)) return false; // фильтр типов
       if (r.overlap === "partial" && !state.showPartial) return false; // соседи — по галочке
       if (r.direction !== "backward") return true;
       return state.showReverse; // показываем все обратные только когда галочка включена
@@ -5638,12 +5700,25 @@ function toggleFavorite(stationId) {
 function isFavoriteRoute(routeId) {
   return favoriteRoutes.some((r) => r.id === routeId);
 }
+// В избранное маршрут добавляется ПАРОЙ с обратным (и убирается тоже парой):
+// прямой и обратный — это одна линия для пользователя, держать в избранном
+// только одно направление смысла нет. Пару даёт сервер (reverseRouteId).
+function favoriteRoutePairIds(routeId) {
+  const ids = [routeId];
+  const rev = state.routesById.get(routeId)?.reverseRouteId;
+  if (rev && rev !== routeId) ids.push(rev);
+  return ids;
+}
 function toggleFavoriteRoute(routeId) {
+  const ids = favoriteRoutePairIds(routeId);
   if (isFavoriteRoute(routeId)) {
-    favoriteRoutes = favoriteRoutes.filter((r) => r.id !== routeId);
+    favoriteRoutes = favoriteRoutes.filter((r) => !ids.includes(r.id));
   } else {
-    const route = state.routesById.get(routeId);
-    if (route) favoriteRoutes.push({ id: route.id, name: route.name, color: route.color, number: route.number });
+    for (const id of ids) {
+      if (favoriteRoutes.some((r) => r.id === id)) continue;
+      const route = state.routesById.get(id);
+      if (route) favoriteRoutes.push({ id: route.id, name: route.name, color: route.color, number: route.number });
+    }
   }
   saveFavorites();
   renderFavoritesBar();
@@ -5929,23 +6004,74 @@ function getEffectiveDeviation(routeId, plannedDeviationMs) {
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideMenu(); });
 
+  // Конфликты рейса на ГРАФИКЕ движения приводим к тому же виду, что даёт
+  // дашборд (state.conflictDetails): нужны effArrival/effDeparture/dwell,
+  // чтобы посчитать сдвиг той же формулой. У станционных конфликтов графика
+  // есть arr/end — их и переиспользуем (dwell уже внутри end).
+  function graphConflictPartners(routeId, t0) {
+    const out = [];
+    const stName = new Map((state.lastGraphData?.stations || []).map((s) => [s.stationId, s.name]));
+    for (const c of state._graphConflicts || []) {
+      if (c.kind !== "station") continue; // обгон сдвигом «на N минут» не лечится
+      let me = null, other = null;
+      if (c.a.routeId === routeId && c.a.t0 === t0) { me = c.a; other = c.b; }
+      else if (c.b.routeId === routeId && c.b.t0 === t0) { me = c.b; other = c.a; }
+      if (!me || !other) continue;
+      out.push({
+        routeId: other.routeId, routeNumber: other.routeNumber, routeName: other.routeNumber,
+        tripOriginMs: other.t0,
+        effArrival: normalizeMs(other.arr), effDeparture: normalizeMs(other.end), dwellTimeMs: 0,
+        // Времена САМОГО рейса именно на этой станции: на графике один рейс
+        // конфликтует на разных станциях, и сдвиг для каждого конфликта надо
+        // считать по его собственным временам, а не по первой остановке.
+        _meArrival: normalizeMs(me.arr), _meEnd: normalizeMs(me.end),
+        _stationName: stName.get(me.stationId) || "",
+      });
+    }
+    return out;
+  }
+
   document.addEventListener("contextmenu", (e) => {
     const block = e.target.closest(".entry-block[data-eidx]");
-    if (!block) {
-      // Скрываем меню если ПКМ не по блоку
+    const graphLine = e.target.closest("[data-tref]");
+    if (!block && !graphLine) {
+      // Скрываем меню если ПКМ не по блоку и не по линии рейса
       if (isVisible()) hideMenu();
       return;
     }
     e.preventDefault();
     e.stopPropagation();
 
-    const idx = Number(block.dataset.eidx);
-    const entries = state.currentDashboardEntries;
-    if (!entries || !entries[idx]) return;
-    ctxEntry = entries[idx];
+    let conflicts;
+    if (block) {
+      const idx = Number(block.dataset.eidx);
+      const entries = state.currentDashboardEntries;
+      if (!entries || !entries[idx]) return;
+      ctxEntry = entries[idx];
+      conflicts = state.conflictDetails.get(ctxEntry.entryKey) || [];
+    } else {
+      // ПКМ по линии рейса на графике движения: собираем entry той же формы,
+      // что и блок дашборда, — дальше меню строится одним и тем же кодом.
+      const ref = state.graphTripRefs?.[Number(graphLine.dataset.tref)];
+      if (!ref) return;
+      const pts = ref.effPoints || [];
+      const first = pts[0] || {};
+      ctxEntry = {
+        routeId: ref.route.routeId,
+        routeName: ref.route.routeName,
+        routeNumber: ref.route.routeNumber,
+        tripOriginMs: ref.trip.tripOriginMs,
+        isDraft: !!ref.route.isDraft,
+        effArrival: normalizeMs(first.arrivalMs ?? 0),
+        effDeparture: first.departureMs == null ? null : normalizeMs(first.departureMs),
+        dwellTimeMs: 0,
+        delta: ref.delta,
+        isEdited: ref.isEdited,
+      };
+      conflicts = graphConflictPartners(ctxEntry.routeId, ctxEntry.tripOriginMs);
+    }
 
     const isFav = isFavoriteRoute(ctxEntry.routeId);
-    const conflicts = state.conflictDetails.get(ctxEntry.entryKey) || [];
     const copyLabel = currentLang() === "ru" ? "Скопировать сдвиг" : "Copy time shift";
 
     const items = [
@@ -5966,35 +6092,47 @@ function getEffectiveDeviation(routeId, plannedDeviationMs) {
     ];
 
     if (conflicts.length) {
-      items.push({ divider: true });
-      items.push({ label: `⚠ ${t("conflictLabel")}`, header: true });
+      const MAX_SUGGESTIONS = 6; // на графике рейс конфликтует на многих станциях
+      const suggestions = [];
       for (const other of conflicts) {
         const minIntervalMs = state.minIntervalMin * 60000;
         const BUFFER = 1000; // чтобы после сдвига интервал был строго > minIntervalMs
         // Конец занятости платформы = max(отправление, прибытие + стоянка) —
         // так же, как в computeConflicts.
         const endOf = (e) => Math.max(e.effDeparture ?? e.effArrival, e.effArrival + (e.dwellTimeMs || 0));
+        // Времена САМОГО рейса в точке конфликта. На дашборде это всегда одна
+        // станция (=ctxEntry), на графике у каждого конфликта своя — тогда
+        // партнёр приносит их в _meArrival/_meEnd.
+        const meArrival = other._meArrival ?? ctxEntry.effArrival;
+        const meEnd = other._meEnd ?? endOf(ctxEntry);
         let shiftMs;
-        if (other.effArrival <= ctxEntry.effArrival) {
+        if (other.effArrival <= meArrival) {
           // other идёт ПЕРЕД текущим → двигаем текущий ВПРАВО (позже),
           // увеличивая интервал между концом other и прибытием текущего.
-          const gap = ctxEntry.effArrival - endOf(other);
+          const gap = meArrival - endOf(other);
           shiftMs = Math.ceil((minIntervalMs - gap + BUFFER) / 60000) * 60000;
         } else {
           // other идёт ПОСЛЕ текущего → двигаем текущий ВЛЕВО (раньше),
           // увеличивая интервал между концом текущего и прибытием other.
           // Раньше здесь использовались неверные точки отсчёта, из-за чего
           // сдвиг «− X мин» не устранял конфликт (та же бага, что чинили для «+»).
-          const gap = other.effArrival - endOf(ctxEntry);
+          const gap = other.effArrival - meEnd;
           shiftMs = -Math.ceil((minIntervalMs - gap + BUFFER) / 60000) * 60000;
         }
+        if (Math.abs(shiftMs) < 60000) continue; // «сдвинуть на 0 минут» — не подсказка
         const shiftMin = Math.abs(shiftMs) / 60000;
         const dir = shiftMs > 0 ? "+" : "−";
-        items.push({
-          label: `↕  ${escapeHtml(t("conflictSuggestShift", { name: ctxEntry.routeNumber || ctxEntry.routeName, mins: `${dir}${shiftMin}` }))}`,
+        const where = other._stationName ? ` · ${escapeHtml(other._stationName)}` : "";
+        suggestions.push({
+          label: `↕  ${escapeHtml(t("conflictSuggestShift", { name: ctxEntry.routeNumber || ctxEntry.routeName, mins: `${dir}${shiftMin}` }))}${where}`,
           action: "fixConflict",
           shiftMs,
         });
+      }
+      if (suggestions.length) {
+        items.push({ divider: true });
+        items.push({ label: `⚠ ${t("conflictLabel")}`, header: true });
+        items.push(...suggestions.slice(0, MAX_SUGGESTIONS));
       }
     }
 

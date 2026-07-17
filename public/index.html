@@ -138,6 +138,19 @@
               <input type="checkbox" id="showPartialToggle" checked>
               <span data-i18n="showPartialLabel">Показывать маршруты-соседи</span>
             </label>
+            <label class="switch-row" data-i18n-title="graphConflictsHint" title="Красные точки конфликтов и обгонов на графике">
+              <input type="checkbox" id="showGraphConflictsToggle" checked>
+              <span data-i18n="showConflictsLabel">Показывать конфликты</span>
+            </label>
+          </div>
+
+          <div class="sidebar-section">
+            <h4 data-i18n="graphTypesFilterLabel">Типы поездов</h4>
+            <div class="sidebar-actions-row">
+              <button class="link-btn" id="graphTypesSelectAll" data-i18n="selectAll">Все</button>
+              <button class="link-btn" id="graphTypesSelectNone" data-i18n="selectNone">Ничего</button>
+            </div>
+            <div id="graphTypeFilterList" class="checkbox-list"></div>
           </div>
 
           <div class="sidebar-section">

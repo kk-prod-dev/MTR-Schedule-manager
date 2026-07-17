@@ -132,9 +132,22 @@ npm run build         # alias for dist:win
 
 ### Partial-overlap routes on the train graph
 - `buildRouteGraph` returns `overlap: "full" | "partial"` per route. `full` = route passes through BOTH selected stations (the original behaviour). `partial` = "neighbour" route that misses A and/or B but runs along ≥2 stations of the corridor (step 2.5, after `stationUnion` is built from the full routes) — e.g. corridor A-B-C-D and a route running only B→C
-- A partial route's segment spans its own first→last corridor station; direction comes from comparing corridor `distance` at those two ends (not from A/B indices, which don't exist for it). Its non-corridor stops are interpolated onto the Y axis by the existing step 3
+- A partial route's segment spans its own first→last corridor station; direction comes from comparing corridor `distance` at those two ends (not from A/B indices, which don't exist for it)
+- **The Y axis is built from FULL routes only**: step 3 skips partials, and step 4 drops a partial's points at stations outside `stationUnion` — so a neighbour is drawn only along the shared stations, with a straight line to the next common one, and its own stops never clutter the axis. A partial trip left with <2 points is skipped
 - ≥2 shared stations is deliberate: a single shared station is just an interchange, not a shared stretch of track
 - Client: `state.showPartial` (default **true**), "Show neighbouring routes" sidebar toggle, tagged in the legend via `graphPartialShort`; `isGraphRouteVisible` and the legend filter both honour it
+
+### Other train-graph filters
+- `state.showGraphConflicts` (default true) only gates *rendering* of `.graph-conflict-marker`/`.graph-conflict-link` — conflicts are still computed, because the tooltip and the context menu read `state._graphConflicts`
+- `state.graphTypeFilter` (Set of `route.type`, rebuilt per station pair via `graphTypeFilterKey`) is checked FIRST in `isGraphRouteVisible`, before `graphRouteOverrides` — otherwise clicking a legend item would resurrect a route whose type is filtered out. Needs `type` on graph routes (served by `buildRouteGraph`)
+
+### Context menu on the train graph
+- The same `setupContextMenu` handles both `.entry-block[data-eidx]` (dashboard) and `[data-tref]` (graph trip line); for the graph it synthesises a dashboard-shaped `ctxEntry` from `state.graphTripRefs`, so the menu body is one code path
+- Conflict shift suggestions: on the dashboard every conflict is at the SAME station, so `ctxEntry.effArrival` works. On the graph one trip conflicts at MANY stations, so `graphConflictPartners` attaches per-conflict `_meArrival`/`_meEnd` (+ `_stationName`) and the shift loop prefers those. Getting this wrong silently produced nonsense shifts computed against the first stop
+- Suggestions with |shift| < 1 min are dropped and the list is capped (MAX_SUGGESTIONS) — a graph trip can otherwise generate a dozen entries
+
+### Favorites
+- Routes are favourited as a PAIR with their reverse (`favoriteRoutePairIds` via `reverseRouteId`); removing either direction removes both. A route without a reverse is handled as a single entry
 
 ### Beta (pre-release) updates
 - `settings.betaUpdates` (default false) → `autoUpdater.allowPrerelease` in electron/main.js. Read from `prefs.json` (`readBetaUpdatesPref`) at startup and flipped live via the `set-beta-updates` IPC channel, so no restart is needed

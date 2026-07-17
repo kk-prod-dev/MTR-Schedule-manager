@@ -650,8 +650,13 @@ function buildRouteGraph(fromStationId, toStationId) {
     }
   }
 
-  // Шаг 3: добавляем пропущенные станции из других маршрутов — вставляем между соседями
-  for (const { segAtoB } of validSegments) {
+  // Шаг 3: добавляем пропущенные станции из других маршрутов — вставляем между соседями.
+  // ТОЛЬКО из полных маршрутов (через А и Б): ось Y — это станции коридора.
+  // Свои станции маршрутов-соседей на ось не добавляем, иначе график зарастает
+  // чужими остановками; линия соседа рисуется сразу до следующей ОБЩЕЙ станции
+  // (точки вне коридора отбрасываются в шаге 4).
+  for (const { segAtoB, overlap } of validSegments) {
+    if (overlap === "partial") continue;
     for (let i = 0; i < segAtoB.length; i++) {
       const s = segAtoB[i];
       if (stationUnion.has(s.id)) continue;
@@ -747,6 +752,10 @@ function buildRouteGraph(fromStationId, toStationId) {
           for (let k = 0; k < segment.length; k++) {
             const sIdx = fromIsAtLo ? k : segment.length - 1 - k;
             const st = segment[sIdx];
+            // Маршрут-сосед: рисуем только по ОБЩИМ с коридором станциям —
+            // его собственных остановок на оси Y нет, линия идёт сразу к
+            // следующей совпадающей станции.
+            if (overlap === "partial" && !stationUnion.has(st.id)) continue;
             const dist = stationUnion.get(st.id)?.distance ?? 0;
             const _draftShift2 = departureInfo.isDraftEntry ? _t0Off2 : 0;
             const arrivalMs = t0 + arrivalOffsets[sIdx] + _draftShift2 + group.deviation;
@@ -760,6 +769,9 @@ function buildRouteGraph(fromStationId, toStationId) {
               platformName: normalizePlatformName(st.name, `#${sIdx + 1}`),
             });
           }
+          // У соседа после отбрасывания «чужих» станций может остаться <2
+          // точек — рисовать нечего
+          if (rawPoints.length < 2) continue;
           // Сортируем по времени чтобы линия шла слева→направо
           rawPoints.sort((a, b) => a.arrivalMs - b.arrivalMs);
           const points = rawPoints;
@@ -783,6 +795,7 @@ function buildRouteGraph(fromStationId, toStationId) {
       // "full" — маршрут идёт через обе выбранные станции; "partial" — только
       // по части коридора (маршрут-сосед на промежуточном участке)
       overlap: overlap || "full",
+      type: route.type, // для фильтра типов поездов на графике
       isDraft: !!route.isDraft,
       hasActiveService: !!departureInfo,
       // Для соединителей оборота прямой↔обратный на графике движения
