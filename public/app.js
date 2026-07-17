@@ -1,6 +1,35 @@
 const MS_PER_DAY = 86400000;
 
 // ============================================================
+// Журнал диагностики: кольцевой буфер последних логов/ошибок для
+// отчёта баг-репорта (кнопка в настройках). Ставим В САМОМ НАЧАЛЕ, до
+// остального кода, чтобы поймать ошибки инициализации.
+// ============================================================
+const _diagLog = [];
+const _DIAG_LOG_MAX = 300;
+function _pushDiag(level, args) {
+  try {
+    const msg = Array.from(args).map((a) => {
+      if (a instanceof Error) return (a.stack || a.message || String(a));
+      if (typeof a === "object") { try { return JSON.stringify(a); } catch { return String(a); } }
+      return String(a);
+    }).join(" ");
+    _diagLog.push(`${new Date().toISOString()} [${level}] ${msg.slice(0, 1000)}`);
+    if (_diagLog.length > _DIAG_LOG_MAX) _diagLog.shift();
+  } catch (e) { /* журнал не должен ничего ломать */ }
+}
+["error", "warn"].forEach((lvl) => {
+  const orig = console[lvl] ? console[lvl].bind(console) : function () {};
+  console[lvl] = function (...a) { _pushDiag(lvl, a); orig(...a); };
+});
+window.addEventListener("error", (e) => {
+  _pushDiag("uncaught", [`${e.message} @ ${e.filename}:${e.lineno}:${e.colno}`, e.error]);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  _pushDiag("promise", [e.reason]);
+});
+
+// ============================================================
 // Локализация
 // ============================================================
 const I18N = {
@@ -179,6 +208,11 @@ const I18N = {
     supportBtn: "Поддержка",
     updatesSectionLabel: "Обновления",
     betaUpdatesLabel: "Получать бета-версии",
+    diagSectionLabel: "Диагностика",
+    diagReportBtn: "Отчёт для баг-репорта",
+    diagReportHint: "Сохранит текстовый файл с версией, статусом сервера, настройками и последними ошибками — приложите его к сообщению об ошибке. Паролей и личных данных в файле нет.",
+    diagReportSaved: "Отчёт сохранён: {path}",
+    diagReportError: "Не удалось сохранить отчёт",
     betaUpdatesHint: "Приложение будет обновляться на пре-релизы — новые функции раньше всех, но возможны ошибки. Выключите, чтобы вернуться к стабильным версиям (обновление придёт, когда стабильная станет новее беты).",
     liveDotHint: "Автообновление активно",
     swapStationsHint: "Поменять местами А и Б",
@@ -601,6 +635,11 @@ const I18N = {
     supportBtn: "Support",
     updatesSectionLabel: "Updates",
     betaUpdatesLabel: "Receive beta versions",
+    diagSectionLabel: "Diagnostics",
+    diagReportBtn: "Bug-report diagnostic file",
+    diagReportHint: "Saves a text file with the version, server status, settings and recent errors — attach it to your bug report. It contains no passwords or personal data.",
+    diagReportSaved: "Report saved: {path}",
+    diagReportError: "Couldn't save the report",
     betaUpdatesHint: "The app will update to pre-releases — new features first, but bugs are possible. Turn this off to go back to stable builds (you'll get an update once a stable release is newer than the beta).",
     liveDotHint: "Auto-refresh is active",
     swapStationsHint: "Swap A and B",
@@ -2260,6 +2299,43 @@ document.getElementById("routesFilterSelectNone")?.addEventListener("click", () 
   renderRouteFilterList();
   renderDashboardFromCache();
 });
+
+// ── Фильтр дашборда по типам поездов ─────────────────────────────────
+function renderDashTypeFilterList() {
+  const data = state.lastScheduleData;
+  const container = document.getElementById("dashTypeFilterList");
+  if (!container) return;
+  if (!data || !data.entries || data.entries.length === 0) {
+    container.innerHTML = "";
+    return;
+  }
+  const types = Array.from(new Set(data.entries.map((e) => e.routeType).filter(Boolean))).sort();
+  // Новая станция — включаем все типы заново
+  if (state.dashTypeFilterStationId !== data.stationId) {
+    state.dashTypeFilter = new Set(types);
+    state.dashTypeFilterStationId = data.stationId;
+  }
+  container.innerHTML = types
+    .map((ty) => `<label><input type="checkbox" data-ty="${escapeHtml(ty)}" ${state.dashTypeFilter.has(ty) ? "checked" : ""}> ${escapeHtml(ty)}</label>`)
+    .join("");
+  container.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      if (cb.checked) state.dashTypeFilter.add(cb.dataset.ty);
+      else state.dashTypeFilter.delete(cb.dataset.ty);
+      renderDashboardFromCache();
+    });
+  });
+}
+document.getElementById("dashTypesSelectAll")?.addEventListener("click", () => {
+  if (state.lastScheduleData) state.dashTypeFilter = new Set(state.lastScheduleData.entries.map((e) => e.routeType).filter(Boolean));
+  renderDashTypeFilterList();
+  renderDashboardFromCache();
+});
+document.getElementById("dashTypesSelectNone")?.addEventListener("click", () => {
+  state.dashTypeFilter = new Set();
+  renderDashTypeFilterList();
+  renderDashboardFromCache();
+});
 document.getElementById("resetDashOverridesBtn").addEventListener("click", () => {
   pushUndoSnapshot();
   clearAllOverrides();
@@ -2275,7 +2351,9 @@ document.getElementById("resetGraphOverridesBtn").addEventListener("click", () =
 document.getElementById("resetDashFiltersBtn").addEventListener("click", () => {
   if (state.lastScheduleData) state.platformFilter = new Set(state.lastScheduleData.platforms);
   if (state.lastScheduleData) state.routeFilter = new Set(state.lastScheduleData.entries.map((e) => e.routeId));
+  if (state.lastScheduleData) state.dashTypeFilter = new Set(state.lastScheduleData.entries.map((e) => e.routeType).filter(Boolean));
   renderRouteFilterList();
+  renderDashTypeFilterList();
   state.minIntervalMin = 3;
   minIntervalSlider.value = "3";
   document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
@@ -2353,10 +2431,12 @@ function renderDashboard(data) {
 
   renderPlatformFilterList();
   renderRouteFilterList();
+  renderDashTypeFilterList();
 
   const TIMELINE_WIDTH = dashTimelineWidth();
   const visiblePlatforms = data.platforms.filter((p) => state.platformFilter.has(p));
   const routeVisible = (rid) => !state.routeFilter || state.routeFilter.has(rid);
+  const typeVisible = (ty) => !state.dashTypeFilter || !ty || state.dashTypeFilter.has(ty);
 
   if (visiblePlatforms.length === 0) {
     dashboardEl.style.display = "none";
@@ -2431,7 +2511,7 @@ function renderDashboard(data) {
         isLiveData,
       };
     })
-    .filter((e) => visiblePlatforms.includes(e.effPlatform) && routeVisible(e.routeId));
+    .filter((e) => visiblePlatforms.includes(e.effPlatform) && routeVisible(e.routeId) && typeVisible(e.routeType));
 
   // Видимые блоки — без скрытых обратных маршрутов
   const processed = allProcessed.filter(e => !e.hiddenByReverse);
@@ -3153,8 +3233,27 @@ function renderGraph(data) {
   const leftMargin = 170;
   const topMargin = 30;
   const bottomMargin = 20;
-  const visibleStations = data.stations.filter((s) => state.graphStationFilter.has(s.stationId));
-  const stationsForAxis = visibleStations.length ? visibleStations : data.stations;
+
+  // Маршруты, которые реально будут нарисованы (showReverse/showPartial,
+  // фильтр типов, ручные оверрайды легенды) — считаем ДО построения оси Y,
+  // чтобы убрать с неё станции, которые сейчас не обслуживает НИ ОДИН
+  // видимый маршрут (например все линии этого типа/направления скрыты).
+  const routesToShow = data.routes.filter((r) => isGraphRouteVisible(r) && r.tripCount > 0);
+  state.currentGraphRoutes = routesToShow;
+  const stationIdsFromVisibleRoutes = new Set();
+  for (const r of routesToShow) {
+    for (const trip of r.trips) {
+      for (const p of trip.points) stationIdsFromVisibleRoutes.add(p.stationId);
+    }
+  }
+
+  const manualStationSelection = data.stations.filter((s) => state.graphStationFilter.has(s.stationId));
+  const byManualFilter = manualStationSelection.length ? manualStationSelection : data.stations;
+  const byRouteVisibility = byManualFilter.filter((s) => stationIdsFromVisibleRoutes.has(s.stationId));
+  // Если фильтр маршрутов срезал вообще всё (например сняли все типы) — не
+  // оставляем пустую ось без причины, показываем корридор как есть, чтобы
+  // было видно "рисовать нечего", а не что график сломался.
+  const stationsForAxis = byRouteVisibility.length ? byRouteVisibility : byManualFilter;
   const height = Math.max(420, stationsForAxis.length * 46) + topMargin + bottomMargin;
   const totalDistance = data.stations[data.stations.length - 1].distance || 1;
   const TIMELINE_WIDTH = state.graphPxPerHour * 24;
@@ -3191,9 +3290,6 @@ function renderGraph(data) {
   // рисуется отдельной копией пути (см. ниже).
   const tzShiftMs = displayShiftMs();
   const xScale = (ms) => ((ms + tzShiftMs) / MS_PER_DAY) * TIMELINE_WIDTH;
-
-  const routesToShow = data.routes.filter((r) => isGraphRouteVisible(r) && r.tripCount > 0);
-  state.currentGraphRoutes = routesToShow;
 
   const parts = [];
   parts.push(`<svg class="graph-svg-host" width="${TIMELINE_WIDTH + 20}" height="${height}" xmlns="http://www.w3.org/2000/svg">`);
@@ -3529,6 +3625,20 @@ function renderGraph(data) {
     graphYPanel.style.width = PANEL_W + "px";
     graphYPanel.style.minWidth = PANEL_W + "px";
     graphYPanel.style.maxHeight = height + "px";
+    // #graphWrap имеет и вертикальный, И горизонтальный скроллбар (24 часа
+    // по времени шире контейнера) — горизонтальный съедает несколько px
+    // clientHeight снизу, поэтому его МАКСИМАЛЬНЫЙ scrollTop больше, чем у
+    // graphYPanel (там только вертикальный скролл). При скролле до упора
+    // расхождение срезалось браузером — линии станций и подписи слева
+    // расходились у нижнего края. Меряем разницу предельных scrollTop
+    // напрямую и добавляем панели ровно такой запас снизу, чтобы её
+    // максимальный scrollTop совпал с графиком (устойчиво к под-пикселям
+    // и рамкам, в отличие от вычисления по высоте скроллбара).
+    graphYPanel.style.paddingBottom = "";
+    const graphMaxScroll = graphWrap.scrollHeight - graphWrap.clientHeight;
+    const panelMaxScroll = graphYPanel.scrollHeight - graphYPanel.clientHeight;
+    const extra = graphMaxScroll - panelMaxScroll;
+    if (extra > 0) graphYPanel.style.paddingBottom = extra + "px";
     // Синхронизация вертикального скролла Y-панели и основного графика
     let _ySync = false;
     graphWrap.addEventListener("scroll", () => {
@@ -3649,6 +3759,9 @@ graphWrap.addEventListener("mousemove", (e) => {
 graphWrap.addEventListener("mouseleave", () => { entryTooltip.style.display = "none"; });
 
 graphWrap.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return; // ПКМ и средняя кнопка не запускают drag — иначе
+  // правый клик засчитывался как "клик без сдвига" на mouseup и открывал
+  // карточку маршрута вместо контекстного меню
   const target = e.target.closest(".graph-trip-hit");
   if (!target) return;
   const refIdx = Number(target.dataset.tref);
@@ -5372,6 +5485,12 @@ function initSettingsUI() {
     });
   }
 
+  const diagBtn = document.getElementById("diagReportBtn");
+  if (diagBtn && !diagBtn._hasListener) {
+    diagBtn._hasListener = true;
+    diagBtn.addEventListener("click", () => { downloadDiagnosticReport(); });
+  }
+
   const langSelect = document.getElementById("languageSelect");
   const tzSelect = document.getElementById("timezoneSelect");
 
@@ -5525,6 +5644,110 @@ function buildPrefsPayload() {
     ...boardEditorPrefsFields(),
   });
 }
+// ============================================================
+// Диагностический отчёт (кнопка «Отчёт для баг-репорта» в настройках).
+// Собирает состояние приложения в читаемый текст, который пользователь
+// сохраняет файлом и прикладывает к баг-репорту. Секретов не содержит:
+// только версия, статус сервера, настройки, счётчики и последние логи.
+// ============================================================
+async function buildDiagnosticReport() {
+  const L = [];
+  const line = (k, v) => L.push(`${k}: ${v}`);
+  const section = (name) => { L.push(""); L.push(`===== ${name} =====`); };
+
+  section("MTR Schedule Manager — diagnostic report");
+  line("Generated", new Date().toISOString());
+
+  // Статус сервера/данных
+  let status = null;
+  try { status = await fetch("/api/status").then((r) => r.json()); } catch (e) { status = { error: String(e) }; }
+  section("App / server");
+  line("App version", status && status.version ? status.version : "?");
+  if (status && status.topology) {
+    line("Topology", `${status.topology.stationCount} stations, ${status.topology.routeCount} routes; fetchedAt ${status.topology.fetchedAt ? new Date(status.topology.fetchedAt).toISOString() : "—"}`);
+    if (status.topology.lastError) line("Topology last error", `${status.topology.lastError.message} @ ${status.topology.lastError.at ? new Date(status.topology.lastError.at).toISOString() : "?"}`);
+  }
+  if (status && status.departures) {
+    line("Departures", `${status.departures.routeCount} routes; fetchedAt ${status.departures.fetchedAt ? new Date(status.departures.fetchedAt).toISOString() : "—"}`);
+    if (status.departures.lastError) line("Departures last error", `${status.departures.lastError.message} @ ${status.departures.lastError.at ? new Date(status.departures.lastError.at).toISOString() : "?"}`);
+  }
+
+  // Окружение
+  section("Environment");
+  line("User agent", navigator.userAgent);
+  line("Platform", navigator.platform);
+  line("Languages", (navigator.languages || []).join(", "));
+  line("Online", navigator.onLine);
+  line("Window size", `${window.innerWidth}x${window.innerHeight} (dpr ${window.devicePixelRatio})`);
+  line("In Electron", !!window.electronAPI);
+  line("System TZ offset (min)", -new Date().getTimezoneOffset());
+
+  // Настройки (без секретов)
+  section("Settings");
+  line("Language mode", settings.langMode);
+  line("Effective language", currentLang());
+  line("TZ mode", settings.tzMode);
+  line("Server TZ offset (min)", settings.serverTzOffsetMin);
+  line("MTR server URL", settings.serverUrl || "(default)");
+  line("Server list", JSON.stringify(settings.serverList || []));
+  line("Min interval (min)", state.minIntervalMin);
+  line("Beta updates", settings.betaUpdates);
+  line("Notifications", `conflict=${settings.notifConflict} delay=${settings.notifDelay} onlyFav=${settings.notifOnlyFav} cooldown=${settings.notifCooldownMin} threshold=${settings.delayThresholdMin}`);
+
+  // Состояние приложения
+  section("State");
+  const activeTab = document.querySelector(".tab-btn.active");
+  line("Active tab", activeTab ? activeTab.dataset.tab : "?");
+  line("Current station", state.currentStationId || "—");
+  line("Last graph", state.lastGraphData ? `${state.lastGraphData.fromStationName} → ${state.lastGraphData.toStationName} (${(state.lastGraphData.routes || []).length} routes)` : "—");
+  line("Overrides", `trip=${overridesList.length} route=${Object.keys(routeOverridesMap).length} platform=${Object.keys(platformOverridesMap).length}`);
+  line("Favorites", `stations=${favorites.length} routes=${favoriteRoutes.length}`);
+  line("Analytics rows", (state.lastAnalytics || []).length);
+
+  // Логи и ошибки
+  section(`Recent console logs / errors (${_diagLog.length})`);
+  if (_diagLog.length) L.push(..._diagLog);
+  else L.push("(none captured)");
+
+  return L.join("\n");
+}
+
+async function downloadDiagnosticReport() {
+  const content = await buildDiagnosticReport();
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const filename = `mtr-diagnostic-${stamp}.txt`;
+  // В Electron — нативный диалог «Сохранить как» (пользователь выбирает путь).
+  if (window.electronAPI?.saveDiagnostic) {
+    try {
+      const res = await window.electronAPI.saveDiagnostic(filename, content);
+      if (res && res.saved) { setStatusToast(t("diagReportSaved", { path: res.path })); return; }
+      if (res && res.canceled) return;
+      // ошибка → падаем в браузерный фолбэк ниже
+    } catch (e) { /* фолбэк */ }
+  }
+  // Браузерный фолбэк: скачивание через Blob
+  try {
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+    setStatusToast(t("diagReportSaved", { path: filename }));
+  } catch (e) {
+    setStatusToast(t("diagReportError"));
+  }
+}
+
+// Мини-тост в статус-бейдже (нет отдельной системы тостов)
+function setStatusToast(msg) {
+  const badge = document.getElementById("statusBadge");
+  if (!badge) return;
+  const prev = badge.textContent, prevClass = badge.className;
+  badge.textContent = msg; badge.className = "status-badge ok";
+  setTimeout(() => { badge.textContent = prev; badge.className = prevClass; }, 4000);
+}
+
 window.addEventListener("beforeunload", () => {
   const payload = buildPrefsPayload();
   // В Electron — через contextBridge API (надёжнее)

@@ -189,6 +189,24 @@ ipcMain.on("save-prefs-sync", (event, prefsJson) => {
   req.end();
 });
 
+// IPC: сохранение диагностического отчёта через нативный диалог «Сохранить как».
+ipcMain.handle("save-diagnostic", async (event, { filename, content }) => {
+  try {
+    const fs = require("fs");
+    const downloads = app.getPath("downloads");
+    const { canceled, filePath } = await dialog.showSaveDialog(mainWindow, {
+      title: "Save diagnostic report",
+      defaultPath: path.join(downloads, filename || "mtr-diagnostic.txt"),
+      filters: [{ name: "Text", extensions: ["txt"] }],
+    });
+    if (canceled || !filePath) return { canceled: true };
+    fs.writeFileSync(filePath, String(content ?? ""), "utf8");
+    return { saved: true, path: filePath };
+  } catch (err) {
+    return { error: err && err.message ? err.message : String(err) };
+  }
+});
+
 // Читает betaUpdates из prefs.json (его пишет renderer через /api/prefs).
 // Отдельная функция, а не кеш: галочку могли поменять в прошлом запуске.
 function readBetaUpdatesPref() {

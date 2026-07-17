@@ -11,4 +11,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   focusWindow: () => ipcRenderer.send("focus-window"),
   // Переключить канал обновлений (бета/стабильный) без перезапуска
   setBetaUpdates: (enabled) => ipcRenderer.send("set-beta-updates", !!enabled),
+  // Сохранить диагностический отчёт через нативный диалог «Сохранить как».
+  // Возвращает { saved:true, path } | { canceled:true } | { error }.
+  saveDiagnostic: (filename, content) => ipcRenderer.invoke("save-diagnostic", { filename, content }),
 });

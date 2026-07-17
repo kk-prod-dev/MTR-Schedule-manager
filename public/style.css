@@ -216,7 +216,12 @@ input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14p
   font-size: 13px; font-weight: 600; border-bottom: 1px solid var(--border); color: var(--muted);
   text-align: center; padding: 0 4px;
 }
-.dashboard-grid-scroll { grid-column: 2; grid-row: 2; overflow-x: auto; overflow-y: visible; }
+/* overflow-y ЯВНО hidden, а не "visible": по спецификации CSS 'visible' на
+   одной оси при не-'visible' на другой браузер молча превращает в 'auto' —
+   из-за этого появлялся вертикальный скроллбар, который ничего не скроллит
+   (высота строки и так равна сумме .platform-label, переполнения нет), но
+   торчит и мешает. */
+.dashboard-grid-scroll { grid-column: 2; grid-row: 2; overflow-x: auto; overflow-y: hidden; }
 .dashboard-grid { position: relative; }
 .grid-row { position: relative; height: 64px; border-bottom: 1px solid var(--border); }
 

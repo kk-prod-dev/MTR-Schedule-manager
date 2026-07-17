@@ -74,6 +74,15 @@
           </div>
 
           <div class="sidebar-section">
+            <h4 data-i18n="graphTypesFilterLabel">Типы поездов</h4>
+            <div class="sidebar-actions-row">
+              <button class="link-btn" id="dashTypesSelectAll" data-i18n="selectAll">Все</button>
+              <button class="link-btn" id="dashTypesSelectNone" data-i18n="selectNone">Ничего</button>
+            </div>
+            <div id="dashTypeFilterList" class="checkbox-list"></div>
+          </div>
+
+          <div class="sidebar-section">
             <button class="full-btn secondary-btn" id="resetDashFiltersBtn" data-i18n="resetFilters">Сбросить фильтры</button>
           </div>
 
@@ -527,6 +536,12 @@
           <span data-i18n="betaUpdatesLabel">Получать бета-версии</span>
         </label>
         <p class="hint small" data-i18n="betaUpdatesHint">Приложение будет обновляться на пре-релизы — новые функции раньше всех, но возможны ошибки. Выключите, чтобы вернуться к стабильным версиям (обновление придёт, когда стабильная станет новее беты).</p>
+      </div>
+
+      <div class="settings-block">
+        <label data-i18n="diagSectionLabel">Диагностика</label>
+        <button class="secondary-btn" id="diagReportBtn" data-i18n="diagReportBtn">Отчёт для баг-репорта</button>
+        <p class="hint small" data-i18n="diagReportHint">Сохранит текстовый файл с версией, статусом сервера, настройками и последними ошибками — приложите его к сообщению об ошибке. Паролей и личных данных в файле нет.</p>
       </div>
 
       <div class="settings-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
