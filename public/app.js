@@ -5955,6 +5955,7 @@ async function loadPrefsFromServer() {
     if (typeof p.notifOnlyFav === "boolean") settings.notifOnlyFav = p.notifOnlyFav;
     if (Number.isFinite(Number(p.notifCooldownMin))) settings.notifCooldownMin = Number(p.notifCooldownMin);
     if (Number.isFinite(Number(p.delayThresholdMin))) settings.delayThresholdMin = Number(p.delayThresholdMin);
+    if (typeof p.betaUpdates === "boolean") settings.betaUpdates = p.betaUpdates;
     try {
       if (window.BoardEditor && typeof window.BoardEditor.applyPersistedState === "function") {
         window.BoardEditor.applyPersistedState({
