@@ -172,7 +172,7 @@ npm run build         # alias for dist:win
 
 ### Beta (pre-release) updates
 - `settings.betaUpdates` (default false) → `autoUpdater.allowPrerelease` in electron/main.js. Read from `prefs.json` (`readBetaUpdatesPref`) at startup and flipped live via the `set-beta-updates` IPC channel, so no restart is needed
-- Must stay in BOTH `savePrefsToServer` and `buildPrefsPayload`, like every other setting (see the buildPrefsPayload gotcha)
+- A persisted setting needs THREE touch points, not two: `savePrefsToServer` + `buildPrefsPayload` (both save paths) AND `loadPrefsFromServer` (read-back). Missing the last one silently reverts the setting on every launch even though prefs.json has it — that was the beta-toggle "doesn't persist" bug (fixed in 1.2.0-beta.2)
 - The toggle is wired BEFORE `initSettingsUI`'s early `return` — that return only guards the notification block, and putting the toggle after it would silently kill the switch
 
 ### Reverse route detection (scoring)
