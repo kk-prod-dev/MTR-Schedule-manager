@@ -104,7 +104,26 @@ const NetworkScheme = (function () {
     return groups;
   }
 
-  function computeMeta(groups, stById, grid) {
+  // Шаг между станциями в клетках: 3, а для плотных сетей больше — чтобы
+  // типичный широкий пучок (90-й перцентиль числа линий на перегоне)
+  // помещался между станциями вместе со значками. Иначе у автобусов (9–14
+  // линий в коридоре) пучок шире перегона и значки/подписи слипаются.
+  function spacingCells(groups, grid, style) {
+    const cnt = new Map();
+    for (const g of groups) {
+      for (const [a, b] of hopsOf(g.fullIds || g.main.stationIds)) {
+        const k = hopKey(a, b);
+        cnt.set(k, (cnt.get(k) || 0) + 1);
+      }
+    }
+    const v = [...cnt.values()].sort((a, b) => a - b);
+    if (!v.length) return SPACING_CELLS;
+    const p90 = v[Math.floor(v.length * 0.9)];
+    const bundle = p90 * ((style.lineWidth || 6) + (style.laneGap == null ? 1.5 : style.laneGap));
+    return Math.max(SPACING_CELLS, Math.min(8, Math.ceil((bundle * 1.2) / grid)));
+  }
+
+  function computeMeta(groups, stById, grid, style) {
     const ds = [];
     let sx = 0, sz = 0, n = 0;
     const seen = new Set();
@@ -120,7 +139,7 @@ const NetworkScheme = (function () {
     }
     ds.sort((a, b) => a - b);
     const median = ds.length ? ds[Math.floor(ds.length / 2)] : 100;
-    return { scale: (SPACING_CELLS * grid) / median, cx: n ? sx / n : 0, cz: n ? sz / n : 0, grid };
+    return { scale: (spacingCells(groups, grid, style || {}) * grid) / median, cx: n ? sx / n : 0, cz: n ? sz / n : 0, grid };
   }
 
   const pkey = (p) => p.x + "," + p.y;
@@ -145,10 +164,34 @@ const NetworkScheme = (function () {
     return base;
   }
 
-  function buildPath(ids, pos, occ, elbows) {
+  // Узлы сетки строго между p и q на октилинейном отрезке (без концов);
+  // не по сетке / не октилинейно — пусто
+  function gridCellsBetween(p, q, grid) {
+    const dx = q.x - p.x, dy = q.y - p.y;
+    if (dx && dy && Math.abs(dx) !== Math.abs(dy)) return [];
+    const steps = Math.max(Math.abs(dx), Math.abs(dy)) / grid;
+    if (!Number.isInteger(steps)) return [];
+    const out = [];
+    for (let k = 1; k < steps; k++) out.push({ x: p.x + (dx / steps) * k, y: p.y + (dy / steps) * k });
+    return out;
+  }
+  // Варианты трассы перегона: прямой — один; иначе два излома (диагональ
+  // первой или в конце). Каждый — список промежуточных узлов, включая излом
+  function hopRoutes(a, b, grid) {
+    const dx = b.x - a.x, dy = b.y - a.y;
+    if (!dx || !dy || Math.abs(dx) === Math.abs(dy)) return [gridCellsBetween(a, b, grid)];
+    const m = Math.min(Math.abs(dx), Math.abs(dy)), sx = Math.sign(dx), sy = Math.sign(dy);
+    return [{ x: a.x + sx * m, y: a.y + sy * m }, { x: b.x - sx * m, y: b.y - sy * m }]
+      .map((e) => [...gridCellsBetween(a, e, grid), e, ...gridCellsBetween(e, b, grid)]);
+  }
+
+  function buildPath(ids, pos, occ, elbows, grid) {
     const pts = [];
     let prevDir = null;
     const sgn = Math.sign;
+    // излом, у которого трасса проходит через чужую станцию, — хуже
+    const through = (a, e, b) => [...gridCellsBetween(a, e, grid), e, ...gridCellsBetween(e, b, grid)]
+      .filter((q) => occ.has(pkey(q))).length;
     for (let i = 0; i < ids.length; i++) {
       const b = pos.get(ids[i]);
       if (!b) continue;
@@ -164,7 +207,7 @@ const NetworkScheme = (function () {
           const eDiag = { x: a.x + sgn(dx) * m, y: a.y + sgn(dy) * m };
           const eStraight = { x: b.x - sgn(dx) * m, y: b.y - sgn(dy) * m };
           const dirOf = (p, q) => sgn(q.x - p.x) + ":" + sgn(q.y - p.y);
-          const score = (c) => (occ.has(pkey(c)) ? 10 : 0) + (prevDir && dirOf(a, c) !== prevDir ? 1 : 0);
+          const score = (c) => through(a, c, b) * 10 + (prevDir && dirOf(a, c) !== prevDir ? 1 : 0);
           e = score(eDiag) < score(eStraight) ? eDiag : eStraight;
           elbows.set(segKey, e);
         }
@@ -283,6 +326,67 @@ const NetworkScheme = (function () {
   }
 
   /**
+   * Перегон, трасса которого проходит через узел с чужой станцией, рисуется
+   * «сквозь» неё — выглядит как остановка, которой нет, или как линия поверх
+   * значка. Такие узлы разводим: новые станции (концы перегона или та, что
+   * на пути) сдвигаются на соседнюю свободную клетку, если это уменьшает
+   * число проходов сквозь станции, не ломая ровные перегоны. Перегон с
+   * изломом засчитывается по лучшему из двух вариантов (buildPath потом
+   * выберет именно его).
+   */
+  function untangle(pos, hops, alignable, movable, occ, grid) {
+    const at = new Map();
+    for (const [id, p] of pos) at.set(pkey(p), id);
+    const hopCost = (a, b) => {
+      const pa = pos.get(a), pb = pos.get(b);
+      let best = Infinity;
+      for (const r of hopRoutes(pa, pb, grid)) {
+        let n = 0;
+        for (const q of r) { const k = pkey(q); if (occ.has(k) && at.get(k) !== a && at.get(k) !== b) n++; }
+        best = Math.min(best, n);
+      }
+      return best;
+    };
+    const exact = (p, q) => { const dx = q.x - p.x, dy = q.y - p.y; return (dx || dy) && (!dx || !dy || Math.abs(dx) === Math.abs(dy)); };
+    const inc = new Map();
+    for (const h of hops) for (const id of h) { if (!inc.has(id)) inc.set(id, []); inc.get(id).push(h); }
+    const aligned = (id) => (inc.get(id) || []).reduce((s, [a, b]) => s + (alignable.has(hopKey(a, b)) && exact(pos.get(a), pos.get(b)) ? 1 : 0), 0);
+    const total = () => hops.reduce((s, [a, b]) => s + hopCost(a, b), 0);
+    const moveTo = (id, c) => {
+      const cur = pos.get(id);
+      occ.delete(pkey(cur)); at.delete(pkey(cur));
+      pos.set(id, c); occ.add(pkey(c)); at.set(pkey(c), id);
+    };
+    for (let pass = 0; pass < 6; pass++) {
+      const involved = new Set();
+      for (const [a, b] of hops) {
+        if (!hopCost(a, b)) continue;
+        involved.add(a); involved.add(b);
+        for (const r of hopRoutes(pos.get(a), pos.get(b), grid)) for (const q of r) { const id = at.get(pkey(q)); if (id) involved.add(id); }
+      }
+      let changed = false;
+      for (const id of involved) {
+        if (!movable.has(id)) continue;
+        const cur = pos.get(id);
+        let best = cur, bestS = total() * 10 - aligned(id);
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            if (!dx && !dy) continue;
+            const c = { x: cur.x + dx * grid, y: cur.y + dy * grid };
+            if (occ.has(pkey(c))) continue;
+            moveTo(id, c);
+            const s = total() * 10 - aligned(id);
+            if (s < bestS) { best = c; bestS = s; }
+            moveTo(id, cur);
+          }
+        }
+        if (best !== cur) { moveTo(id, best); changed = true; }
+      }
+      if (!changed) break;
+    }
+  }
+
+  /**
    * Полосы в пучках: на КАЖДОМ перегоне линии, идущие по нему, собираются
    * по центру (без пустых полос), а порядок выбирается так, чтобы линии не
    * перекрещивались: для пары линий идём назад (потом вперёд) по общему
@@ -291,6 +395,10 @@ const NetworkScheme = (function () {
    */
   function assignLanes(lines, pos) {
     const hops = new Map(); // hopKey -> { a, b, entries: [{ line, seq, idx }] }
+    // сквозные проезды: "g>h" -> { g, h, v, keys:Set } — линии, идущие по
+    // перегону g и сразу по h через общую станцию v
+    const through = new Map();
+    const laneKey = (line) => (line.group ? "g:" + line.group : line.id);
     lines.forEach((line, order) => {
       const ids = (line._fullIds || line.mtrStationIds).filter((id, i, arr) => i === 0 || id !== arr[i - 1]);
       line._hopLanes = [];
@@ -298,6 +406,14 @@ const NetworkScheme = (function () {
         const a = ids[i], b = ids[i + 1];
         const k = hopKey(a, b);
         if (!hops.has(k)) hops.set(k, { a: a < b ? a : b, b: a < b ? b : a, entries: [] });
+        if (i > 0) {
+          const g = hopKey(ids[i - 1], a);
+          for (const [x, y] of [[g, k], [k, g]]) {
+            const tk = x + ">" + y;
+            if (!through.has(tk)) through.set(tk, { g: x, h: y, v: a, keys: new Set() });
+            through.get(tk).keys.add(laneKey(line));
+          }
+        }
         const h = hops.get(k);
         // последовательность в ориентации перегона a→b
         const fwd = ids[i] === h.a;
@@ -308,7 +424,9 @@ const NetworkScheme = (function () {
         const idxR = seq.length - 2 - idx;
         const entry = { line, order, seq, idx, seqR, idxR, dir: fwd ? 1 : -1, hopIdx: i };
         // объединённые линии (и повторный проезд одной линии по тому же перегону) — одной полосой
-        const twin = line.group && h.entries.find((x) => x.line.group === line.group);
+        // (раньше проверялась только группа — линия с разворотом по тому же
+        // пути занимала две полосы и рисовалась узкой петлёй)
+        const twin = h.entries.find((x) => x.line === line || (line.group && x.line.group === line.group));
         if (twin) (twin.dups || (twin.dups = [])).push(entry); else h.entries.push(entry);
       }
     });
@@ -369,14 +487,64 @@ const NetworkScheme = (function () {
       // расхождения нет (общий путь целиком) — по номеру линии
       return inRef(e1.order - e2.order);
     }
-    for (const h of hops.values()) {
-      const list = h.entries.slice().sort(cmp);
+    // Порядок на перегоне. Раньше каждый перегон сортировался сам по себе
+    // через cmp, а cmp для трёх и более линий не транзитивен: при другом
+    // составе пучка (линия ушла / добавилась) порядок остальных менялся, и
+    // в плотных автобусных коридорах линии менялись местами на каждой
+    // станции. Теперь перегоны обрабатываются от самого загруженного по
+    // связям: каждый следующий наследует взаимный порядок общих с уже
+    // упорядоченными соседями линий (вес 3), cmp решает остальное (вес 1),
+    // итог — по числу «побед» (Копленд), устойчиво к нетранзитивности.
+    const byH = new Map(), byG = new Map();
+    for (const r of through.values()) {
+      if (!byH.has(r.h)) byH.set(r.h, []);
+      byH.get(r.h).push(r);
+      if (!byG.has(r.g)) byG.set(r.g, []);
+      byG.get(r.g).push(r);
+    }
+    const posIn = new Map(); // hopKey -> Map(laneKey -> позиция; больше = левее в системе перегона a→b)
+    const sIn = (hk, v) => (hops.get(hk).b === v ? 1 : -1); // приезд в v по перегону: совпадает с a→b?
+    const sOut = (hk, v) => (hops.get(hk).a === v ? 1 : -1); // отъезд из v
+    function orderHop(hk) {
+      const list = hops.get(hk).entries;
       const n = list.length;
-      list.forEach((e, k) => {
+      const score = new Array(n).fill(0);
+      const nb = (byH.get(hk) || []).filter((r) => posIn.has(r.g));
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const ki = laneKey(list[i].line), kj = laneKey(list[j].line);
+          let pref = -Math.sign(cmp(list[i], list[j])); // > 0 — i левее j
+          for (const r of nb) {
+            if (!r.keys.has(ki) || !r.keys.has(kj)) continue;
+            const pg = posIn.get(r.g);
+            pref += 3 * Math.sign(pg.get(ki) - pg.get(kj)) * sIn(r.g, r.v) * sOut(hk, r.v);
+          }
+          score[i] += Math.sign(pref);
+          score[j] -= Math.sign(pref);
+        }
+      }
+      const idx = list.map((_, i) => i).sort((i, j) => score[j] - score[i] || cmp(list[i], list[j]));
+      const m = new Map();
+      idx.forEach((i, k) => {
+        const e = list[i];
         const base = (n - 1) / 2 - k;
+        m.set(laneKey(e.line), base);
         e.line._hopLanes[e.hopIdx] = base * e.dir;
         (e.dups || []).forEach((d) => { d.line._hopLanes[d.hopIdx] = base * d.dir; });
       });
+      posIn.set(hk, m);
+    }
+    const frontier = new Map();
+    const allHops = [...hops.keys()];
+    for (let step = 0; step < allHops.length; step++) {
+      let best = null, bf = -1, bn = -1;
+      for (const k of allHops) {
+        if (posIn.has(k)) continue;
+        const f = frontier.get(k) || 0, n = hops.get(k).entries.length;
+        if (f > bf || (f === bf && n > bn)) { best = k; bf = f; bn = n; }
+      }
+      orderHop(best);
+      for (const r of byG.get(best) || []) frontier.set(r.h, (frontier.get(r.h) || 0) + r.keys.size);
     }
     // полосы перегонов → полосы отрезков полилинии (между станциями бывают изломы)
     for (const line of lines) {
@@ -401,6 +569,30 @@ const NetworkScheme = (function () {
    * остановки». g.fullIds — путь со всеми проходимыми станциями, g.pass —
    * только пропущенные.
    */
+  // Цепочка a…c другой линии годится как трасса экспресса a→c, только если
+  // это действительно тот же коридор: промежуточные станции не являются
+  // остановками самого экспресса (иначе это его же петля/разворот), идут
+  // по порядку вдоль a→c, недалеко от прямой, а путь по цепочке не длиннее
+  // прямого перегона больше чем на четверть. Без этой проверки линия
+  // «уходила» через 10+ чужих станций — петли на пол-схемы.
+  function expressChainOk(seg, stops, stById) {
+    const P = seg.map((id) => stById.get(id));
+    const a = P[0], c = P[P.length - 1];
+    const dx = c.x - a.x, dz = c.z - a.z, d = Math.hypot(dx, dz);
+    if (!d) return false;
+    let path = 0, prevT = 0;
+    for (let k = 1; k < P.length; k++) {
+      path += Math.hypot(P[k].x - P[k - 1].x, P[k].z - P[k - 1].z);
+      if (k === P.length - 1) break;
+      if (stops.has(seg[k])) return false;
+      const t = ((P[k].x - a.x) * dx + (P[k].z - a.z) * dz) / (d * d);
+      const off = Math.abs((P[k].x - a.x) * dz - (P[k].z - a.z) * dx) / d;
+      if (t <= prevT || t >= 1 || off > d * 0.2) return false;
+      prevT = t;
+    }
+    return path <= d * 1.25;
+  }
+
   function expandExpress(groups, stById) {
     for (const g of groups) {
       const ids = g.main.stationIds.filter((s) => stById.has(s));
@@ -417,6 +609,7 @@ const NetworkScheme = (function () {
           if (ia < 0 || ic < 0 || Math.abs(ic - ia) < 2 || Math.abs(ic - ia) > 14) continue;
           const seg = ia < ic ? hid.slice(ia, ic + 1) : hid.slice(ic, ia + 1).reverse();
           if (!seg.every((x) => stById.has(x))) continue;
+          if (!expressChainOk(seg, stops, stById)) continue;
           if (!best || seg.length < best.length) best = seg;
         }
         if (best) {
@@ -462,7 +655,7 @@ const NetworkScheme = (function () {
     const prevStations = new Map(prev.stations.filter((s) => isMtr(s.id, P_ST)).map((s) => [s.mtrStationId, s]));
     const prevTransfers = new Map(prev.transfers.filter((t) => isMtr(t.id, P_TR)).map((t) => [t.id, t]));
     const hadMtr = prevLines.some((l) => isMtr(l.id, P_LINE));
-    let meta = prev.mtrMeta && prev.mtrMeta.grid === grid ? prev.mtrMeta : computeMeta(groups, stById, grid);
+    let meta = prev.mtrMeta && prev.mtrMeta.grid === grid ? prev.mtrMeta : computeMeta(groups, stById, grid, prev.style);
 
     const lineIdOf = (g) => P_LINE + g.main.id;
     const stLines = new Map();
@@ -519,6 +712,7 @@ const NetworkScheme = (function () {
     }
     const freshSet = new Set(fresh);
     gridAlign(pos, allHops, alignable, freshSet, occ, grid);
+    untangle(pos, allHops, alignable, freshSet, occ, grid);
 
     const elbows = new Map();
     const usedPrev = new Set();
@@ -535,13 +729,16 @@ const NetworkScheme = (function () {
       const line = Object.assign(
         { name: nm.name, number: g.main.number || "", color: g.main.color, width: null, dash: /_bus$/.test(g.main.type) ? "dashed" : "solid", offset: 0 },
         old || {},
-        { id, mtrRouteIds: g.routeIds, mtrStationIds: ids, mtrPassIds: g.pass, mtrType: g.main.type, points: sameRoute ? old.points : buildPath(g.fullIds, pos, occ, elbows) });
+        { id, mtrRouteIds: g.routeIds, mtrStationIds: ids, mtrPassIds: g.pass, mtrType: g.main.type, points: sameRoute ? old.points : buildPath(g.fullIds, pos, occ, elbows, grid) });
       line._fullIds = g.fullIds;
       // проекты до полос по перегонам хранили авто-сдвиг в offset — сбрасываем
       if (old && !old.lanes) line.offset = 0;
       return line;
     });
-    assignLanes(lines, pos);
+    // скрытые линии полос не занимают (как в relayoutLanes): иначе после
+    // пересборки в пучках видимых линий оставались дыры под скрытых соседей
+    assignLanes(lines.filter((l) => !l.hidden), pos);
+    lines.forEach((l) => { if (l.hidden) { delete l.lanes; delete l._fullIds; } });
     const lineIds = new Set(lines.map((l) => l.id));
     const userLines = prevLines.filter((l) => !isMtr(l.id, P_LINE));
 
