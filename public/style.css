@@ -1297,6 +1297,12 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .scheme-list-row { display: flex; align-items: center; gap: 4px; }
 .scheme-list-row input[type="text"] { min-width: 0; }
 .scheme-list-pick { flex: none; }
+.scheme-eye { flex: none; width: 24px; padding: 0; }
+.scheme-eye.off { opacity: 0.5; }
+.scheme-list-row.is-hidden .scheme-list-name, .scheme-list-row.is-hidden .scheme-list-num { opacity: 0.45; }
+.scheme-type-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.scheme-chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+.scheme-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .scheme-list-row.is-merged .scheme-list-color { outline: 2px solid var(--accent); }
 .scheme-list-color { width: 28px; height: 26px; padding: 1px; flex: none; }
 .scheme-list-num { width: 44px; flex: none; }

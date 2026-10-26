@@ -118,6 +118,7 @@ const SchemeCore = (function () {
           width: l.width == null || l.width === "" ? null : Math.max(1, Math.min(30, num(l.width, 6))),
           dash: oneOf(l.dash, DASHES, "solid"),
           group: str(l.group, 40),
+          hidden: !!l.hidden,
           offset: Math.max(-8, Math.min(8, Math.round(num(l.offset, 0)))),
           points: (Array.isArray(l.points) ? l.points : []).slice(0, 5000).map(pt),
         };
@@ -178,6 +179,7 @@ const SchemeCore = (function () {
   // Публикация: компактная форма для ссылки (без служебных полей MTR)
   // ------------------------------------------------------------
   function toPublished(p) {
+    p = visibleProject(p);
     const r = (v) => Math.round(v);
     return {
       v: VERSION,
@@ -245,7 +247,8 @@ const SchemeCore = (function () {
    * для отрезка i). Стык двух отрезков — пересечение их смещённых прямых;
    * на прямой со сменой полосы — короткий косой переход.
    */
-  function offsetPolylineVar(ptsIn, offsIn) {
+  function offsetPolylineVar(ptsIn, offsIn, R) {
+    if (R == null) R = CORNER_R;
     // нулевые отрезки выкидываем вместе с их смещениями
     const pts = [], offs = [];
     ptsIn.forEach((p, i) => {
@@ -264,32 +267,47 @@ const SchemeCore = (function () {
     }
     const at = (p, i, o) => ({ x: p.x + nrm[i].x * o, y: p.y + nrm[i].y * o });
     const out = [at(pts[0], 0, offs[0])];
+    // Радиус скругления в каждой вершине своей смещённой линии: полосы в
+    // пучке идут по концентрическим дугам (снаружи поворота радиус больше,
+    // внутри меньше на величину смещения), иначе соседние линии на углу
+    // пересекаются и сплетаются в узлы
+    const radii = [0];
     for (let j = 1; j < n; j++) {
       const o1 = offs[j - 1], o2 = offs[j];
       const v = pts[j];
-      if (!o1 && !o2) { out.push({ x: v.x, y: v.y }); continue; }
       const c = cross(dir[j - 1], dir[j]);
       const dot = dir[j - 1].x * dir[j].x + dir[j - 1].y * dir[j].y;
+      const base = Math.min(R, segLen[j - 1] / 2, segLen[j] / 2);
+      if (!o1 && !o2) { out.push({ x: v.x, y: v.y }); radii.push(R); continue; }
       if (Math.abs(c) < 1e-6) {
         if (dot > 0 && o1 !== o2) {
           // смена полосы на прямой — косой переход
-          const t = Math.min(Math.abs(o2 - o1), segLen[j - 1] / 2, segLen[j] / 2);
+          const tt = Math.min(Math.abs(o2 - o1), segLen[j - 1] / 2, segLen[j] / 2);
           const a = at(v, j - 1, o1), b = at(v, j, o2);
-          out.push({ x: a.x - dir[j].x * t, y: a.y - dir[j].y * t }, { x: b.x + dir[j].x * t, y: b.y + dir[j].y * t });
+          out.push({ x: a.x - dir[j].x * tt, y: a.y - dir[j].y * tt }, { x: b.x + dir[j].x * tt, y: b.y + dir[j].y * tt });
+          radii.push(R, R);
         } else if (dot > 0) {
           out.push(at(v, j, o2));
+          radii.push(R);
         } else {
           out.push(at(v, j - 1, o1), at(v, j, o2));
+          radii.push(R, R);
         }
         continue;
       }
       const A = at(v, j - 1, o1), B = at(v, j, o2);
       const s = cross(sub(B, A), dir[j]) / c;
       const X = { x: A.x + dir[j - 1].x * s, y: A.y + dir[j - 1].y * s };
-      if (len(sub(X, v)) > 4 * Math.max(Math.abs(o1), Math.abs(o2)) + 1) out.push(A, B);
-      else out.push(X);
+      if (len(sub(X, v)) > 4 * Math.max(Math.abs(o1), Math.abs(o2)) + 1) { out.push(A, B); radii.push(R, R); }
+      else {
+        out.push(X);
+        // c > 0 — поворот направо (y вниз): слева снаружи, справа внутри
+        radii.push(Math.max(1, base + ((o1 + o2) / 2) * Math.sign(c)));
+      }
     }
     out.push(at(pts[n], n - 1, offs[n - 1]));
+    radii.push(0);
+    out.radii = radii;
     return out;
   }
 
@@ -300,7 +318,7 @@ const SchemeCore = (function () {
     for (let i = 1; i < pts.length - 1; i++) {
       const a = pts[i - 1], v = pts[i], b = pts[i + 1];
       const la = len(sub(a, v)), lb = len(sub(b, v));
-      const rr = Math.min(r, la / 2, lb / 2);
+      const rr = Math.min(pts.radii ? pts.radii[i] : r, la / 2, lb / 2);
       if (rr < 0.5) { d += ` L${f(v.x)} ${f(v.y)}`; continue; }
       const ua = unit(sub(a, v)), ub = unit(sub(b, v));
       d += ` L${f(v.x + ua.x * rr)} ${f(v.y + ua.y * rr)} Q${f(v.x)} ${f(v.y)} ${f(v.x + ub.x * rr)} ${f(v.y + ub.y * rr)}`;
@@ -963,8 +981,20 @@ const SchemeCore = (function () {
    * (только редактор): { conflictStations: Map(mtrStationId→count),
    * delayedRoutes: Map(routeId→ms) }. Возвращает индекс для редактора.
    */
+  // Схема без скрытых линий: станции, у которых все линии скрыты, и
+  // пересадки, потерявшие пару, тоже скрываются
+  function visibleProject(p) {
+    const hid = new Set(p.lines.filter((l) => l.hidden).map((l) => l.id));
+    if (!hid.size) return p;
+    const stations = p.stations.filter((s) => !(s.lineIds.length && s.lineIds.every((id) => hid.has(id))));
+    const vis = new Set(stations.map((s) => s.id));
+    const transfers = p.transfers.map((t) => Object.assign({}, t, { stationIds: t.stationIds.filter((id) => vis.has(id)) })).filter((t) => t.stationIds.length >= 2);
+    return Object.assign({}, p, { lines: p.lines.filter((l) => !l.hidden), stations, transfers });
+  }
+
   function render(root, p, opts) {
     opts = opts || {};
+    p = visibleProject(p);
     while (root.firstChild) root.removeChild(root.firstChild);
     root.setAttribute("font-family", FONT);
     const linesById = new Map(p.lines.map((l) => [l.id, l]));
@@ -988,7 +1018,7 @@ const SchemeCore = (function () {
     const offsetPts = new Map();
     for (const line of p.lines) {
       if (line.points.length < 2) continue;
-      const pts = offsetPolylineVar(line.points, lineOffsets(p, line));
+      const pts = offsetPolylineVar(line.points, lineOffsets(p, line), p.style.cornerRadius);
       offsetPts.set(line.id, pts);
       const g = el("g", { "data-kind": "line", "data-id": line.id, class: "sc-line" }, gLines);
       // широкая прозрачная зона попадания
@@ -1108,7 +1138,7 @@ const SchemeCore = (function () {
     VERSION, NS, STATION_STYLES, LABEL_POS, LABEL_ANGLES, DASHES, SHAPE_DASHES, SHAPE_TYPES, DIRS,
     normalize, emptyProject, toPublished, fromPublished,
     render, bounds, toSvgElement, toSvgString, toPngBlob,
-    nearestOnPolyline, offsetPolylineVar, vertexDisplayPoints, el, normalizeShape, shapeBox,
+    nearestOnPolyline, offsetPolylineVar, visibleProject, vertexDisplayPoints, el, normalizeShape, shapeBox,
   };
 })();
 

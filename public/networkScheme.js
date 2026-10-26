@@ -1697,11 +1697,30 @@ const NetworkScheme = (function () {
     const lines = project.lines.filter((l) => l.points.length >= 2);
     if (lines.length) {
       wrap.append(h("div", { class: "scheme-props-title", text: tt("schemeListLines") }));
+      // показ линий по типам (например, скрыть автобусы, не удаляя их)
+      const typeCount = new Map();
+      lines.forEach((l) => { if (l.mtrType) typeCount.set(l.mtrType, (typeCount.get(l.mtrType) || 0) + 1); });
+      if (typeCount.size > 1) {
+        wrap.append(h("div", { class: "scheme-type-chips" }, [...typeCount.keys()].sort().map((type) => {
+          const of = lines.filter((l) => l.mtrType === type);
+          const shown = of.some((l) => !l.hidden);
+          return h("button", {
+            type: "button", class: "scheme-chip" + (shown ? " on" : ""), title: tt("schemeToggleType"),
+            text: typeLabel(type) + " " + of.length,
+            onclick: () => { pushHistory(); of.forEach((l) => { l.hidden = shown; }); relayoutLanes(); changed(); },
+          });
+        })));
+      }
       lines.forEach((l) => {
         const pick = h("input", { type: "checkbox", class: "scheme-list-pick", title: tt("schemeMergePick") });
         pick.checked = mergePick.has(l.id);
         pick.addEventListener("change", () => { if (pick.checked) mergePick.add(l.id); else mergePick.delete(l.id); });
-        wrap.append(h("div", { class: "scheme-list-row" + (l.group ? " is-merged" : "") }, [
+        const eye = h("button", {
+          type: "button", class: "icon-btn scheme-eye" + (l.hidden ? " off" : ""), text: l.hidden ? "⌀" : "◉", title: tt("schemeToggleLine"),
+          onclick: () => { pushHistory(); l.hidden = !l.hidden; relayoutLanes(); changed(); },
+        });
+        wrap.append(h("div", { class: "scheme-list-row" + (l.group ? " is-merged" : "") + (l.hidden ? " is-hidden" : "") }, [
+          eye,
           pick,
           bindEdit(h("input", { type: "color", value: l.color, class: "scheme-list-color" }), (v) => { l.color = v; shareGroupProps(l); }),
           bindEdit(h("input", { type: "text", value: l.number, class: "scheme-list-num", title: tt("schemeFieldNumber") }), (v) => { l.number = v.slice(0, 24); }),
@@ -2052,7 +2071,7 @@ const NetworkScheme = (function () {
   // вручную остаются как есть.
   function relayoutLanes() {
     const pos = new Map();
-    const tmp = project.lines.filter((l) => l.points.length >= 2).map((l) => {
+    const tmp = project.lines.filter((l) => l.points.length >= 2 && !l.hidden).map((l) => {
       const ids = [];
       l.points.forEach((q) => {
         const k = pkey(q);
