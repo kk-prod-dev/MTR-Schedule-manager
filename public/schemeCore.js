@@ -117,6 +117,7 @@ const SchemeCore = (function () {
           color: color(l.color, "#6366f1"),
           width: l.width == null || l.width === "" ? null : Math.max(1, Math.min(30, num(l.width, 6))),
           dash: oneOf(l.dash, DASHES, "solid"),
+          group: str(l.group, 40),
           offset: Math.max(-8, Math.min(8, Math.round(num(l.offset, 0)))),
           points: (Array.isArray(l.points) ? l.points : []).slice(0, 5000).map(pt),
         };
@@ -179,7 +180,7 @@ const SchemeCore = (function () {
       t: p.title,
       s: [p.style.lineWidth, p.style.labelSize, p.style.bg, p.style.labelColor, p.style.cornerRadius, p.style.laneGap,
         p.style.stationScale, p.style.stationFill, p.style.stationStroke, p.style.labelAuto ? 1 : 0, p.style.transferScale],
-      l: p.lines.map((l) => [l.id, l.name, l.number, l.color, l.width, l.dash, l.offset, l.points.flatMap((q) => [r(q.x), r(q.y)]), l.lanes || null]),
+      l: p.lines.map((l) => [l.id, l.name, l.number, l.color, l.width, l.dash, l.offset, l.points.flatMap((q) => [r(q.x), r(q.y)]), l.lanes || null, l.group || ""]),
       st: p.stations.map((s) => [s.id, s.name, s.sub, r(s.x), r(s.y), s.style, s.label.pos, s.label.angle, s.lineIds,
         s.passLineIds, s.fill, s.stroke, s.strokeW, s.size, s.labelSize, s.labelColor]),
       sh: p.shapes.map((x) => [x.type, x.x, x.y, x.w, x.h, x.fill, x.stroke, x.strokeW, x.opacity, x.dash, x.rx, x.rot, x.layer, x.text, x.fontSize, x.bold ? 1 : 0, x.align]),
@@ -211,7 +212,7 @@ const SchemeCore = (function () {
         const flat = arr(l[7]);
         const points = [];
         for (let i = 0; i + 1 < flat.length; i += 2) points.push({ x: flat[i], y: flat[i + 1] });
-        return { id: l[0], name: l[1], number: l[2], color: l[3], width: l[4], dash: l[5], offset: l[6], points, lanes: l[8] };
+        return { id: l[0], name: l[1], number: l[2], color: l[3], width: l[4], dash: l[5], offset: l[6], points, lanes: l[8], group: l[9] };
       }),
       stations: arr(c.st).map((x) => {
         x = arr(x);
@@ -452,11 +453,10 @@ const SchemeCore = (function () {
     return { c, items, dir, nrm, lo, hi, maxW, ends, inTransfer: drawn.transferStations.has(st.id) };
   }
 
-  function resolveStyle(st, geo) {
-    if (st.style !== "auto") return st.style;
-    if (geo.items.length > 1 || geo.inTransfer) return "pill";
-    if (geo.ends.length) return "circle";
-    return "tick";
+  // Авто: любая станция — скруглённый прямоугольник поперёк пучка
+  // (размер зависит только от числа линий с каждой стороны, см. pillMetrics)
+  function resolveStyle(st) {
+    return st.style !== "auto" ? st.style : "pill";
   }
 
   function labelDir(st, geo) {
@@ -472,13 +472,62 @@ const SchemeCore = (function () {
   // ------------------------------------------------------------
   const stScale = (p, st) => p.style.stationScale * (st.size || 1);
 
+  /**
+   * Размер значка-прямоугольника. Простая станция (все линии идут одинаково,
+   * в том числе поворачивают вместе) — тонкая «палка» поперёк пучка: длина =
+   * ширина пучка (число полос) + запас, толщина стандартная. Т-образная /
+   * пересекающаяся — ширина по числу полос основного направления, высота по
+   * числу полос примыкающих линий. Полосы считаются в системе самой линии
+   * (смещение от оси), поэтому угол подхода размер не раздувает.
+   */
+  function pillMetrics(p, st, geo) {
+    const c = geo.c, n = geo.nrm, k = stScale(p, st);
+    const pts = geo.items.flatMap((it) => it.pts);
+    if (!pts.length) pts.push({ x: c.x, y: c.y, w: geo.maxW, n });
+    const canon = (m) => (m.x < -1e-6 || (Math.abs(m.x) <= 1e-6 && m.y < 0) ? { x: -m.x, y: -m.y } : m);
+    const axisKey = (v) => { const m = canon(v); return Math.round(Math.atan2(m.y, m.x) * 8 / Math.PI); };
+    const sig = (it) => [...new Set(it.pts.map((q) => axisKey(q.n || n)))].sort().join(",");
+    const simple = geo.items.length && geo.items.every((it) => sig(it) === sig(geo.items[0]));
+    const off = (q) => { const qn = q.n || n; return (q.x - c.x) * qn.x + (q.y - c.y) * qn.y; };
+    const ext = (arr) => {
+      let lo = Infinity, hi = -Infinity;
+      for (const q of arr) { const o = off(q); lo = Math.min(lo, o - q.w / 2); hi = Math.max(hi, o + q.w / 2); }
+      return { lo, hi };
+    };
+    let m = n, main = pts, others = [];
+    if (!simple) {
+      const groups = new Map();
+      for (const q of pts) {
+        const key = axisKey(q.n || n);
+        if (!groups.has(key)) groups.set(key, { m: canon(q.n || n), pts: [] });
+        groups.get(key).pts.push(q);
+      }
+      const sorted = [...groups.values()].sort((a, b) => b.pts.length - a.pts.length);
+      m = sorted[0].m;
+      main = sorted[0].pts;
+      others = sorted.slice(1).flatMap((g) => g.pts);
+    }
+    const along = { x: -m.y, y: m.x };
+    const mainE = ext(main);
+    const pad = geo.maxW * 0.6 * k, thin = geo.maxW * 0.9 * k;
+    const half = (mainE.hi - mainE.lo) / 2 + pad;
+    let thick = thin, sMid = 0;
+    if (others.length) {
+      const oE = ext(others);
+      thick = Math.max(thin, oE.hi - oE.lo + pad);
+      const sp = others.map((q) => (q.x - c.x) * along.x + (q.y - c.y) * along.y);
+      sMid = (Math.min(...sp) + Math.max(...sp)) / 2;
+    }
+    const tMid = (mainE.lo + mainE.hi) / 2;
+    const mid = { x: c.x + m.x * tMid + along.x * sMid, y: c.y + m.y * tMid + along.y * sMid };
+    const rx = Math.min(thick / 2, half, Math.max(geo.maxW * 0.45 * k, Math.min(thick, half * 2) * 0.28));
+    return { mid, half, thick, rx, rot: Math.atan2(m.y, m.x) * 180 / Math.PI, reach: len(sub(mid, c)) + Math.max(half, thick / 2) };
+  }
+
   // Радиус охвата значка (для отступа подписи) — без рисования
   function markerReach(p, st, geo, style) {
     const k = stScale(p, st);
-    if (style === "pill") {
-      const lanes = Math.max(Math.abs(geo.lo), Math.abs(geo.hi));
-      return lanes + geo.maxW * 0.95 * k;
-    }
+    if (style === "pill") return pillMetrics(p, st, geo).reach;
     if (style === "circle" || style === "square" || style === "diamond") {
       const pos = geo.items[0] ? Math.abs(geo.items[0].pos) : 0;
       return pos + geo.maxW * 0.8 * k * (style === "circle" ? 1 : style === "square" ? 1.05 : 1.3);
@@ -500,42 +549,13 @@ const SchemeCore = (function () {
     let reach = Math.max(Math.abs(geo.lo), Math.abs(geo.hi));
 
     if (style === "pill") {
-      // Одна капсула поперёк ОСНОВНОГО пучка (направление с наибольшим
-      // числом полос), расширенная так, чтобы накрыть и полосы примыкающих
-      // под углом линий: на Т-образных и угловых станциях овал становится
-      // шире, а не поворачивается по диагонали и не раздувается в круг.
-      const pts = geo.items.flatMap((it) => it.pts);
-      if (!pts.length) pts.push({ x: c.x, y: c.y, w: geo.maxW, n });
-      const canon = (m) => (m.x < -1e-6 || (Math.abs(m.x) <= 1e-6 && m.y < 0) ? { x: -m.x, y: -m.y } : m);
-      const axisKey = (v) => { const m = canon(v); return Math.round(Math.atan2(m.y, m.x) * 8 / Math.PI); };
-      const sig = (it) => [...new Set(it.pts.map((q) => axisKey(q.n || n)))].sort().join(",");
-      const simple = geo.items.length && geo.items.every((it) => sig(it) === sig(geo.items[0]));
-      const groups = new Map();
-      for (const q of pts) {
-        const key = axisKey(q.n || n);
-        if (!groups.has(key)) groups.set(key, { m: canon(q.n || n), count: 0 });
-        groups.get(key).count++;
-      }
-      const m = simple ? n : [...groups.values()].sort((a, b) => b.count - a.count)[0].m;
-      const along = { x: -m.y, y: m.x };
-      let tLo = Infinity, tHi = -Infinity, sLo = Infinity, sHi = -Infinity;
-      for (const q of pts) {
-        const t = (q.x - c.x) * m.x + (q.y - c.y) * m.y;
-        const s = (q.x - c.x) * along.x + (q.y - c.y) * along.y;
-        tLo = Math.min(tLo, t - q.w / 2); tHi = Math.max(tHi, t + q.w / 2);
-        const crossing = !simple && Math.abs((q.n || m).x * m.x + (q.n || m).y * m.y) < 0.9;
-        sLo = Math.min(sLo, s - (crossing ? q.w / 2 : 0)); sHi = Math.max(sHi, s + (crossing ? q.w / 2 : 0));
-      }
-      const pad = geo.maxW * 0.45 * k;
-      const half = (tHi - tLo) / 2 + pad;
-      const thick = Math.max(geo.maxW * 1.35 * k, sHi - sLo + pad * 2);
-      const mid = { x: c.x + m.x * (tLo + tHi) / 2 + along.x * (sLo + sHi) / 2, y: c.y + m.y * (tLo + tHi) / 2 + along.y * (sLo + sHi) / 2 };
+      const pm = pillMetrics(p, st, geo);
       el("rect", {
-        x: -half, y: -thick / 2, width: half * 2, height: thick, rx: Math.min(thick, half * 2) / 2,
+        x: -pm.half, y: -pm.thick / 2, width: pm.half * 2, height: pm.thick, rx: pm.rx,
         fill, stroke, "stroke-width": sw != null ? sw : Math.max(1.1, geo.maxW * 0.2 * k),
-        transform: `translate(${mid.x} ${mid.y}) rotate(${Math.atan2(m.y, m.x) * 180 / Math.PI})`,
+        transform: `translate(${pm.mid.x} ${pm.mid.y}) rotate(${pm.rot})`,
       }, g);
-      reach = len(sub(mid, c)) + Math.max(half, thick / 2);
+      reach = pm.reach;
     } else if (style === "circle" || style === "square" || style === "diamond") {
       const pos = primary ? primary.pos : 0;
       const r = geo.maxW * 0.8 * k;
@@ -816,7 +836,15 @@ const SchemeCore = (function () {
 
   function drawLegend(g, p) {
     if (!p.legend.show) return;
-    const rows = p.lines.filter((l) => l.points.length >= 2);
+    // объединённые линии — одна строка легенды
+    const seenGroups = new Set();
+    const rows = p.lines.filter((l) => {
+      if (l.points.length < 2) return false;
+      if (!l.group) return true;
+      if (seenGroups.has(l.group)) return false;
+      seenGroups.add(l.group);
+      return true;
+    });
     if (!rows.length) return;
     const size = p.style.labelSize;
     const rowH = size * 2;
@@ -978,7 +1006,7 @@ const SchemeCore = (function () {
     for (const st of p.stations) {
       const geo = stationGeometry(p, st, linesById, drawn);
       geos.set(st.id, geo);
-      const style = resolveStyle(st, geo);
+      const style = resolveStyle(st);
       entries.push({ st, geo, style, reach: markerReach(p, st, geo, style) });
     }
     const labels = placeLabels(p, entries, offsetPts);

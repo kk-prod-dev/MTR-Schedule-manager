@@ -1296,6 +1296,8 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .scheme-lists { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
 .scheme-list-row { display: flex; align-items: center; gap: 4px; }
 .scheme-list-row input[type="text"] { min-width: 0; }
+.scheme-list-pick { flex: none; }
+.scheme-list-row.is-merged .scheme-list-color { outline: 2px solid var(--accent); }
 .scheme-list-color { width: 28px; height: 26px; padding: 1px; flex: none; }
 .scheme-list-num { width: 44px; flex: none; }
 .scheme-list-name { flex: 1; }

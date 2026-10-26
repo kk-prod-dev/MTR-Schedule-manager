@@ -306,7 +306,10 @@ const NetworkScheme = (function () {
         // и в обратной ориентации (для сравнения в системе хода другой линии)
         const seqR = fwd ? [...ids].reverse() : ids;
         const idxR = seq.length - 2 - idx;
-        h.entries.push({ line, order, seq, idx, seqR, idxR, dir: fwd ? 1 : -1, hopIdx: i });
+        const entry = { line, order, seq, idx, seqR, idxR, dir: fwd ? 1 : -1, hopIdx: i };
+        // объединённые линии идут по перегону одной полосой
+        const twin = line.group && h.entries.find((x) => x.line !== line && x.line.group === line.group);
+        if (twin) (twin.dups || (twin.dups = [])).push(entry); else h.entries.push(entry);
       }
     });
     const P = (id) => pos.get(id);
@@ -369,7 +372,11 @@ const NetworkScheme = (function () {
     for (const h of hops.values()) {
       const list = h.entries.slice().sort(cmp);
       const n = list.length;
-      list.forEach((e, k) => { e.line._hopLanes[e.hopIdx] = ((n - 1) / 2 - k) * e.dir; });
+      list.forEach((e, k) => {
+        const base = (n - 1) / 2 - k;
+        e.line._hopLanes[e.hopIdx] = base * e.dir;
+        (e.dups || []).forEach((d) => { d.line._hopLanes[d.hopIdx] = base * d.dir; });
+      });
     }
     // полосы перегонов → полосы отрезков полилинии (между станциями бывают изломы)
     for (const line of lines) {
@@ -1677,13 +1684,26 @@ const NetworkScheme = (function () {
     if (lines.length) {
       wrap.append(h("div", { class: "scheme-props-title", text: tt("schemeListLines") }));
       lines.forEach((l) => {
-        wrap.append(h("div", { class: "scheme-list-row" }, [
+        const pick = h("input", { type: "checkbox", class: "scheme-list-pick", title: tt("schemeMergePick") });
+        pick.checked = mergePick.has(l.id);
+        pick.addEventListener("change", () => { if (pick.checked) mergePick.add(l.id); else mergePick.delete(l.id); });
+        wrap.append(h("div", { class: "scheme-list-row" + (l.group ? " is-merged" : "") }, [
+          pick,
           bindEdit(h("input", { type: "color", value: l.color, class: "scheme-list-color" }), (v) => { l.color = v; }),
           bindEdit(h("input", { type: "text", value: l.number, class: "scheme-list-num", title: tt("schemeFieldNumber") }), (v) => { l.number = v.slice(0, 24); }),
           bindEdit(h("input", { type: "text", value: l.name, class: "scheme-list-name", title: tt("schemeFieldName") }), (v) => { l.name = v; }),
           h("button", { type: "button", class: "icon-btn", text: "◎", title: tt("schemeSelectLine"), onclick: () => { clearSelection(); sel = { kind: "line", id: l.id }; renderOverlay(); renderProps(); } }),
         ]));
       });
+    }
+    if (lines.length > 1) {
+      wrap.append(
+        h("p", { class: "hint small", text: tt("schemeMergeHint") }),
+        h("div", { class: "scheme-btn-row" }, [
+          button("schemeMergeBtn", mergeLines),
+          button("schemeUnmergeBtn", () => { unmergeLines(new Set(mergePick)); mergePick.clear(); renderProps(); }),
+        ]),
+      );
     }
     wrap.append(h("div", { class: "scheme-props-title", text: tt("schemeListStations") }));
     const search = h("input", { type: "text", placeholder: tt("schemeSearchStations") });
@@ -1805,6 +1825,13 @@ const NetworkScheme = (function () {
         h("p", { class: "hint small", text: tt("schemeLineEditHint") }),
         styleButtons(),
       );
+      if (line.group) {
+        const n = project.lines.filter((l) => l.group === line.group).length;
+        box.append(
+          h("p", { class: "hint small", text: tt("schemeMergedInfo", { n }) }),
+          button("schemeUnmergeOne", () => unmergeLines(new Set([line.id]))),
+        );
+      }
       if (sel.vidx != null) box.append(button("schemeDeleteVertex", deleteSelection));
       if (line.mtrRouteIds && line.mtrRouteIds.length) box.append(button("schemeOpenRoute", () => openRoute(line.mtrRouteIds[0])));
       box.append(button("schemeDeleteLine", () => { sel = { kind: "line", id: line.id }; deleteSelection(); }, "secondary-btn danger"));
@@ -2003,6 +2030,58 @@ const NetworkScheme = (function () {
   // ------------------------------------------------------------
   // Режимы вкладки и инициализация
   // ------------------------------------------------------------
+  // ------------------------------------------------------------
+  // Объединение линий
+  // ------------------------------------------------------------
+  // Полосы в пучках заново — по геометрии (вершины = «станции» для
+  // assignLanes). Применяются к линиям из MTR и объединённым; нарисованные
+  // вручную остаются как есть.
+  function relayoutLanes() {
+    const pos = new Map();
+    const tmp = project.lines.filter((l) => l.points.length >= 2).map((l) => {
+      const ids = [];
+      l.points.forEach((q) => {
+        const k = pkey(q);
+        pos.set(k, { x: q.x, y: q.y });
+        if (!ids.length || ids[ids.length - 1] !== k) ids.push(k);
+      });
+      return { ref: l, id: l.id, group: l.group, points: l.points, mtrStationIds: ids };
+    });
+    assignLanes(tmp, pos);
+    tmp.forEach((t) => { if (isMtr(t.ref.id, P_LINE) || t.ref.group) t.ref.lanes = t.lanes; });
+  }
+
+  const mergePick = new Set();
+
+  function mergeLines() {
+    const picked = project.lines.filter((l) => mergePick.has(l.id));
+    // вместе с теми, кто уже в одной группе с выбранными
+    const groups = new Set(picked.map((l) => l.group).filter(Boolean));
+    const members = project.lines.filter((l) => mergePick.has(l.id) || (l.group && groups.has(l.group)));
+    if (members.length < 2) { setStatus(tt("schemeMergeNeed")); return; }
+    pushHistory();
+    const master = members[0];
+    const gid = master.group || "g" + Date.now().toString(36);
+    members.forEach((l) => {
+      l.group = gid;
+      if (l !== master) { l.color = master.color; l.number = master.number; l.width = master.width; l.dash = master.dash; l.name = master.name; }
+    });
+    relayoutLanes();
+    mergePick.clear();
+    changed();
+    setStatus(tt("schemeMerged", { n: members.length }));
+  }
+
+  function unmergeLines(ids) {
+    const lines = project.lines.filter((l) => ids.has(l.id) && l.group);
+    if (!lines.length) return;
+    pushHistory();
+    lines.forEach((l) => { l.group = ""; });
+    relayoutLanes();
+    changed();
+    setStatus(tt("schemeUnmerged", { n: lines.length }));
+  }
+
   // ------------------------------------------------------------
   // Несколько схем
   // ------------------------------------------------------------
