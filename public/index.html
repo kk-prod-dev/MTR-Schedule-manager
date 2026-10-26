@@ -242,6 +242,11 @@
 
     <!-- ===== Конструктор бумажных расписаний (Aushangfahrplan) ===== -->
     <section id="tab-board" class="tab-panel">
+      <div class="board-mode-switch">
+        <button id="boardModeTimetableBtn" class="board-mode-btn active" type="button" data-i18n="boardModeTimetable">Табло</button>
+        <button id="boardModeSchemeBtn" class="board-mode-btn" type="button" data-i18n="boardModeScheme">Схема сети</button>
+      </div>
+      <div id="boardModeTimetable">
       <p class="hint" data-i18n="boardHint">Редактор-холст для оформления бумажного расписания станции: свободно расставляйте текст, фигуры и картинки, а расписание вставляйте кнопкой ниже — редактировать вручную можно всё.</p>
 
       <div class="board-toolbar board-tools-flat">
@@ -438,6 +443,28 @@
         <div id="boardSizeIndicator" class="board-size-indicator" style="display:none;"></div>
       </div>
       <p class="hint small" id="boardStatusHint"></p>
+      </div>
+
+      <!-- Схема сети: встроенный MURScheme (vendor/murscheme, см. networkScheme.js) -->
+      <div id="boardModeScheme" style="display:none;">
+        <p class="hint" data-i18n="schemeHint">Схема сети в редакторе MURScheme. «Построить из MTR» раскладывает выбранные линии по реальным координатам станций; повторное построение сохраняет ваши ручные правки и добавляет новое из MTR.</p>
+        <div class="board-toolbar">
+          <div class="board-toolbar-group">
+            <div class="board-dd">
+              <button id="schemeTypesBtn" class="secondary-btn" type="button"><span data-i18n="schemeTypesBtn">Типы маршрутов</span> <span id="schemeTypesCount"></span> ▾</button>
+              <div class="board-dd-panel" id="schemeTypesPanel"></div>
+            </div>
+            <button id="schemeGenerateBtn" type="button" data-i18n="schemeGenerateBtn">Построить из MTR</button>
+            <button id="schemeFitBtn" class="secondary-btn" type="button" data-i18n="schemeFitBtn">Вписать в экран</button>
+          </div>
+          <div class="board-toolbar-group">
+            <button id="schemeResetBtn" class="secondary-btn" type="button" data-i18n="schemeResetBtn">Новая пустая схема</button>
+          </div>
+        </div>
+        <p class="hint small" id="schemeStatus"></p>
+        <div id="schemeFrameHost" class="scheme-frame-host"></div>
+        <p class="hint small" data-i18n="schemeCredit">Редактор схем MURScheme — tringoli, github.com/tringoli/MURStack (GPL-3.0)</p>
+      </div>
     </section>
 
     <!-- ===== Проблемные места ===== -->
@@ -617,6 +644,7 @@
   <script src="vendor/lz-string.min.js"></script>
   <script src="app.js"></script>
   <script src="boardEditor.js"></script>
+  <script src="networkScheme.js"></script>
   <script src="i18n-extra.js"></script>
 </body>
 </html>

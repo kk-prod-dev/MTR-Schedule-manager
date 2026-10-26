@@ -1194,8 +1194,59 @@ function getLiveDelays(minDeviationMs) {
   return out.sort((a, b) => b.maxDeviationMs - a.maxDeviationMs);
 }
 
+/**
+ * Данные для генерации схемы сети (MURScheme во вкладке «Редактор»):
+ * станции с мировыми координатами и маршруты с упорядоченными станциями.
+ * Координата станции = среднее координат её платформ по всем маршрутам
+ * (MTR отдаёт x/z у остановки маршрута, т.е. у платформы, а не у станции).
+ * Черновики не включаются — у них нет координат.
+ */
+function getSchemeData() {
+  const topology = store.getTopology();
+  if (!topology) return null;
+  const revMap = getReverseRouteMap(topology.routes, topology.fetchedAt);
+  const visible = topology.routes.filter((r) => !r.hidden && (r.stations || []).length >= 2);
+
+  const acc = new Map(); // stationId -> { sx, sz, n }
+  for (const r of visible) {
+    for (const s of r.stations) {
+      if (!Number.isFinite(s.x) || !Number.isFinite(s.z)) continue;
+      const a = acc.get(s.id) || { sx: 0, sz: 0, n: 0 };
+      a.sx += s.x; a.sz += s.z; a.n += 1;
+      acc.set(s.id, a);
+    }
+  }
+  const stations = topology.stations
+    .filter((s) => acc.has(s.id))
+    .map((s) => {
+      const a = acc.get(s.id);
+      return {
+        id: s.id,
+        name: s.name,
+        x: a.sx / a.n,
+        z: a.sz / a.n,
+        connections: (s.connections || []).filter((c) => acc.has(c)),
+      };
+    });
+  const routes = visible.map((r) => {
+    const { displayName, shortCode } = splitRouteName(r.name);
+    return {
+      id: r.id,
+      name: displayName,
+      number: r.number || shortCode,
+      color: colorToHex(r.color),
+      type: r.type,
+      circular: r.circularState && r.circularState !== "NONE" ? r.circularState : null,
+      stationIds: r.stations.map((s) => s.id).filter((id) => acc.has(id)),
+      reverseRouteId: revMap.get(r.id) || null,
+    };
+  });
+  return { stations, routes, fetchedAt: topology.fetchedAt };
+}
+
 module.exports = {
   ...module.exports,
+  getSchemeData,
   getAllConflictingStations,
   conflictCandidateIds,
   scanStationsForConflicts,

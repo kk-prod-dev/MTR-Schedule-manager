@@ -59,6 +59,13 @@ app.get("/api/routes", (req, res) => {
   res.json(listRoutes());
 });
 
+// Станции с координатами + маршруты — для генерации схемы сети (MURScheme)
+app.get("/api/scheme-data", (req, res) => {
+  const result = schedule.getSchemeData();
+  if (!result) return res.status(503).json({ error: "Данные ещё не получены от сервера MTR, подождите немного." });
+  res.json(result);
+});
+
 // Цепочка оборота рейса: все рейсы прямого/обратного маршрутов, связанные
 // через развороты на конечных, — при ручном сдвиге двигаются вместе
 app.get("/api/turnaround-chain", (req, res) => {

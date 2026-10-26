@@ -47,6 +47,9 @@ Editor tab (public/boardEditor.js)
 | `public/app.js` | All frontend logic (~5000 lines) |
 | `public/boardEditor.js` | Editor tab: fabric.js canvas for printable timetables |
 | `public/vendor/` | fabric.min.js, lz-string.min.js, Monocraft.ttf (plain `<script>` includes) |
+| `public/vendor/murscheme/` | MURScheme.html (upstream tringoli/MURStack, GPL-3.0, **unmodified**) + its LICENSE |
+| `public/networkScheme.js` | Editor tab «Схема сети» mode: MURScheme iframe + MTR→MURScheme generator with merge |
+| `public/murscheme-bridge.js` | Injected INTO the MURScheme iframe (not in index.html) — exposes `window.__mtrBridge` |
 | `public/i18n-extra.js` | Translations for DE/FR/PL/PT/CS (merged into I18N at runtime) |
 | `public/index.html` | Single-page app shell |
 | `.github/workflows/build.yml` | CI: Win/mac/Linux builds on every push to main; publishes on `v*` tags |
@@ -170,6 +173,17 @@ npm run build         # alias for dist:win
 - `buildDiagnosticReport()` assembles a readable text report (app/server status from `/api/status`, environment, settings without secrets, state counts, the log buffer); `downloadDiagnosticReport()` saves it. In Electron it uses a native Save dialog via the `save-diagnostic` IPC (`ipcMain.handle` in main.js + `saveDiagnostic` in preload); in the browser it falls back to a Blob download. "Bug-report diagnostic file" button in Settings
 - Deliberately contains no credentials (the app has none) — safe to attach to a public bug report
 
+### Network map (MURScheme in the Editor tab)
+- Editor tab has a mode switch «Табло / Схема сети» (`#boardModeTimetable` / `#boardModeScheme`); the scheme mode hosts MURScheme in a lazily created iframe (created on first switch — a hidden iframe has a 0×0 svg and breaks fit)
+- `MURScheme.html` is kept byte-identical to upstream (beta 3.3, commit 25e26f0) — updating = replacing the file. All integration goes through `murscheme-bridge.js`, injected as a `<script>` into the iframe after load: classic scripts share the global lexical scope, so it sees MURScheme's `const STATE`, `I18N`, `refreshCanvas`, `pushHistory`, `svg`… If an upstream update renames these, the bridge is the only place to fix
+- Change detection: bridge wraps the global `pushHistory` (every MURScheme mutation calls it) + listens to mouseup/keyup/change/wheel (drags, inputs, pan/zoom bypass history) → parent debounces 1.5 s → `savePrefsToServer()`
+- Persisted in prefs.json as `networkSchemeProject` (the MURScheme project minus transient drag/selection fields) + `networkSchemeUi` (`mode`, `types`) — wired into all three touch points via `networkSchemePrefsFields()` / `applyPersistedState`
+- `GET /api/scheme-data` (`getSchemeData` in schedule.js): stations with world x/z = average of their PLATFORM coords over all routes (MTR gives x/z per route stop, i.e. per platform), routes with ordered `stationIds` + `reverseRouteId`. Drafts excluded (no coords)
+- Generator `NetworkScheme.buildProject(data, {types}, prevProject)` is pure (testable in node via `vm`): forward+reverse = one line; short-turn variants (same color+number, contiguous sub-path) fold into the longest route; scale = median inter-station distance → 3 grid cells, snapped to grid, collisions spiral to the nearest free cell; non-octilinear hops get ONE elbow, chosen once per station pair (cached by sorted pair key) so lines sharing a hop share the trace; parallel lines get MURScheme `offset`, which is relative to POLYLINE DIRECTION — conflicts compare `offset × dir` on each shared hop
+- Merge: generated objects have prefixed ids `mtr-line-<routeId>` / `mtr-st-<stationId>` / `mtr-tr-<minStationId>` plus `mtrRouteIds`/`mtrStationIds`/`mtrStationId`/`mtrName`; the coordinate transform is stored as `mtrMeta` and reused so new stations land consistently. On rebuild: existing objects keep position/style/user names (MTR renames propagate only if the name wasn't edited — compared via `mtrName`), line points are kept unless the station sequence changed, new objects are added, mtr-objects no longer selected are removed, user-drawn objects (no prefix) are untouched. Generation pushes MURScheme history first → Ctrl+Z inside the editor undoes it
+- MURScheme UI has only ru/en: our language maps ru→ru, everything else→en (`bridge.setLang`, called from `applyI18n`)
+- License: MURScheme is GPL-3.0 (credit line under the iframe + LICENSE next to the file). The app itself has no license declared yet — decide before a public release
+
 ### Beta (pre-release) updates
 - `settings.betaUpdates` (default false) → `autoUpdater.allowPrerelease` in electron/main.js. Read from `prefs.json` (`readBetaUpdatesPref`) at startup and flipped live via the `set-beta-updates` IPC channel, so no restart is needed
 - A persisted setting needs THREE touch points, not two: `savePrefsToServer` + `buildPrefsPayload` (both save paths) AND `loadPrefsFromServer` (read-back). Missing the last one silently reverts the setting on every launch even though prefs.json has it — that was the beta-toggle "doesn't persist" bug (fixed in 1.2.0-beta.2)
@@ -211,6 +225,7 @@ npm run build         # alias for dist:win
 | PUT | `/api/drafts/:id` | Update draft route |
 | DELETE | `/api/drafts/:id` | Delete draft route |
 | GET | `/api/stations/:id/arrivals` | Live arrivals for train consist |
+| GET | `/api/scheme-data` | Stations with world coords + routes, for the network-map generator |
 
 ---
 

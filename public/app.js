@@ -353,6 +353,28 @@ const I18N = {
     boardHourGapLabel: "Пробел между часами",
     boardCanvasLangLabel: "Язык холста",
     boardCanvasLangAuto: "как интерфейс",
+    boardModeTimetable: "Табло",
+    boardModeScheme: "Схема сети",
+    schemeHint: "Схема сети в редакторе MURScheme. «Построить из MTR» раскладывает выбранные линии по реальным координатам станций; повторное построение сохраняет ваши ручные правки и добавляет новое из MTR.",
+    schemeTypesBtn: "Типы маршрутов",
+    schemeGenerateBtn: "Построить из MTR",
+    schemeFitBtn: "Вписать в экран",
+    schemeResetBtn: "Новая пустая схема",
+    schemeCredit: "Редактор схем MURScheme — tringoli, github.com/tringoli/MURStack (GPL-3.0)",
+    schemeGenerating: "Строим схему из данных MTR…",
+    schemeGenerated: "Схема построена: линий {lines}, станций {stations}, пересадок {transfers}. Отменить — Ctrl+Z в редакторе.",
+    schemeUpdated: "Схема обновлена из MTR: линий {lines}, новых станций {newStations}, удалено линий {removedLines}. Ручные правки сохранены.",
+    schemeNoTypes: "Выберите хотя бы один тип маршрутов.",
+    schemeGenerateError: "Не удалось построить схему",
+    schemeLoadError: "Не удалось загрузить редактор схем",
+    schemeResetConfirm: "Удалить текущую схему и начать с пустой? Это действие нельзя отменить.",
+    schemeType_normal: "Поезда",
+    schemeType_light_rail: "Лёгкое метро",
+    schemeType_high_speed: "Скоростные",
+    schemeType_metro: "Метро",
+    schemeType_sbahn: "S-Bahn",
+    schemeType_tram: "Трамвай",
+    schemeType_bus: "Автобус",
     boardTabCanvas: "Холст",
     boardTabInsert: "Вставка",
     boardTabObject: "Объект",
@@ -723,6 +745,28 @@ const I18N = {
     boardHourGapLabel: "Gap between hours",
     boardCanvasLangLabel: "Canvas language",
     boardCanvasLangAuto: "same as UI",
+    boardModeTimetable: "Timetable",
+    boardModeScheme: "Network map",
+    schemeHint: "Network map in the MURScheme editor. “Build from MTR” lays out the selected lines by the real station coordinates; building again keeps your manual edits and adds what is new in MTR.",
+    schemeTypesBtn: "Route types",
+    schemeGenerateBtn: "Build from MTR",
+    schemeFitBtn: "Fit to screen",
+    schemeResetBtn: "New empty map",
+    schemeCredit: "MURScheme map editor by tringoli, github.com/tringoli/MURStack (GPL-3.0)",
+    schemeGenerating: "Building the map from MTR data…",
+    schemeGenerated: "Map built: {lines} lines, {stations} stations, {transfers} transfers. Undo with Ctrl+Z in the editor.",
+    schemeUpdated: "Map updated from MTR: {lines} lines, {newStations} new stations, {removedLines} lines removed. Manual edits kept.",
+    schemeNoTypes: "Select at least one route type.",
+    schemeGenerateError: "Could not build the map",
+    schemeLoadError: "Could not load the map editor",
+    schemeResetConfirm: "Delete the current map and start from an empty one? This cannot be undone.",
+    schemeType_normal: "Trains",
+    schemeType_light_rail: "Light rail",
+    schemeType_high_speed: "High-speed",
+    schemeType_metro: "Metro",
+    schemeType_sbahn: "S-Bahn",
+    schemeType_tram: "Tram",
+    schemeType_bus: "Bus",
     boardTabCanvas: "Canvas",
     boardTabInsert: "Insert",
     boardTabObject: "Object",
@@ -888,6 +932,7 @@ function applyI18n() {
     // data-hotkey — подсказка горячей клавиши, не переводится
     el.title = t(el.dataset.i18nTitle) + (el.dataset.hotkey ? ` (${el.dataset.hotkey})` : "");
   });
+  try { window.NetworkScheme && window.NetworkScheme.onLanguageChange(); } catch (e) {}
 }
 
 // ============================================================
@@ -5622,6 +5667,17 @@ function boardEditorPrefsFields() {
   } catch (e) {}
   return {};
 }
+// Схема сети (MURScheme в режиме «Схема сети» вкладки «Редактор») — так же
+// живёт в prefs.json и обязана попадать в каждый payload.
+function networkSchemePrefsFields() {
+  try {
+    if (window.NetworkScheme && typeof window.NetworkScheme.getPersistedState === "function") {
+      const s = window.NetworkScheme.getPersistedState();
+      return { networkSchemeProject: s.project || null, networkSchemeUi: s.ui || null };
+    }
+  } catch (e) {}
+  return {};
+}
 
 function buildPrefsPayload() {
   return JSON.stringify({
@@ -5642,6 +5698,7 @@ function buildPrefsPayload() {
     serverUrl: settings.serverUrl,
     serverList: settings.serverList || [],
     ...boardEditorPrefsFields(),
+    ...networkSchemePrefsFields(),
   });
 }
 // ============================================================
@@ -5808,6 +5865,7 @@ if (window.electronAPI && window.electronAPI.onChangelog) {
   try { initNotifSettings(); } catch (e) { console.warn("initNotifSettings failed (non-critical):", e); }
   try { renderInstructions(); } catch (e) { console.error("renderInstructions failed:", e); }
   try { window.BoardEditor && window.BoardEditor.init(); } catch (e) { console.error("BoardEditor.init failed:", e); }
+  try { window.NetworkScheme && window.NetworkScheme.init(); } catch (e) { console.error("NetworkScheme.init failed:", e); }
   try {
     document.getElementById("minIntervalValue").textContent = t("minIntervalValue", { m: state.minIntervalMin });
   } catch (e) {}
@@ -5930,6 +5988,7 @@ async function savePrefsToServer() {
         delayThresholdMin: settings.delayThresholdMin,
         betaUpdates: settings.betaUpdates,
         ...boardEditorPrefsFields(),
+        ...networkSchemePrefsFields(),
       }),
     });
   } catch (e) { console.warn("savePrefsToServer failed:", e.message); }
@@ -5962,6 +6021,14 @@ async function loadPrefsFromServer() {
           presets: Array.isArray(p.boardEditorPresets) ? p.boardEditorPresets : [],
           lastCanvas: p.boardEditorLastCanvas || null,
           ui: p.boardEditorUi || null,
+        });
+      }
+    } catch (e) {}
+    try {
+      if (window.NetworkScheme && typeof window.NetworkScheme.applyPersistedState === "function") {
+        window.NetworkScheme.applyPersistedState({
+          project: p.networkSchemeProject || null,
+          ui: p.networkSchemeUi || null,
         });
       }
     } catch (e) {}
