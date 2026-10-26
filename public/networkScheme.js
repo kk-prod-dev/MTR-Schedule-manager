@@ -430,20 +430,24 @@ const NetworkScheme = (function () {
   }
 
   // Сжатие пустот по одной оси: промежутки между соседними значениями
-  // длиннее maxGap сокращаются до maxGap (порядок сохраняется)
-  function compressAxis(vals, maxGap) {
-    const xs = [...new Set(vals)].sort((a, b) => a - b);
-    if (xs.length < 2) return (v) => v;
+  // длиннее maxGap сокращаются до maxGap (порядок сохраняется). Карта
+  // {xs, ys} хранится в mtrMeta.cmp: при повторном построении новые станции
+  // проходят то же преобразование, что и старые (иначе они слипаются).
+  function makeCmp(vals, maxGap) {
+    const xs = [...new Set(vals.map((v) => Math.round(v * 100) / 100))].sort((p, q) => p - q);
     const ys = [xs[0]];
     for (let i = 1; i < xs.length; i++) ys.push(ys[i - 1] + Math.min(xs[i] - xs[i - 1], maxGap));
-    return (v) => {
-      if (v <= xs[0]) return ys[0] + (v - xs[0]);
-      if (v >= xs[xs.length - 1]) return ys[ys.length - 1] + (v - xs[xs.length - 1]);
-      let lo = 0, hi = xs.length - 1;
-      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m; else hi = m; }
-      const t = (v - xs[lo]) / ((xs[hi] - xs[lo]) || 1);
-      return ys[lo] + (ys[hi] - ys[lo]) * t;
-    };
+    return { xs, ys };
+  }
+  function applyCmp(m, v) {
+    const { xs, ys } = m;
+    if (!xs || xs.length < 2) return v;
+    if (v <= xs[0]) return ys[0] + (v - xs[0]);
+    if (v >= xs[xs.length - 1]) return ys[ys.length - 1] + (v - xs[xs.length - 1]);
+    let lo = 0, hi = xs.length - 1;
+    while (hi - lo > 1) { const k = (lo + hi) >> 1; if (xs[k] <= v) lo = k; else hi = k; }
+    const u = (v - xs[lo]) / ((xs[hi] - xs[lo]) || 1);
+    return ys[lo] + (ys[hi] - ys[lo]) * u;
   }
 
   function buildFromMtr(data, types, prevIn, opts) {
@@ -458,7 +462,7 @@ const NetworkScheme = (function () {
     const prevStations = new Map(prev.stations.filter((s) => isMtr(s.id, P_ST)).map((s) => [s.mtrStationId, s]));
     const prevTransfers = new Map(prev.transfers.filter((t) => isMtr(t.id, P_TR)).map((t) => [t.id, t]));
     const hadMtr = prevLines.some((l) => isMtr(l.id, P_LINE));
-    const meta = prev.mtrMeta && prev.mtrMeta.grid === grid ? prev.mtrMeta : computeMeta(groups, stById, grid);
+    let meta = prev.mtrMeta && prev.mtrMeta.grid === grid ? prev.mtrMeta : computeMeta(groups, stById, grid);
 
     const lineIdOf = (g) => P_LINE + g.main.id;
     const stLines = new Map();
@@ -482,12 +486,20 @@ const NetworkScheme = (function () {
     // «сырые» позиции: существующие станции — на своих местах (закреплены)
     const raw = new Map();
     const world = (s) => ({ x: (s.x - meta.cx) * meta.scale, y: (s.z - meta.cz) * meta.scale });
-    let fx = (v) => v, fy = (v) => v;
-    if (opts.compress > 0) {
-      const all = [...stLines.keys()].map((id) => world(stById.get(id)));
-      fx = compressAxis(all.map((q) => q.x), opts.compress * grid);
-      fy = compressAxis(all.map((q) => q.y), opts.compress * grid);
+    // сжатие задаётся один раз — при первом построении; дальше действует
+    // сохранённая карта, чтобы старые и новые станции лежали в одной системе
+    if (!meta.cmp && !hadMtr && opts.compress > 0 && stLines.size > 1) {
+      // карта строится по ВСЕМ станциям сервера, а не по выбранным типам:
+      // иначе при добавлении типов позже её опорных точек не хватает и
+      // станции между ними слипаются
+      const used = new Set(data.routes.flatMap((r) => r.stationIds));
+      const all = [...used].filter((id) => stById.has(id)).map((id) => world(stById.get(id)));
+      meta = Object.assign({}, meta, {
+        cmp: { x: makeCmp(all.map((q) => q.x), opts.compress * grid), y: makeCmp(all.map((q) => q.y), opts.compress * grid) },
+      });
     }
+    const fx = (v) => (meta.cmp ? applyCmp(meta.cmp.x, v) : v);
+    const fy = (v) => (meta.cmp ? applyCmp(meta.cmp.y, v) : v);
     for (const id of stLines.keys()) {
       const w = world(stById.get(id));
       raw.set(id, pos.has(id) ? { ...pos.get(id) } : { x: fx(w.x), y: fy(w.y) });
@@ -606,6 +618,8 @@ const NetworkScheme = (function () {
         newStations: fresh.length,
         removedLines: prevLines.filter((l) => isMtr(l.id, P_LINE)).length - usedPrev.size,
         hadMtr,
+        // старая схема строилась без сохранённой карты сжатия — новые станции не сжимаем
+        compressSkipped: !!(hadMtr && !meta.cmp && opts.compress > 0),
       },
     };
   }
@@ -1973,7 +1987,7 @@ const NetworkScheme = (function () {
       sel = null; group = null;
       changed();
       if (!res.stats.hadMtr) fitView();
-      setStatus(tt(res.stats.hadMtr ? "schemeUpdated" : "schemeGenerated", res.stats));
+      setStatus(tt(res.stats.hadMtr ? "schemeUpdated" : "schemeGenerated", res.stats) + (res.stats.compressSkipped ? " " + tt("schemeCompressSkipped") : ""));
       if (ui.live) refreshLive();
     } catch (e) {
       console.error("NetworkScheme.generate failed:", e);

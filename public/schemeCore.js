@@ -166,6 +166,10 @@ const SchemeCore = (function () {
     };
     if (src.mtrMeta && typeof src.mtrMeta === "object") {
       p.mtrMeta = { scale: num(src.mtrMeta.scale, 1), cx: num(src.mtrMeta.cx, 0), cz: num(src.mtrMeta.cz, 0), grid: num(src.mtrMeta.grid, p.grid) };
+      const cm = src.mtrMeta.cmp;
+      const axis = (a) => (a && Array.isArray(a.xs) && Array.isArray(a.ys) && a.xs.length === a.ys.length && a.xs.length >= 2 && a.xs.length <= 5000
+        ? { xs: a.xs.map((v) => num(v, 0)), ys: a.ys.map((v) => num(v, 0)) } : null);
+      if (cm && axis(cm.x) && axis(cm.y)) p.mtrMeta.cmp = { x: axis(cm.x), y: axis(cm.y) };
     }
     return p;
   }
@@ -720,7 +724,7 @@ const SchemeCore = (function () {
       let best = null;
       for (let i = 0; i < cands.length; i++) {
         const lay = labelLayout(p, e.st, e.geo, e.reach, cands[i][0], cands[i][1]);
-        const cst = cost(e, lay.box) + i * 3 + (cands[i][1] ? 8 : 0);
+        const cst = cost(e, lay.box) + i * 3 + (cands[i][1] ? 400 : 0);
         if (!best || cst < best.cst) best = { cst, lay };
         if (cst === 0) break;
       }
