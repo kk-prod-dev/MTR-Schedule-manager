@@ -62,20 +62,33 @@
 
   var svg = document.getElementById("map");
   var world = document.getElementById("world");
-  var project;
-  try {
-    var m = /[#&]m=([^&]+)/.exec(location.hash);
-    if (!m) throw new Error("no data");
-    var json = LZString.decompressFromEncodedURIComponent(m[1]);
-    if (!json) throw new Error("decompress failed");
-    project = SchemeCore.fromPublished(JSON.parse(json));
-  } catch (e) {
+  function fail() {
     var err = document.getElementById("error");
     err.textContent = T.bad;
     err.style.display = "flex";
     document.getElementById("title").textContent = T.untitled;
-    return;
   }
+  // #m=… — схема целиком в адресе; #b=<id> — «живая» запись в JSON-хранилище
+  // (jsonblob.com): автор обновляет её, ссылка остаётся той же
+  var project, live = null;
+  var hm = /[#&]m=([^&]+)/.exec(location.hash);
+  var hb = /[#&]b=([A-Za-z0-9-]{8,64})(?:&|$)/.exec(location.hash);
+  if (hm) {
+    try {
+      var json = LZString.decompressFromEncodedURIComponent(hm[1]);
+      if (!json) throw new Error("decompress failed");
+      project = SchemeCore.fromPublished(JSON.parse(json));
+    } catch (e) { fail(); return; }
+    start();
+  } else if (hb) {
+    document.getElementById("title").textContent = "…";
+    fetch("https://jsonblob.com/api/jsonBlob/" + hb[1], { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (data) { project = SchemeCore.fromPublished(data); start(); })
+      .catch(fail);
+  } else { fail(); }
+
+  function start() {
 
   var title = project.title || project.legend.title || T.untitled;
   document.getElementById("title").textContent = title;
@@ -155,6 +168,7 @@
   }
   svg.addEventListener("pointerup", up);
   svg.addEventListener("pointercancel", up);
+  }
 })();
 </script>
 </body>

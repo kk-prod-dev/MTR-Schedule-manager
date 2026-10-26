@@ -946,6 +946,23 @@ const BoardEditor = (function () {
     reader.readAsDataURL(file);
   }
 
+  // Вставка готовой картинки (схема сети из соседнего режима «Редактора»):
+  // по центру листа, вписывается в него с полями. Возвращает false, если
+  // холст ещё не создан.
+  function insertImageDataUrl(url) {
+    if (!canvas) return false;
+    fabric.Image.fromURL(url, (img) => {
+      const maxW = pageW - PAGE_MARGIN * 2, maxH = pageH - PAGE_MARGIN * 2;
+      img.scale(Math.min(maxW / img.width, maxH / img.height, 1));
+      img.set({ left: (pageW - img.getScaledWidth()) / 2, top: (pageH - img.getScaledHeight()) / 2 });
+      canvas.add(img);
+      canvas.setActiveObject(img);
+      canvas.requestRenderAll();
+      requestHistoryPush();
+    });
+    return true;
+  }
+
   // Собирает все текстовые объекты выделения, включая вложенные в группы
   // (столбцы расписания, прямоугольники с текстом) — чтобы шрифт/жирность/
   // выравнивание применялись и к ним, а не только к «голому» тексту.
@@ -2433,7 +2450,7 @@ const BoardEditor = (function () {
     };
   }
 
-  return { init, applyPersistedState, getPersistedState };
+  return { init, applyPersistedState, getPersistedState, insertImageDataUrl };
 })();
 
 window.BoardEditor = BoardEditor;

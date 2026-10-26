@@ -41,7 +41,7 @@ const NetworkScheme = (function () {
   const C = () => window.SchemeCore;
   let project = null;
   // alignTol — допуск выравнивания перегонов при построении, градусы (0 = выкл)
-  let ui = { mode: "timetable", types: null, live: false, alignTol: 15 };
+  let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, viewerBase: "" };
   let schemeData = null;
   let initialized = false;
   const el = {};
@@ -56,6 +56,11 @@ const NetworkScheme = (function () {
   let undoStack = [], redoStack = [];
   let saveTimer = null;
   let liveData = null, liveTimer = null;
+  let schemes = [];          // [{ id, name, project, types, publish }] — несколько схем
+  let activeId = null;
+  let group = null;          // { stations:Set, nodes:Set<ключ позиции>, shapes:Set } — выделение рамкой
+  let styleClip = null;      // скопированный стиль { kind, props }
+  let marquee = null;        // { x0, y0, x1, y1, add }
 
   function tt(key, vars) { return typeof t === "function" ? t(key, vars) : key; }
   const isMtr = (id, p) => typeof id === "string" && id.startsWith(p);
@@ -287,7 +292,7 @@ const NetworkScheme = (function () {
   function assignLanes(lines, pos) {
     const hops = new Map(); // hopKey -> { a, b, entries: [{ line, seq, idx }] }
     lines.forEach((line, order) => {
-      const ids = line.mtrStationIds.filter((id, i, arr) => i === 0 || id !== arr[i - 1]);
+      const ids = (line._fullIds || line.mtrStationIds).filter((id, i, arr) => i === 0 || id !== arr[i - 1]);
       line._hopLanes = [];
       for (let i = 0; i + 1 < ids.length; i++) {
         const a = ids[i], b = ids[i + 1];
@@ -368,7 +373,7 @@ const NetworkScheme = (function () {
     }
     // полосы перегонов → полосы отрезков полилинии (между станциями бывают изломы)
     for (const line of lines) {
-      const ids = line.mtrStationIds.filter((id, i, arr) => i === 0 || id !== arr[i - 1]);
+      const ids = (line._fullIds || line.mtrStationIds).filter((id, i, arr) => i === 0 || id !== arr[i - 1]);
       const lanes = [];
       let h = 0;
       for (let i = 0; i + 1 < line.points.length; i++) {
@@ -378,7 +383,60 @@ const NetworkScheme = (function () {
       }
       line.lanes = lanes;
       delete line._hopLanes;
+      delete line._fullIds;
     }
+  }
+
+  /**
+   * Экспресс-линии: если участок линии A→C пропускает станции, по которым
+   * проходит другая линия (A…B…C подряд), экспресс рисуется по её трассе и
+   * идёт в пучке рядом с остальными, а B помечается как «проходит без
+   * остановки». g.fullIds — путь со всеми проходимыми станциями, g.pass —
+   * только пропущенные.
+   */
+  function expandExpress(groups, stById) {
+    for (const g of groups) {
+      const ids = g.main.stationIds.filter((s) => stById.has(s));
+      const stops = new Set(ids);
+      const full = [], pass = new Set();
+      ids.forEach((c, i) => {
+        if (!i) { full.push(c); return; }
+        const a = ids[i - 1];
+        let best = null;
+        for (const h of groups) {
+          if (h === g) continue;
+          const hid = h.main.stationIds;
+          const ia = hid.indexOf(a), ic = hid.indexOf(c);
+          if (ia < 0 || ic < 0 || Math.abs(ic - ia) < 2 || Math.abs(ic - ia) > 14) continue;
+          const seg = ia < ic ? hid.slice(ia, ic + 1) : hid.slice(ic, ia + 1).reverse();
+          if (!seg.every((x) => stById.has(x))) continue;
+          if (!best || seg.length < best.length) best = seg;
+        }
+        if (best) {
+          best.slice(1, -1).forEach((x) => { if (!stops.has(x)) pass.add(x); });
+          full.push(...best.slice(1));
+        } else full.push(c);
+      });
+      g.fullIds = full.filter((x, i, arr) => i === 0 || x !== arr[i - 1]);
+      g.pass = [...pass];
+    }
+  }
+
+  // Сжатие пустот по одной оси: промежутки между соседними значениями
+  // длиннее maxGap сокращаются до maxGap (порядок сохраняется)
+  function compressAxis(vals, maxGap) {
+    const xs = [...new Set(vals)].sort((a, b) => a - b);
+    if (xs.length < 2) return (v) => v;
+    const ys = [xs[0]];
+    for (let i = 1; i < xs.length; i++) ys.push(ys[i - 1] + Math.min(xs[i] - xs[i - 1], maxGap));
+    return (v) => {
+      if (v <= xs[0]) return ys[0] + (v - xs[0]);
+      if (v >= xs[xs.length - 1]) return ys[ys.length - 1] + (v - xs[xs.length - 1]);
+      let lo = 0, hi = xs.length - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (xs[m] <= v) lo = m; else hi = m; }
+      const t = (v - xs[lo]) / ((xs[hi] - xs[lo]) || 1);
+      return ys[lo] + (ys[hi] - ys[lo]) * t;
+    };
   }
 
   function buildFromMtr(data, types, prevIn, opts) {
@@ -387,6 +445,7 @@ const NetworkScheme = (function () {
     const grid = prev.grid;
     const stById = new Map(data.stations.map((s) => [s.id, s]));
     const groups = groupRoutes(data.routes, types);
+    expandExpress(groups, stById);
 
     const prevLines = prev.lines;
     const prevStations = new Map(prev.stations.filter((s) => isMtr(s.id, P_ST)).map((s) => [s.mtrStationId, s]));
@@ -415,13 +474,20 @@ const NetworkScheme = (function () {
       .sort((a, b) => stLines.get(b).size - stLines.get(a).size);
     // «сырые» позиции: существующие станции — на своих местах (закреплены)
     const raw = new Map();
+    const world = (s) => ({ x: (s.x - meta.cx) * meta.scale, y: (s.z - meta.cz) * meta.scale });
+    let fx = (v) => v, fy = (v) => v;
+    if (opts.compress > 0) {
+      const all = [...stLines.keys()].map((id) => world(stById.get(id)));
+      fx = compressAxis(all.map((q) => q.x), opts.compress * grid);
+      fy = compressAxis(all.map((q) => q.y), opts.compress * grid);
+    }
     for (const id of stLines.keys()) {
-      const s = stById.get(id);
-      raw.set(id, pos.has(id) ? { ...pos.get(id) } : { x: (s.x - meta.cx) * meta.scale, y: (s.z - meta.cz) * meta.scale });
+      const w = world(stById.get(id));
+      raw.set(id, pos.has(id) ? { ...pos.get(id) } : { x: fx(w.x), y: fy(w.y) });
     }
     const hopSeen = new Set(), allHops = [];
     for (const g of groups) {
-      for (const [a, b] of hopsOf(g.main.stationIds.filter((s) => stById.has(s)))) {
+      for (const [a, b] of hopsOf(g.fullIds)) {
         const k = hopKey(a, b);
         if (!hopSeen.has(k)) { hopSeen.add(k); allHops.push([a, b]); }
       }
@@ -445,11 +511,13 @@ const NetworkScheme = (function () {
       const ids = g.main.stationIds.filter((s) => stById.has(s));
       const nm = splitName(g.main.name);
       const sameRoute = old && JSON.stringify(old.mtrStationIds) === JSON.stringify(ids)
-        && !ids.some((s) => freshSet.has(s)) && old.points.length >= 2;
+        && JSON.stringify(old.mtrPassIds || []) === JSON.stringify(g.pass)
+        && !g.fullIds.some((s) => freshSet.has(s)) && old.points.length >= 2;
       const line = Object.assign(
         { name: nm.name, number: g.main.number || "", color: g.main.color, width: null, dash: /_bus$/.test(g.main.type) ? "dashed" : "solid", offset: 0 },
         old || {},
-        { id, mtrRouteIds: g.routeIds, mtrStationIds: ids, mtrType: g.main.type, points: sameRoute ? old.points : buildPath(ids, pos, occ, elbows) });
+        { id, mtrRouteIds: g.routeIds, mtrStationIds: ids, mtrPassIds: g.pass, mtrType: g.main.type, points: sameRoute ? old.points : buildPath(g.fullIds, pos, occ, elbows) });
+      line._fullIds = g.fullIds;
       // проекты до полос по перегонам хранили авто-сдвиг в offset — сбрасываем
       if (old && !old.lanes) line.offset = 0;
       return line;
@@ -458,6 +526,11 @@ const NetworkScheme = (function () {
     const lineIds = new Set(lines.map((l) => l.id));
     const userLines = prevLines.filter((l) => !isMtr(l.id, P_LINE));
 
+    const passMap = new Map();
+    for (const g of groups) for (const sid of g.pass) {
+      if (!passMap.has(sid)) passMap.set(sid, []);
+      passMap.get(sid).push(lineIdOf(g));
+    }
     const stations = [];
     for (const [id, lset] of stLines) {
       const s = stById.get(id);
@@ -466,7 +539,7 @@ const NetworkScheme = (function () {
       const myLines = [...lset];
       if (old) {
         const keepUser = old.lineIds.filter((l) => !isMtr(l, P_LINE));
-        const st = Object.assign({}, old, { lineIds: [...myLines, ...keepUser], mtrName: s.name });
+        const st = Object.assign({}, old, { lineIds: [...myLines, ...keepUser], passLineIds: passMap.get(id) || [], mtrName: s.name });
         // переименование в MTR доходит до схемы, если имя не правили вручную
         const oldNm = splitName(old.mtrName);
         if (old.name === oldNm.name) st.name = nm.name;
@@ -476,10 +549,11 @@ const NetworkScheme = (function () {
         const p = pos.get(id);
         stations.push({
           id: P_ST + id, mtrStationId: id, mtrName: s.name, name: nm.name, sub: nm.sub,
-          x: p.x, y: p.y, style: "auto", label: { pos: "auto", angle: 0 }, lineIds: myLines,
+          x: p.x, y: p.y, style: "auto", label: { pos: "auto", angle: 0 }, lineIds: myLines, passLineIds: passMap.get(id) || [],
         });
       }
     }
+    stations.forEach((st) => { st.passLineIds = (st.passLineIds || []).filter((l) => lineIds.has(l)); });
     const userStations = prev.stations.filter((s) => !isMtr(s.id, P_ST))
       .map((s) => Object.assign({}, s, { lineIds: s.lineIds.filter((l) => !isMtr(l, P_LINE) || lineIds.has(l)) }));
 
@@ -541,14 +615,14 @@ const NetworkScheme = (function () {
     if (!undoStack.length) return;
     redoStack.push(JSON.stringify(project));
     project = C().normalize(JSON.parse(undoStack.pop()));
-    sel = null;
+    sel = null; group = null;
     changed();
   }
   function redo() {
     if (!redoStack.length) return;
     undoStack.push(JSON.stringify(project));
     project = C().normalize(JSON.parse(redoStack.pop()));
-    sel = null;
+    sel = null; group = null;
     changed();
   }
   function changed() {
@@ -591,14 +665,57 @@ const NetworkScheme = (function () {
     renderOverlay();
   }
 
+  // ------------------------------------------------------------
+  // Overlay: выделение, точки правки, фигуры
+  // ------------------------------------------------------------
+  function rotPt(p, c, deg) {
+    const a = (deg * Math.PI) / 180, ca = Math.cos(a), sa = Math.sin(a);
+    const dx = p.x - c.x, dy = p.y - c.y;
+    return { x: c.x + dx * ca - dy * sa, y: c.y + dx * sa + dy * ca };
+  }
+
+  const SHAPE_TOOLS = { rect: "rect", ellipse: "ellipse", shapeline: "line", text: "text" };
+
+  // Рамка, ручки изменения размера и ручка поворота выбранной фигуры
+  function drawShapeHandles(g, sh) {
+    const mk = C().el;
+    const z = project.view.zoom;
+    const s = 8 / z;
+    const b = C().shapeBox(sh);
+    const c = { x: b.x + b.w / 2, y: b.y + b.h / 2 };
+    const rot = sh.type === "line" ? 0 : sh.rot;
+    if (sh.type === "line") {
+      [["p1", sh.x, sh.y], ["p2", sh.x + sh.w, sh.y + sh.h]].forEach(([hn, x, y]) => {
+        mk("rect", { x: x - s / 2, y: y - s / 2, width: s, height: s, rx: 1.5 / z, class: "sc-handle mine", "data-kind": "shandle", "data-h": hn, "stroke-width": 1.5 / z }, g);
+      });
+      return;
+    }
+    const corners = [[b.x, b.y], [b.x + b.w, b.y], [b.x + b.w, b.y + b.h], [b.x, b.y + b.h]].map(([x, y]) => rotPt({ x, y }, c, rot));
+    mk("polygon", { points: corners.map((q) => `${q.x},${q.y}`).join(" "), class: "sc-shape-box", "stroke-width": 1.5 / z }, g);
+    if (sh.type === "text") return;
+    const pts = {
+      nw: [b.x, b.y], n: [c.x, b.y], ne: [b.x + b.w, b.y], e: [b.x + b.w, c.y],
+      se: [b.x + b.w, b.y + b.h], s: [c.x, b.y + b.h], sw: [b.x, b.y + b.h], w: [b.x, c.y],
+    };
+    for (const hn of Object.keys(pts)) {
+      const q = rotPt({ x: pts[hn][0], y: pts[hn][1] }, c, rot);
+      mk("rect", { x: q.x - s / 2, y: q.y - s / 2, width: s, height: s, rx: 1.5 / z, class: "sc-handle mine", "data-kind": "shandle", "data-h": hn, "stroke-width": 1.5 / z }, g);
+    }
+    const top = rotPt({ x: c.x, y: b.y }, c, rot);
+    const knob = rotPt({ x: c.x, y: b.y - 24 / z }, c, rot);
+    mk("line", { x1: top.x, y1: top.y, x2: knob.x, y2: knob.y, class: "sc-shape-box", "stroke-width": 1.5 / z }, g);
+    mk("circle", { cx: knob.x, cy: knob.y, r: s * 0.65, class: "sc-handle mine", "data-kind": "shandle", "data-h": "rot", "stroke-width": 1.5 / z }, g);
+  }
+
   function renderOverlay() {
     const g = el.overlay;
     while (g.firstChild) g.removeChild(g.firstChild);
     const mk = C().el;
     const z = project.view.zoom;
+    const ringR = project.style.lineWidth * 2.2;
     if (sel && sel.kind === "station") {
       const st = project.stations.find((s) => s.id === sel.id);
-      if (st) mk("circle", { cx: st.x, cy: st.y, r: project.style.lineWidth * 2.2, class: "sc-sel-ring" }, g);
+      if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring" }, g);
     }
     // Точки редактирования на каждом угле линий. Угол пучка — общая вершина
     // нескольких линий, одна точка двигает их все (moveNode). Вершины в
@@ -628,7 +745,7 @@ const NetworkScheme = (function () {
         }
       }
       for (const n of nodes.values()) {
-        const active = sel && sel.kind === "node" && sel.x === n.x && sel.y === n.y;
+        const active = (sel && sel.kind === "node" && sel.x === n.x && sel.y === n.y) || (group && group.nodes.has(pkey(n)));
         mk("rect", {
           x: n.x - s / 2, y: n.y - s / 2, width: s, height: s, rx: 1.5 / z,
           class: "sc-handle" + (active ? " active" : ""),
@@ -636,22 +753,45 @@ const NetworkScheme = (function () {
         }, g);
       }
     }
+    if (group) {
+      group.stations.forEach((id) => {
+        const st = project.stations.find((x) => x.id === id);
+        if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring" }, g);
+      });
+      group.shapes.forEach((id) => {
+        const sh = project.shapes.find((x) => x.id === id);
+        if (!sh) return;
+        const b = C().shapeBox(sh);
+        mk("rect", { x: b.x, y: b.y, width: b.w, height: b.h, class: "sc-shape-box", "stroke-width": 1.5 / z }, g);
+      });
+    }
+    if (sel && sel.kind === "shape") {
+      const sh = project.shapes.find((x) => x.id === sel.id);
+      if (sh && tool === "select") drawShapeHandles(g, sh);
+    }
     if (sel && sel.kind === "transfer") {
       const tr = project.transfers.find((x) => x.id === sel.id);
       if (tr) tr.stationIds.forEach((id) => {
-        const st = project.stations.find((s) => s.id === id);
-        if (st) mk("circle", { cx: st.x, cy: st.y, r: project.style.lineWidth * 2.2, class: "sc-sel-ring" }, g);
+        const st = project.stations.find((x) => x.id === id);
+        if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring" }, g);
       });
     }
     if (transferFirst) {
-      const st = project.stations.find((s) => s.id === transferFirst);
-      if (st) mk("circle", { cx: st.x, cy: st.y, r: project.style.lineWidth * 2.2, class: "sc-sel-ring pending" }, g);
+      const st = project.stations.find((x) => x.id === transferFirst);
+      if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring pending" }, g);
     }
     if (drawing && drawing.points.length) {
       const pts = hoverPt ? [...drawing.points, hoverPt] : drawing.points;
       mk("polyline", {
         points: pts.map((p) => `${p.x},${p.y}`).join(" "), class: "sc-draw-preview",
         "stroke-width": project.style.lineWidth, stroke: drawing.color,
+      }, g);
+    }
+    if (marquee) {
+      mk("rect", {
+        x: Math.min(marquee.x0, marquee.x1), y: Math.min(marquee.y0, marquee.y1),
+        width: Math.abs(marquee.x1 - marquee.x0), height: Math.abs(marquee.y1 - marquee.y0),
+        class: "sc-marquee", "stroke-width": 1 / z,
       }, g);
     }
     if (hoverPt && (tool === "line" || tool === "station")) {
@@ -672,7 +812,7 @@ const NetworkScheme = (function () {
     if (!node) return null;
     return {
       kind: node.getAttribute("data-kind"), id: node.getAttribute("data-id"), idx: Number(node.getAttribute("data-idx")),
-      x: Number(node.getAttribute("data-x")), y: Number(node.getAttribute("data-y")),
+      x: Number(node.getAttribute("data-x")), y: Number(node.getAttribute("data-y")), h: node.getAttribute("data-h"),
     };
   }
   const stationAt = (p, tol) => project.stations.find((s) => Math.hypot(s.x - p.x, s.y - p.y) <= tol);
@@ -696,8 +836,14 @@ const NetworkScheme = (function () {
   // ------------------------------------------------------------
   // Мышь
   // ------------------------------------------------------------
+  let spaceDown = false;
+
+  function clearSelection() { sel = null; group = null; }
+
   function onMouseDown(e) {
-    if (e.button === 1 || (e.button === 0 && e.shiftKey && tool === "select" && !hitOf(e))) {
+    // сдвиг: средняя/правая кнопка или пробел
+    if (e.button === 1 || e.button === 2 || (e.button === 0 && spaceDown)) {
+      e.preventDefault();
       startPan(e);
       return;
     }
@@ -722,9 +868,28 @@ const NetworkScheme = (function () {
       changed();
       return;
     }
+    if (SHAPE_TOOLS[tool]) { startShapeCreate(w); return; }
 
     // select
-    if (!hit) { sel = null; renderOverlay(); renderProps(); startPan(e); return; }
+    if (hit && hit.kind === "shandle") { startShapeHandle(hit); return; }
+    if (!hit) {
+      // пустое место: рамка выделения (Shift — добавить к выделенному)
+      if (!e.shiftKey) clearSelection();
+      marquee = { x0: w.x, y0: w.y, x1: w.x, y1: w.y, add: e.shiftKey };
+      drag = { type: "marquee" };
+      renderOverlay();
+      renderProps();
+      return;
+    }
+    if (e.shiftKey && (hit.kind === "station" || hit.kind === "shape")) {
+      toggleInGroup(hit.kind, hit.id);
+      return;
+    }
+    if (group && ((hit.kind === "station" && group.stations.has(hit.id)) || (hit.kind === "shape" && group.shapes.has(hit.id)))) {
+      startGroupDrag(e);
+      return;
+    }
+    group = null;
     if (hit.kind === "node") {
       sel = { kind: "node", x: hit.x, y: hit.y };
       startDrag(e, "node");
@@ -744,11 +909,196 @@ const NetworkScheme = (function () {
     renderProps();
     if (hit.kind === "station") startDrag(e, "station", hit.id);
     else if (hit.kind === "legend") startDrag(e, "legend", "legend");
+    else if (hit.kind === "shape") startDrag(e, "shape", hit.id);
   }
 
   function startPan(e) {
     drag = { type: "pan", sx: e.clientX, sy: e.clientY, vx: project.view.x, vy: project.view.y };
     el.svg.classList.add("panning");
+  }
+
+  // ---- Группа (выделение рамкой / Shift+клик) ----
+  function groupSize(g) { return g ? g.stations.size + g.nodes.size + g.shapes.size : 0; }
+
+  function toggleInGroup(kind, id) {
+    if (!group) {
+      group = { stations: new Set(), nodes: new Set(), shapes: new Set() };
+      if (sel && sel.kind === "station") group.stations.add(sel.id);
+      else if (sel && sel.kind === "shape") group.shapes.add(sel.id);
+    }
+    const set = kind === "station" ? group.stations : group.shapes;
+    if (set.has(id)) set.delete(id); else set.add(id);
+    sel = groupSize(group) ? { kind: "group" } : null;
+    if (!groupSize(group)) group = null;
+    renderOverlay();
+    renderProps();
+  }
+
+  function finishMarquee() {
+    const m = marquee;
+    marquee = null;
+    const x0 = Math.min(m.x0, m.x1), x1 = Math.max(m.x0, m.x1), y0 = Math.min(m.y0, m.y1), y1 = Math.max(m.y0, m.y1);
+    if ((x1 - x0) * project.view.zoom < 4 && (y1 - y0) * project.view.zoom < 4) {
+      renderOverlay();
+      renderProps();
+      return;
+    }
+    const g = { stations: new Set(), nodes: new Set(), shapes: new Set() };
+    if (m.add) {
+      if (group) { group.stations.forEach((i) => g.stations.add(i)); group.nodes.forEach((i) => g.nodes.add(i)); group.shapes.forEach((i) => g.shapes.add(i)); }
+      else if (sel && sel.kind === "station") g.stations.add(sel.id);
+      else if (sel && sel.kind === "shape") g.shapes.add(sel.id);
+    }
+    const inside = (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    const stKeys = new Set();
+    for (const st of project.stations) { stKeys.add(pkey(st)); if (inside(st.x, st.y)) g.stations.add(st.id); }
+    for (const l of project.lines) for (const q of l.points) if (!stKeys.has(pkey(q)) && inside(q.x, q.y)) g.nodes.add(pkey(q));
+    for (const sh of project.shapes) {
+      const b = C().shapeBox(sh);
+      if (inside(b.x + b.w / 2, b.y + b.h / 2)) g.shapes.add(sh.id);
+    }
+    if (g.stations.size === 1 && !g.nodes.size && !g.shapes.size) { sel = { kind: "station", id: [...g.stations][0] }; group = null; }
+    else if (g.shapes.size === 1 && !g.nodes.size && !g.stations.size) { sel = { kind: "shape", id: [...g.shapes][0] }; group = null; }
+    else if (groupSize(g)) { group = g; sel = { kind: "group" }; }
+    else { group = null; sel = null; }
+    renderOverlay();
+    renderProps();
+  }
+
+  function startGroupDrag(e) {
+    drag = {
+      type: "group", start: toWorld(e), snapshot: JSON.stringify(project), moved: false, dx: 0, dy: 0,
+      stations: new Set(group.stations), nodes: new Set(group.nodes), shapes: new Set(group.shapes),
+    };
+  }
+
+  // Сдвиг группы от исходного состояния (снимок) на (dx, dy)
+  function applyGroupMove(d, dx, dy) {
+    project = C().normalize(JSON.parse(d.snapshot));
+    const moves = new Map(); // ключ позиции → множество линий (null = все)
+    for (const id of d.stations) {
+      const st = project.stations.find((x) => x.id === id);
+      if (!st) continue;
+      moves.set(pkey(st), new Set([...st.lineIds, ...(st.passLineIds || [])]));
+    }
+    for (const k of d.nodes) moves.set(k, null);
+    for (const l of project.lines) {
+      const idx = [];
+      l.points.forEach((q, i) => {
+        const ls = moves.get(pkey(q));
+        if (ls === undefined) return;
+        if (ls === null || ls.has(l.id)) idx.push(i);
+      });
+      idx.forEach((i) => { l.points[i] = { x: l.points[i].x + dx, y: l.points[i].y + dy }; });
+    }
+    for (const id of d.stations) {
+      const st = project.stations.find((x) => x.id === id);
+      if (st) { st.x += dx; st.y += dy; }
+    }
+    for (const id of d.shapes) {
+      const sh = project.shapes.find((x) => x.id === id);
+      if (sh) { sh.x += dx; sh.y += dy; }
+    }
+    group.nodes = new Set([...d.nodes].map((k) => { const [x, y] = k.split(",").map(Number); return pkey({ x: x + dx, y: y + dy }); }));
+  }
+
+  // ---- Фигуры ----
+  function defaultShape(type, x, y) {
+    const base = { id: "sh-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type, x, y };
+    if (type === "rect" || type === "ellipse") return C().normalizeShape(Object.assign(base, { w: 2, h: 2, fill: "#dbeafe", stroke: "#2563eb", strokeW: 2 }));
+    if (type === "line") return C().normalizeShape(Object.assign(base, { w: 0, h: 0, stroke: "#111827", strokeW: 3, fill: "none" }));
+    return C().normalizeShape(Object.assign(base, { text: tt("schemeNewText"), fill: "#111827", stroke: "none", fontSize: 18 }));
+  }
+
+  function startShapeCreate(w) {
+    const type = SHAPE_TOOLS[tool];
+    const snapshot = JSON.stringify(project);
+    const sh = defaultShape(type, Math.round(w.x), Math.round(w.y));
+    undoStack.push(snapshot);
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    redoStack = [];
+    project.shapes.push(sh);
+    clearSelection();
+    sel = { kind: "shape", id: sh.id };
+    if (type === "text") {
+      setTool("select");
+      changed();
+      askText(tt("schemeAskText"), sh.text, (v) => { sh.text = v; changed(); }, true);
+      return;
+    }
+    drag = { type: "shapeCreate", id: sh.id, start: { x: sh.x, y: sh.y }, moved: false };
+    render();
+  }
+
+  function updateShapeCreate(d, w, e) {
+    const sh = project.shapes.find((x) => x.id === d.id);
+    if (!sh) return;
+    let dx = w.x - d.start.x, dy = w.y - d.start.y;
+    if (sh.type === "line") {
+      if (e.shiftKey) {
+        const ang = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4), l = Math.hypot(dx, dy);
+        dx = Math.cos(ang) * l; dy = Math.sin(ang) * l;
+      }
+      sh.w = Math.round(dx); sh.h = Math.round(dy);
+    } else {
+      if (e.shiftKey) { const m = Math.max(Math.abs(dx), Math.abs(dy)); dx = Math.sign(dx || 1) * m; dy = Math.sign(dy || 1) * m; }
+      sh.x = Math.round(Math.min(d.start.x, d.start.x + dx));
+      sh.y = Math.round(Math.min(d.start.y, d.start.y + dy));
+      sh.w = Math.max(2, Math.round(Math.abs(dx)));
+      sh.h = Math.max(2, Math.round(Math.abs(dy)));
+    }
+    d.moved = true;
+    render();
+  }
+
+  function finishShapeCreate(d) {
+    const sh = project.shapes.find((x) => x.id === d.id);
+    if (sh) {
+      const tiny = sh.type === "line" ? Math.hypot(sh.w, sh.h) < 6 : sh.w < 6 && sh.h < 6;
+      if (tiny) {
+        if (sh.type === "line") { sh.w = 120; sh.h = 0; } else { sh.w = 140; sh.h = 80; }
+      }
+    }
+    setTool("select");
+    changed();
+  }
+
+  function startShapeHandle(hit) {
+    const sh = project.shapes.find((x) => x.id === (sel && sel.id));
+    if (!sh) return;
+    drag = {
+      type: "shapeHandle", id: sh.id, h: hit.h, snapshot: JSON.stringify(project), moved: false,
+      box0: { x: sh.x, y: sh.y, w: sh.w, h: sh.h }, rot: sh.rot,
+    };
+  }
+
+  function applyShapeHandle(d, w, e) {
+    const sh = project.shapes.find((x) => x.id === d.id);
+    if (!sh) return;
+    const b0 = d.box0;
+    if (sh.type === "line") {
+      if (d.h === "p1") { const ex = b0.x + b0.w, ey = b0.y + b0.h; sh.x = Math.round(w.x); sh.y = Math.round(w.y); sh.w = ex - sh.x; sh.h = ey - sh.y; }
+      else { sh.w = Math.round(w.x) - b0.x; sh.h = Math.round(w.y) - b0.y; }
+      return;
+    }
+    const c0 = { x: b0.x + b0.w / 2, y: b0.y + b0.h / 2 };
+    if (d.h === "rot") {
+      let a = (Math.atan2(w.y - c0.y, w.x - c0.x) * 180) / Math.PI + 90;
+      if (e.shiftKey) a = Math.round(a / 15) * 15;
+      sh.rot = Math.round(((a + 540) % 360) - 180);
+      return;
+    }
+    const q = rotPt(w, c0, -d.rot);
+    let x1 = b0.x, y1 = b0.y, x2 = b0.x + b0.w, y2 = b0.y + b0.h;
+    if (d.h.includes("w")) x1 = Math.min(q.x, x2 - 4);
+    if (d.h.includes("e")) x2 = Math.max(q.x, x1 + 4);
+    if (d.h.includes("n")) y1 = Math.min(q.y, y2 - 4);
+    if (d.h.includes("s")) y2 = Math.max(q.y, y1 + 4);
+    const nc = rotPt({ x: (x1 + x2) / 2, y: (y1 + y2) / 2 }, c0, d.rot);
+    sh.w = Math.round(x2 - x1);
+    sh.h = Math.round(y2 - y1);
+    sh.x = Math.round(nc.x - sh.w / 2);
+    sh.y = Math.round(nc.y - sh.h / 2);
   }
 
   // Станция, лежащая на отрезке своей линии (а не в вершине), встраивается
@@ -781,6 +1131,7 @@ const NetworkScheme = (function () {
     if (type === "station") { const s = project.stations.find((x) => x.id === id); orig = { x: s.x, y: s.y }; }
     else if (type === "node") orig = { x: sel.x, y: sel.y };
     else if (type === "vertex") { const q = project.lines.find((l) => l.id === id).points[sel.vidx]; orig = { x: q.x, y: q.y }; }
+    else if (type === "shape") { const s = project.shapes.find((x) => x.id === id); orig = { x: s.x, y: s.y }; }
     else orig = { x: project.legend.x, y: project.legend.y };
     drag = { type, id, start: w, orig, last: orig, snapshot: JSON.stringify(project), moved: false };
   }
@@ -792,6 +1143,13 @@ const NetworkScheme = (function () {
     }
   }
 
+  function pushDragHistory(d) {
+    undoStack.push(d.snapshot);
+    if (undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    redoStack = [];
+    d.moved = true;
+  }
+
   function onMouseMove(e) {
     if (drag && drag.type === "pan") {
       project.view.x = drag.vx + (e.clientX - drag.sx);
@@ -801,18 +1159,37 @@ const NetworkScheme = (function () {
     }
     const w = toWorld(e);
     if (drag) {
+      if (drag.type === "marquee") { marquee.x1 = w.x; marquee.y1 = w.y; renderOverlay(); return; }
+      if (drag.type === "shapeCreate") { updateShapeCreate(drag, w, e); return; }
+      if (drag.type === "shapeHandle") {
+        if (!drag.moved) pushDragHistory(drag);
+        applyShapeHandle(drag, w, e);
+        render();
+        return;
+      }
+      if (drag.type === "group") {
+        const onlyShapes = !drag.stations.size && !drag.nodes.size;
+        const step = onlyShapes ? 1 : project.grid;
+        const dx = Math.round((w.x - drag.start.x) / step) * step, dy = Math.round((w.y - drag.start.y) / step) * step;
+        if (dx === drag.dx && dy === drag.dy) return;
+        if (!drag.moved) pushDragHistory(drag);
+        drag.dx = dx; drag.dy = dy;
+        applyGroupMove(drag, dx, dy);
+        render();
+        return;
+      }
       const raw = { x: drag.orig.x + (w.x - drag.start.x), y: drag.orig.y + (w.y - drag.start.y) };
-      const np = drag.type === "legend" ? { x: Math.round(raw.x), y: Math.round(raw.y) } : { x: snap(raw.x), y: snap(raw.y) };
+      const free = drag.type === "legend" || drag.type === "shape";
+      const np = free ? { x: Math.round(raw.x), y: Math.round(raw.y) } : { x: snap(raw.x), y: snap(raw.y) };
       if (np.x === drag.last.x && np.y === drag.last.y) return;
       if (!drag.moved) {
-        undoStack.push(drag.snapshot);
-        redoStack = [];
-        drag.moved = true;
+        pushDragHistory(drag);
         if (drag.type === "station") anchorStation(project.stations.find((x) => x.id === drag.id));
       }
       if (drag.type === "station") moveStation(drag.id, drag.last, np);
       else if (drag.type === "node") { moveNode(drag.last, np); sel = { kind: "node", x: np.x, y: np.y }; }
       else if (drag.type === "vertex") { project.lines.find((l) => l.id === drag.id).points[sel.vidx] = np; }
+      else if (drag.type === "shape") { const sh = project.shapes.find((x) => x.id === drag.id); sh.x = np.x; sh.y = np.y; }
       else { project.legend.x = np.x; project.legend.y = np.y; }
       drag.last = np;
       render();
@@ -826,10 +1203,12 @@ const NetworkScheme = (function () {
 
   function onMouseUp() {
     if (!drag) return;
-    const wasMoved = drag.moved || drag.type === "pan";
+    const d = drag;
     drag = null;
     el.svg.classList.remove("panning");
-    if (wasMoved) { renderProps(); scheduleSave(); }
+    if (d.type === "marquee") { finishMarquee(); return; }
+    if (d.type === "shapeCreate") { finishShapeCreate(d); return; }
+    if (d.moved || d.type === "pan") { renderProps(); scheduleSave(); }
   }
 
   function onWheel(e) {
@@ -847,16 +1226,106 @@ const NetworkScheme = (function () {
     scheduleSave();
   }
 
+  // Небольшое окно ввода поверх холста (prompt() в Electron недоступен)
+  let askBox = null;
+  function askText(label, value, apply, multiline) {
+    if (askBox) askBox.remove();
+    const input = multiline ? h("textarea", { rows: "4" }) : h("input", { type: "text" });
+    input.value = value || "";
+    const close = () => { if (askBox) { askBox.remove(); askBox = null; } };
+    const ok = () => { const v = input.value; close(); apply(v); };
+    askBox = h("div", { class: "scheme-ask" }, [
+      h("div", { class: "scheme-ask-label", text: label }),
+      input,
+      h("div", { class: "scheme-ask-btns" }, [
+        h("button", { type: "button", text: tt("schemeAskOk"), onclick: ok }),
+        h("button", { type: "button", class: "secondary-btn", text: tt("schemeAskCancel"), onclick: close }),
+      ]),
+    ]);
+    input.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+      if (e.key === "Escape") close();
+      else if (e.key === "Enter" && (!multiline || e.ctrlKey)) { e.preventDefault(); ok(); }
+    });
+    el.canvasBox.appendChild(askBox);
+    input.focus();
+    input.select();
+  }
+
+  function renameSelection() {
+    if (sel && sel.kind === "station") {
+      const st = project.stations.find((s) => s.id === sel.id);
+      if (st) askText(tt("schemeAskStation"), st.name, (v) => { pushHistory(); st.name = v; changed(); });
+    } else if (sel && sel.kind === "line") {
+      const l = project.lines.find((x) => x.id === sel.id);
+      if (l) askText(tt("schemeAskLine"), l.name, (v) => { pushHistory(); l.name = v; changed(); });
+    } else if (sel && sel.kind === "shape") {
+      const sh = project.shapes.find((x) => x.id === sel.id);
+      if (sh && sh.type === "text") askText(tt("schemeAskText"), sh.text, (v) => { pushHistory(); sh.text = v; changed(); }, true);
+    }
+  }
+
   function onDblClick(e) {
     const hit = hitOf(e);
     if (tool === "line") { finishLine(); return; }
     if (!hit || tool !== "select") return;
     if (hit.kind === "station") {
       const st = project.stations.find((s) => s.id === hit.id);
-      if (st && st.mtrStationId) openStation(st.mtrStationId);
+      if (!st) return;
+      const onLabel = e.target.closest && e.target.closest(".sc-label");
+      // двойной клик по подписи (или по станции без данных MTR) — переименование,
+      // по значку станции MTR — её расписание
+      if (onLabel || !st.mtrStationId) { sel = { kind: "station", id: st.id }; group = null; renameSelection(); }
+      else openStation(st.mtrStationId);
+      return;
+    }
+    if (hit.kind === "shape") {
+      const sh = project.shapes.find((x) => x.id === hit.id);
+      if (sh && sh.type === "text") { sel = { kind: "shape", id: sh.id }; group = null; renameSelection(); }
       return;
     }
     if (hit.kind === "line") insertVertex(hit.id, toWorld(e));
+  }
+
+  // ---- Копирование стиля ----
+  const STYLE_KEYS = {
+    station: ["style", "fill", "stroke", "strokeW", "size", "labelSize", "labelColor"],
+    line: ["color", "width", "dash", "offset"],
+    shape: ["fill", "stroke", "strokeW", "opacity", "dash", "rx", "fontSize", "bold", "align"],
+  };
+  function selectedObject() {
+    if (!sel) return null;
+    if (sel.kind === "station") { const o = project.stations.find((s) => s.id === sel.id); return o && { kind: "station", o }; }
+    if (sel.kind === "line") { const o = project.lines.find((s) => s.id === sel.id); return o && { kind: "line", o }; }
+    if (sel.kind === "shape") { const o = project.shapes.find((s) => s.id === sel.id); return o && { kind: "shape", o }; }
+    return null;
+  }
+  function copyStyle() {
+    let src = selectedObject();
+    if (!src && group) {
+      const id = [...group.stations][0];
+      if (id) src = { kind: "station", o: project.stations.find((s) => s.id === id) };
+    }
+    if (!src) return;
+    styleClip = { kind: src.kind, props: {} };
+    STYLE_KEYS[src.kind].forEach((k) => { styleClip.props[k] = src.o[k]; });
+    setStatus(tt("schemeStyleCopied"));
+    renderProps();
+  }
+  function pasteStyle() {
+    if (!styleClip) return;
+    const targets = [];
+    const one = selectedObject();
+    if (one && one.kind === styleClip.kind) targets.push(one.o);
+    if (group) {
+      if (styleClip.kind === "station") group.stations.forEach((id) => { const o = project.stations.find((s) => s.id === id); if (o) targets.push(o); });
+      if (styleClip.kind === "shape") group.shapes.forEach((id) => { const o = project.shapes.find((s) => s.id === id); if (o) targets.push(o); });
+    }
+    if (!targets.length) { setStatus(tt("schemeStyleNoTarget")); return; }
+    pushHistory();
+    targets.forEach((o) => Object.assign(o, JSON.parse(JSON.stringify(styleClip.props))));
+    changed();
+    setStatus(tt("schemeStylePasted", { n: targets.length }));
   }
 
   // ------------------------------------------------------------
@@ -969,12 +1438,29 @@ const NetworkScheme = (function () {
   }
 
   function deleteSelection() {
+    if (group) {
+      pushHistory();
+      project.stations = project.stations.filter((s) => !group.stations.has(s.id));
+      project.transfers.forEach((t) => { t.stationIds = t.stationIds.filter((id) => !group.stations.has(id)); });
+      project.transfers = project.transfers.filter((t) => t.stationIds.length >= 2);
+      project.shapes = project.shapes.filter((s) => !group.shapes.has(s.id));
+      for (const l of project.lines) {
+        for (let i = l.points.length - 1; i >= 0; i--) {
+          if (group.nodes.has(pkey(l.points[i])) && l.points.length > 2) removePoint(l, i);
+        }
+      }
+      clearSelection();
+      changed();
+      return;
+    }
     if (!sel) return;
     pushHistory();
     if (sel.kind === "station") {
       project.stations = project.stations.filter((s) => s.id !== sel.id);
       project.transfers.forEach((t) => { t.stationIds = t.stationIds.filter((id) => id !== sel.id); });
       project.transfers = project.transfers.filter((t) => t.stationIds.length >= 2);
+    } else if (sel.kind === "shape") {
+      project.shapes = project.shapes.filter((s) => s.id !== sel.id);
     } else if (sel.kind === "line" && sel.vidx != null) {
       // выбрана точка линии — удаляем точку, а не линию
       const l = project.lines.find((x) => x.id === sel.id);
@@ -984,7 +1470,10 @@ const NetworkScheme = (function () {
       return;
     } else if (sel.kind === "line") {
       project.lines = project.lines.filter((l) => l.id !== sel.id);
-      project.stations.forEach((s) => { s.lineIds = s.lineIds.filter((id) => id !== sel.id); });
+      project.stations.forEach((s) => {
+        s.lineIds = s.lineIds.filter((id) => id !== sel.id);
+        s.passLineIds = (s.passLineIds || []).filter((id) => id !== sel.id);
+      });
     } else if (sel.kind === "transfer") {
       project.transfers = project.transfers.filter((t) => t.id !== sel.id);
     } else if (sel.kind === "node") {
@@ -997,6 +1486,21 @@ const NetworkScheme = (function () {
       project.legend.show = false;
     }
     sel = null;
+    changed();
+  }
+
+  // Слой/порядок фигуры и дублирование
+  function moveShapeOrder(sh, toFront) {
+    pushHistory();
+    project.shapes = project.shapes.filter((x) => x !== sh);
+    if (toFront) project.shapes.push(sh); else project.shapes.unshift(sh);
+    changed();
+  }
+  function duplicateShape(sh) {
+    pushHistory();
+    const copy = C().normalizeShape(Object.assign({}, sh, { id: "sh-" + Date.now().toString(36), x: sh.x + 20, y: sh.y + 20 }));
+    project.shapes.push(copy);
+    sel = { kind: "shape", id: copy.id };
     changed();
   }
 
@@ -1092,12 +1596,154 @@ const NetworkScheme = (function () {
     return h("button", { type: "button", class: cls || "secondary-btn", text: tt(labelKey), onclick });
   }
 
+  // Цвет с возможностью сбросить на значение по умолчанию (value = "")
+  function optColor(value, fallback, apply) {
+    const inp = bindEdit(h("input", { type: "color", value: value || fallback }), apply);
+    const reset = h("button", {
+      type: "button", class: "icon-btn", text: "×", title: tt("schemeReset"),
+      onclick: () => { pushHistory(); apply(""); render(); renderProps(); scheduleSave(); },
+    });
+    return h("span", { class: "scheme-optcolor" + (value ? "" : " is-default") }, [inp, reset]);
+  }
+  // Цвет фигуры: значение или «нет» (none)
+  function noneColor(value, apply) {
+    const inp = bindEdit(h("input", { type: "color", value: value && value !== "none" ? value : "#ffffff" }), apply);
+    const none = h("button", {
+      type: "button", class: "icon-btn" + (value === "none" ? " active" : ""), text: "∅", title: tt("schemeNone"),
+      onclick: () => { pushHistory(); apply("none"); render(); renderProps(); scheduleSave(); },
+    });
+    return h("span", { class: "scheme-optcolor" + (value === "none" ? " is-default" : "") }, [inp, none]);
+  }
+  // Число или пусто (= по умолчанию)
+  function optNum(value, min, max, step, apply, placeholder) {
+    const inp = h("input", { type: "number", min, max, step, value: value == null ? "" : value, placeholder });
+    return bindEdit(inp, (v) => apply(v === "" ? null : Math.max(min, Math.min(max, Number(v) || min))));
+  }
+  function slider(value, min, max, step, apply) {
+    const out = h("span", { class: "scheme-offset-val", text: String(value) });
+    const inp = h("input", { type: "range", min, max, step, value });
+    inp.addEventListener("input", () => { out.textContent = inp.value; });
+    bindEdit(inp, (v) => apply(Number(v)));
+    return h("span", { class: "scheme-slider" }, [inp, out]);
+  }
+
+  function stationFields(st) {
+    return [
+      field("schemeFieldStationStyle", selectInput(st.style, C().STATION_STYLES.map((s) => [s, tt("schemeStStyle_" + s)]), (v) => { st.style = v; })),
+      field("schemeFieldFill", optColor(st.fill, project.style.stationFill, (v) => { st.fill = v; })),
+      field("schemeFieldStroke", optColor(st.stroke, project.style.stationStroke, (v) => { st.stroke = v; })),
+      field("schemeFieldStrokeW", optNum(st.strokeW, 0, 20, 0.5, (v) => { st.strokeW = v; }, "auto")),
+      field("schemeFieldSize", slider(st.size, 0.3, 4, 0.1, (v) => { st.size = v; })),
+      field("schemeFieldLabelPos", selectInput(st.label.pos, C().LABEL_POS.map((s) => [s, tt("schemeLabelPos_" + s)]), (v) => { st.label.pos = v; })),
+      field("schemeFieldLabelAngle", selectInput(st.label.angle, C().LABEL_ANGLES.map((a) => [a, a + "°"]), (v) => { st.label.angle = Number(v); })),
+      field("schemeFieldLabelSize", optNum(st.labelSize, 6, 48, 1, (v) => { st.labelSize = v; }, String(project.style.labelSize))),
+      field("schemeFieldLabelColor", optColor(st.labelColor, project.style.labelColor, (v) => { st.labelColor = v; })),
+    ];
+  }
+
+  function shapeFields(sh) {
+    const rows = [];
+    if (sh.type === "text") {
+      const ta = bindEdit(h("textarea", { rows: "3" }), (v) => { sh.text = v; });
+      ta.value = sh.text;
+      rows.push(field("schemeFieldText", ta));
+      rows.push(field("schemeFieldFontSize", numInput(sh.fontSize, 6, 200, (v) => { sh.fontSize = Math.max(6, Math.min(200, Number(v) || 16)); })));
+      rows.push(field("schemeFieldColor", noneColor(sh.fill, (v) => { sh.fill = v; })));
+      rows.push(field("schemeFieldBold", checkInput(sh.bold, (v) => { sh.bold = v; })));
+      rows.push(field("schemeFieldAlign", selectInput(sh.align, [["start", tt("schemeAlign_start")], ["middle", tt("schemeAlign_middle")], ["end", tt("schemeAlign_end")]], (v) => { sh.align = v; })));
+    } else {
+      if (sh.type !== "line") rows.push(field("schemeFieldFill", noneColor(sh.fill, (v) => { sh.fill = v; })));
+      rows.push(field(sh.type === "line" ? "schemeFieldColor" : "schemeFieldStroke", noneColor(sh.stroke, (v) => { sh.stroke = v; })));
+      rows.push(field("schemeFieldStrokeW", numInput(sh.strokeW, 0, 60, (v) => { sh.strokeW = Math.max(0, Math.min(60, Number(v) || 0)); })));
+      rows.push(field("schemeFieldDash", selectInput(sh.dash, C().SHAPE_DASHES.map((d) => [d, tt("schemeDash_" + d)]), (v) => { sh.dash = v; })));
+      if (sh.type === "rect") rows.push(field("schemeFieldRadius", numInput(sh.rx, 0, 500, (v) => { sh.rx = Math.max(0, Number(v) || 0); })));
+    }
+    rows.push(field("schemeFieldOpacity", slider(sh.opacity, 0.1, 1, 0.05, (v) => { sh.opacity = v; })));
+    if (sh.type !== "line") rows.push(field("schemeFieldRotation", numInput(sh.rot, -180, 180, (v) => { sh.rot = Math.max(-180, Math.min(180, Number(v) || 0)); })));
+    rows.push(field("schemeFieldLayer", selectInput(sh.layer, [["back", tt("schemeLayer_back")], ["front", tt("schemeLayer_front")]], (v) => { sh.layer = v; })));
+    return rows;
+  }
+
+  function styleButtons() {
+    const row = h("div", { class: "scheme-btn-row" }, [button("schemeCopyStyle", copyStyle)]);
+    if (styleClip) row.append(button("schemePasteStyle", pasteStyle));
+    return row;
+  }
+
+  // Списки для быстрого переименования линий и станций
+  function renameLists() {
+    const wrap = h("div", { class: "scheme-lists" });
+    const lines = project.lines.filter((l) => l.points.length >= 2);
+    if (lines.length) {
+      wrap.append(h("div", { class: "scheme-props-title", text: tt("schemeListLines") }));
+      lines.forEach((l) => {
+        wrap.append(h("div", { class: "scheme-list-row" }, [
+          bindEdit(h("input", { type: "color", value: l.color, class: "scheme-list-color" }), (v) => { l.color = v; }),
+          bindEdit(h("input", { type: "text", value: l.number, class: "scheme-list-num", title: tt("schemeFieldNumber") }), (v) => { l.number = v.slice(0, 24); }),
+          bindEdit(h("input", { type: "text", value: l.name, class: "scheme-list-name", title: tt("schemeFieldName") }), (v) => { l.name = v; }),
+          h("button", { type: "button", class: "icon-btn", text: "◎", title: tt("schemeSelectLine"), onclick: () => { clearSelection(); sel = { kind: "line", id: l.id }; renderOverlay(); renderProps(); } }),
+        ]));
+      });
+    }
+    wrap.append(h("div", { class: "scheme-props-title", text: tt("schemeListStations") }));
+    const search = h("input", { type: "text", placeholder: tt("schemeSearchStations") });
+    const box = h("div", { class: "scheme-station-list" });
+    const fill = () => {
+      const q = search.value.trim().toLowerCase();
+      const hits = project.stations.filter((s) => !q || (s.name + " " + s.sub).toLowerCase().includes(q)).slice(0, 40);
+      box.replaceChildren(...hits.map((s) => h("div", { class: "scheme-list-row" }, [
+        bindEdit(h("input", { type: "text", value: s.name, class: "scheme-list-name" }), (v) => { s.name = v; }),
+        h("button", { type: "button", class: "icon-btn", text: "◎", title: tt("schemeFindStation"), onclick: () => focusStation(s.id) }),
+      ])));
+    };
+    search.addEventListener("input", fill);
+    fill();
+    wrap.append(search, box);
+    return wrap;
+  }
+
+  function focusStation(id) {
+    const st = project.stations.find((s) => s.id === id);
+    if (!st) return;
+    const r = el.svg.getBoundingClientRect();
+    const v = project.view;
+    v.zoom = Math.max(v.zoom, 1);
+    v.x = r.width / 2 - st.x * v.zoom;
+    v.y = r.height / 2 - st.y * v.zoom;
+    clearSelection();
+    sel = { kind: "station", id };
+    applyView();
+    renderOverlay();
+    renderProps();
+    scheduleSave();
+  }
+
   function renderProps() {
     const box = el.props;
     if (!box) return;
     box.replaceChildren();
     const title = (key) => h("div", { class: "scheme-props-title", text: tt(key) });
 
+    if (group) {
+      const n = group.stations.size, m = group.shapes.size, k = group.nodes.size;
+      box.append(title("schemePropGroup"), h("p", { class: "hint small", text: tt("schemeGroupInfo", { s: n, f: m, n: k }) }));
+      if (n) {
+        // общие правки применяются ко всем станциям группы
+        const firstId = [...group.stations][0];
+        const first = project.stations.find((s) => s.id === firstId);
+        const proxy = Object.assign({}, first, { label: Object.assign({}, first && first.label) });
+        const applyAll = (fn) => (v) => { project.stations.forEach((s) => { if (group.stations.has(s.id)) fn(s, v); }); };
+        box.append(
+          field("schemeFieldStationStyle", selectInput(proxy.style, C().STATION_STYLES.map((s) => [s, tt("schemeStStyle_" + s)]), applyAll((s, v) => { s.style = v; }))),
+          field("schemeFieldFill", optColor(proxy.fill, project.style.stationFill, applyAll((s, v) => { s.fill = v; }))),
+          field("schemeFieldStroke", optColor(proxy.stroke, project.style.stationStroke, applyAll((s, v) => { s.stroke = v; }))),
+          field("schemeFieldSize", slider(proxy.size, 0.3, 4, 0.1, applyAll((s, v) => { s.size = v; }))),
+          field("schemeFieldLabelPos", selectInput(proxy.label.pos, C().LABEL_POS.map((s) => [s, tt("schemeLabelPos_" + s)]), applyAll((s, v) => { s.label.pos = v; }))),
+        );
+      }
+      box.append(h("p", { class: "hint small", text: tt("schemeGroupHint") }), styleButtons(), button("schemeDeleteGroup", deleteSelection, "secondary-btn danger"));
+      return;
+    }
     if (sel && sel.kind === "station") {
       const st = project.stations.find((s) => s.id === sel.id);
       if (!st) { sel = null; return renderProps(); }
@@ -1105,12 +1751,30 @@ const NetworkScheme = (function () {
         title("schemePropStation"),
         field("schemeFieldName", textInput(st.name, (v) => { st.name = v; })),
         field("schemeFieldSub", textInput(st.sub, (v) => { st.sub = v; })),
-        field("schemeFieldStationStyle", selectInput(st.style, C().STATION_STYLES.map((s) => [s, tt("schemeStStyle_" + s)]), (v) => { st.style = v; })),
-        field("schemeFieldLabelPos", selectInput(st.label.pos, C().LABEL_POS.map((s) => [s, tt("schemeLabelPos_" + s)]), (v) => { st.label.pos = v; })),
-        field("schemeFieldLabelAngle", selectInput(st.label.angle, C().LABEL_ANGLES.map((a) => [a, a + "°"]), (v) => { st.label.angle = Number(v); })),
+        ...stationFields(st),
+        styleButtons(),
       );
+      if (st.passLineIds && st.passLineIds.length) {
+        box.append(h("p", { class: "hint small", text: tt("schemePassInfo", { n: st.passLineIds.length }) }));
+      }
       if (st.mtrStationId) box.append(button("schemeOpenSchedule", () => openStation(st.mtrStationId)));
       box.append(button("schemeDelete", deleteSelection, "secondary-btn danger"));
+      return;
+    }
+    if (sel && sel.kind === "shape") {
+      const sh = project.shapes.find((s) => s.id === sel.id);
+      if (!sh) { sel = null; return renderProps(); }
+      box.append(
+        title("schemePropShape_" + sh.type),
+        ...shapeFields(sh),
+        styleButtons(),
+        h("div", { class: "scheme-btn-row" }, [
+          button("schemeToFront", () => moveShapeOrder(sh, true)),
+          button("schemeToBack", () => moveShapeOrder(sh, false)),
+          button("schemeDuplicate", () => duplicateShape(sh)),
+        ]),
+        button("schemeDelete", deleteSelection, "secondary-btn danger"),
+      );
       return;
     }
     if (sel && sel.kind === "node") {
@@ -1139,6 +1803,7 @@ const NetworkScheme = (function () {
           h("button", { type: "button", class: "icon-btn", text: "+", onclick: bump(1) }),
         ])),
         h("p", { class: "hint small", text: tt("schemeLineEditHint") }),
+        styleButtons(),
       );
       if (sel.vidx != null) box.append(button("schemeDeleteVertex", deleteSelection));
       if (line.mtrRouteIds && line.mtrRouteIds.length) box.append(button("schemeOpenRoute", () => openRoute(line.mtrRouteIds[0])));
@@ -1157,17 +1822,27 @@ const NetworkScheme = (function () {
       return;
     }
     // Ничего не выбрано / легенда — общие настройки схемы
+    const st = project.style;
     box.append(
       title("schemePropScheme"),
       field("schemeFieldTitle", textInput(project.title, (v) => { project.title = v; })),
-      field("schemeFieldLineWidth", numInput(project.style.lineWidth, 1, 30, (v) => { project.style.lineWidth = Math.max(1, Math.min(30, Number(v) || 6)); })),
-      field("schemeFieldLabelSize", numInput(project.style.labelSize, 6, 48, (v) => { project.style.labelSize = Math.max(6, Math.min(48, Number(v) || 12)); })),
-      field("schemeFieldBg", colorInput(project.style.bg, (v) => { project.style.bg = v; })),
-      field("schemeFieldLabelColor", colorInput(project.style.labelColor, (v) => { project.style.labelColor = v; })),
+      title("schemePropLook"),
+      field("schemeFieldLineWidth", slider(st.lineWidth, 1, 24, 1, (v) => { st.lineWidth = v; })),
+      field("schemeFieldLaneGap", slider(st.laneGap, 0, 8, 0.5, (v) => { st.laneGap = v; })),
+      field("schemeFieldCorner", slider(st.cornerRadius, 0, 60, 1, (v) => { st.cornerRadius = v; })),
+      field("schemeFieldStationScale", slider(st.stationScale, 0.3, 3, 0.1, (v) => { st.stationScale = v; })),
+      field("schemeFieldTransferScale", slider(st.transferScale, 0.2, 3, 0.1, (v) => { st.transferScale = v; })),
+      field("schemeFieldStationFill", colorInput(st.stationFill, (v) => { st.stationFill = v; })),
+      field("schemeFieldStationStroke", colorInput(st.stationStroke, (v) => { st.stationStroke = v; })),
+      field("schemeFieldLabelSize", numInput(st.labelSize, 6, 48, (v) => { st.labelSize = Math.max(6, Math.min(48, Number(v) || 12)); })),
+      field("schemeFieldLabelColor", colorInput(st.labelColor, (v) => { st.labelColor = v; })),
+      field("schemeFieldLabelAuto", checkInput(st.labelAuto, (v) => { st.labelAuto = v; })),
+      field("schemeFieldBg", colorInput(st.bg, (v) => { st.bg = v; })),
       title("schemePropLegend"),
       field("schemeFieldShowLegend", checkInput(project.legend.show, (v) => { project.legend.show = v; })),
       field("schemeFieldLegendTitle", textInput(project.legend.title, (v) => { project.legend.title = v; })),
       h("p", { class: "hint small", text: tt("schemeStats", { lines: project.lines.length, stations: project.stations.length, transfers: project.transfers.length }) }),
+      renameLists(),
     );
   }
 
@@ -1266,9 +1941,9 @@ const NetworkScheme = (function () {
       const types = new Set(ui.types || []);
       if (!types.size) { setStatus(tt("schemeNoTypes")); return; }
       pushHistory();
-      const res = buildFromMtr(data, types, project, { alignTol: ui.alignTol });
+      const res = buildFromMtr(data, types, project, { alignTol: ui.alignTol, compress: ui.compress });
       project = res.project;
-      sel = null;
+      sel = null; group = null;
       changed();
       if (!res.stats.hadMtr) fitView();
       setStatus(tt(res.stats.hadMtr ? "schemeUpdated" : "schemeGenerated", res.stats));
@@ -1285,7 +1960,7 @@ const NetworkScheme = (function () {
     const view = project.view;
     project = C().emptyProject();
     project.view = view;
-    sel = null;
+    sel = null; group = null;
     changed();
     setStatus("");
   }
@@ -1317,6 +1992,8 @@ const NetworkScheme = (function () {
     const url = publishUrl();
     el.publishUrl.value = url;
     el.publishSize.textContent = tt("schemePublishSize", { kb: Math.ceil(url.length / 1024) });
+    refreshLiveUi();
+    el.liveStatus.textContent = "";
     el.publishOverlay.style.display = "flex";
     el.publishUrl.focus();
     el.publishUrl.select();
@@ -1326,6 +2003,160 @@ const NetworkScheme = (function () {
   // ------------------------------------------------------------
   // Режимы вкладки и инициализация
   // ------------------------------------------------------------
+  // ------------------------------------------------------------
+  // Несколько схем
+  // ------------------------------------------------------------
+  const uid = () => "s" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const activeScheme = () => schemes.find((s) => s.id === activeId);
+
+  function ensureSchemes() {
+    if (!project) project = C().emptyProject();
+    if (!schemes.length) {
+      activeId = uid();
+      schemes = [{ id: activeId, name: tt("schemeDefaultName", { n: 1 }), project, types: ui.types, publish: null }];
+    }
+    if (!activeScheme()) activeId = schemes[0].id;
+  }
+  // Текущее рабочее состояние → запись активной схемы
+  function syncActive() {
+    const e = activeScheme();
+    if (!e) return;
+    e.project = project;
+    e.types = ui.types;
+  }
+  function refreshSchemeSelect() {
+    if (!el.schemeSelect) return;
+    el.schemeSelect.replaceChildren(...schemes.map((s) => h("option", { value: s.id, text: s.name })));
+    el.schemeSelect.value = activeId;
+    if (el.schemeDelBtn) el.schemeDelBtn.disabled = schemes.length < 2;
+  }
+  function switchScheme(id) {
+    if (id === activeId) return;
+    const e = schemes.find((s) => s.id === id);
+    if (!e) return;
+    syncActive();
+    activeId = id;
+    project = e.project;
+    ui.types = e.types || null;
+    undoStack = []; redoStack = [];
+    clearSelection();
+    liveData = null;
+    refreshSchemeSelect();
+    if (schemeData) renderTypes();
+    changed();
+    if (ui.live) refreshLive();
+    setStatus("");
+  }
+  function newScheme() {
+    askText(tt("schemeAskNewScheme"), tt("schemeDefaultName", { n: schemes.length + 1 }), (name) => {
+      syncActive();
+      const e = { id: uid(), name: name.trim() || tt("schemeDefaultName", { n: schemes.length + 1 }), project: C().emptyProject(), types: null, publish: null };
+      schemes.push(e);
+      switchScheme(e.id);
+      scheduleSave();
+    });
+  }
+  function duplicateScheme() {
+    syncActive();
+    const cur = activeScheme();
+    const copy = { id: uid(), name: cur.name + " (2)", project: C().normalize(JSON.parse(JSON.stringify(cur.project))), types: cur.types ? [...cur.types] : null, publish: null };
+    schemes.push(copy);
+    switchScheme(copy.id);
+    scheduleSave();
+  }
+  function renameScheme() {
+    const cur = activeScheme();
+    askText(tt("schemeAskRenameScheme"), cur.name, (name) => {
+      if (name.trim()) { cur.name = name.trim(); refreshSchemeSelect(); scheduleSave(); }
+    });
+  }
+  function deleteScheme() {
+    if (schemes.length < 2) return;
+    if (!confirm(tt("schemeDeleteConfirm", { name: activeScheme().name }))) return;
+    const i = schemes.findIndex((s) => s.id === activeId);
+    schemes.splice(i, 1);
+    const next = schemes[Math.max(0, i - 1)];
+    activeId = null;
+    activeId = next.id;
+    project = next.project;
+    ui.types = next.types || null;
+    undoStack = []; redoStack = [];
+    clearSelection();
+    refreshSchemeSelect();
+    if (schemeData) renderTypes();
+    changed();
+    scheduleSave();
+  }
+
+  // ------------------------------------------------------------
+  // Вставка в «Табло»
+  // ------------------------------------------------------------
+  async function sendToBoard() {
+    if (!window.BoardEditor || typeof window.BoardEditor.insertImageDataUrl !== "function") return;
+    if (!project.stations.length && !project.lines.length) { setStatus(tt("schemePublishEmpty")); return; }
+    try {
+      const blob = await C().toPngBlob(project, 2);
+      const url = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+        r.readAsDataURL(blob);
+      });
+      setMode("timetable");
+      scheduleSave();
+      // холст табло живёт в соседнем режиме — даём ему показаться
+      setTimeout(() => {
+        const ok = window.BoardEditor.insertImageDataUrl(url);
+        setStatus(tt(ok ? "schemeToBoardDone" : "schemeToBoardFail"));
+      }, 50);
+    } catch (e) {
+      setStatus(tt("schemeExportError") + ": " + e.message);
+    }
+  }
+
+  // ------------------------------------------------------------
+  // Живая публикация (jsonblob.com через сервер приложения)
+  // ------------------------------------------------------------
+  function liveLink() {
+    const e = activeScheme();
+    if (!e || !e.publish || !e.publish.id) return "";
+    return `${(ui.viewerBase || PUBLISH_BASE).replace(/#.*$/, "")}#b=${e.publish.id}`;
+  }
+  function refreshLiveUi() {
+    el.liveUrl.value = liveLink();
+    el.liveViewer.value = ui.viewerBase || PUBLISH_BASE;
+    const has = !!liveLink();
+    el.livePublish.textContent = tt(has ? "schemeLiveUpdate" : "schemeLivePublish");
+    el.liveCopy.disabled = !has;
+    el.liveForget.disabled = !has;
+  }
+  async function livePublish() {
+    const e = activeScheme();
+    el.liveStatus.textContent = tt("schemeLivePublishing");
+    el.livePublish.disabled = true;
+    try {
+      const res = await fetch("/api/scheme-publish", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: e.publish && e.publish.id, data: C().toPublished(project) }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 404 && e.publish) {
+        // запись пропала на стороне хранилища — следующий клик создаст новую
+        e.publish = null;
+        scheduleSave();
+      }
+      if (!res.ok) throw new Error(body.error || res.status);
+      e.publish = { id: body.id, at: Date.now() };
+      scheduleSave();
+      el.liveStatus.textContent = tt("schemeLiveDone", { time: new Date().toLocaleTimeString() });
+    } catch (err) {
+      el.liveStatus.textContent = tt("schemeLiveFail") + ": " + err.message;
+    } finally {
+      el.livePublish.disabled = false;
+      refreshLiveUi();
+    }
+  }
+
   function setMode(mode) {
     ui.mode = mode === "scheme" ? "scheme" : "timetable";
     const scheme = ui.mode === "scheme";
@@ -1346,18 +2177,31 @@ const NetworkScheme = (function () {
     const tag = (e.target && e.target.tagName) || "";
     if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
     const k = e.key.toLowerCase();
+    if (e.code === "Space") { spaceDown = true; e.preventDefault(); return; }
     if ((e.ctrlKey || e.metaKey) && k === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if ((e.ctrlKey || e.metaKey) && (k === "y" || (k === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyC") { e.preventDefault(); copyStyle(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === "KeyV") { e.preventDefault(); pasteStyle(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.code === "KeyA") {
+      e.preventDefault();
+      group = { stations: new Set(project.stations.map((s) => s.id)), nodes: new Set(), shapes: new Set(project.shapes.map((s) => s.id)) };
+      sel = { kind: "group" };
+      renderOverlay(); renderProps();
+      return;
+    }
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (k === "delete" || k === "backspace") { e.preventDefault(); deleteSelection(); return; }
+    if (k === "f2") { e.preventDefault(); renameSelection(); return; }
     if (k === "escape") {
       if (drawing) { drawing = null; renderOverlay(); return; }
-      sel = null; transferFirst = null; setTool("select"); renderProps(); return;
+      clearSelection(); transferFirst = null; setTool("select"); renderProps(); return;
     }
     if (k === "enter" && drawing) { finishLine(); return; }
-    const tools = { v: "select", l: "line", s: "station", t: "transfer" };
+    const tools = { v: "select", l: "line", s: "station", t: "transfer", r: "rect", o: "ellipse", d: "shapeline", a: "text" };
     if (tools[k]) setTool(tools[k]);
   }
+
+  function onKeyUp(e) { if (e.code === "Space") spaceDown = false; }
 
   function init() {
     if (initialized) return;
@@ -1378,9 +2222,19 @@ const NetworkScheme = (function () {
     el.publishOverlay = $("schemePublishOverlay");
     el.publishUrl = $("schemePublishUrl");
     el.publishSize = $("schemePublishSize");
+    el.schemeSelect = $("schemeSelect");
+    el.schemeDelBtn = $("schemeDelBtn");
+    el.liveUrl = $("schemeLiveUrl");
+    el.liveViewer = $("schemeViewerBase");
+    el.livePublish = $("schemeLivePublish");
+    el.liveCopy = $("schemeLiveCopy");
+    el.liveForget = $("schemeLiveForget");
+    el.liveStatus = $("schemeLiveStatus");
     if (!el.scheme || !el.svg || !window.SchemeCore) return;
     initialized = true;
     if (!project) project = C().emptyProject();
+    ensureSchemes();
+    el.canvasBox = el.svg.parentElement;
 
     // Слои SVG: сетка → схема → оверлей редактора
     const mk = C().el;
@@ -1399,6 +2253,8 @@ const NetworkScheme = (function () {
     el.svg.addEventListener("dblclick", onDblClick);
     el.svg.addEventListener("mouseleave", () => { hoverPt = null; renderOverlay(); });
     document.addEventListener("keydown", onKey);
+    document.addEventListener("keyup", onKeyUp);
+    el.svg.addEventListener("contextmenu", (e) => e.preventDefault());
     window.addEventListener("resize", () => { if (visible()) applyView(); });
 
     el.toolBtns = Array.from(document.querySelectorAll("#schemeTools [data-tool]"));
@@ -1423,6 +2279,28 @@ const NetworkScheme = (function () {
     el.alignTol = $("schemeAlignTol");
     el.alignTol.value = String(ui.alignTol);
     el.alignTol.addEventListener("change", () => { ui.alignTol = Number(el.alignTol.value) || 0; scheduleSave(); });
+    refreshSchemeSelect();
+    el.schemeSelect.addEventListener("change", () => switchScheme(el.schemeSelect.value));
+    $("schemeNewBtn").addEventListener("click", newScheme);
+    $("schemeRenameBtn").addEventListener("click", renameScheme);
+    $("schemeDupBtn").addEventListener("click", duplicateScheme);
+    el.schemeDelBtn.addEventListener("click", deleteScheme);
+    el.compress = $("schemeCompress");
+    el.compress.value = String(ui.compress);
+    el.compress.addEventListener("change", () => { ui.compress = Number(el.compress.value) || 0; scheduleSave(); });
+    $("schemeToBoardBtn").addEventListener("click", sendToBoard);
+    el.livePublish.addEventListener("click", livePublish);
+    el.liveViewer.addEventListener("change", () => {
+      const v = el.liveViewer.value.trim();
+      ui.viewerBase = /^https?:\/\//i.test(v) && v !== PUBLISH_BASE ? v : "";
+      refreshLiveUi();
+      scheduleSave();
+    });
+    el.liveCopy.addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(el.liveUrl.value); } catch (e) { el.liveUrl.select(); document.execCommand("copy"); }
+      el.liveStatus.textContent = tt("schemePublishCopied");
+    });
+    el.liveForget.addEventListener("click", () => { const e = activeScheme(); if (e) { e.publish = null; scheduleSave(); refreshLiveUi(); } });
     $("schemePublishClose").addEventListener("click", closePublish);
     el.publishOverlay.addEventListener("click", (e) => { if (e.target === el.publishOverlay) closePublish(); });
     $("schemePublishCopy").addEventListener("click", async () => {
@@ -1449,21 +2327,52 @@ const NetworkScheme = (function () {
   }
 
   function getPersistedState() {
-    return { project, ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol } };
+    ensureSchemes();
+    syncActive();
+    return {
+      project,
+      ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol, compress: ui.compress, viewerBase: ui.viewerBase },
+      schemes: schemes.map((e) => ({ id: e.id, name: e.name, project: e.project, types: e.types, publish: e.publish })),
+      activeId,
+    };
   }
 
   function applyPersistedState(s) {
     if (!s) return;
-    // проект без версии формата не загружаем
-    if (s.project && typeof s.project === "object" && s.project.v === 1) project = window.SchemeCore.normalize(s.project);
+    const valid = (p) => p && typeof p === "object" && p.v === 1;
+    if (Array.isArray(s.schemes) && s.schemes.some((e) => e && valid(e.project))) {
+      schemes = s.schemes.filter((e) => e && valid(e.project)).map((e) => ({
+        id: String(e.id || uid()).slice(0, 40), name: String(e.name || "").slice(0, 80) || tt("schemeDefaultName", { n: 1 }),
+        project: window.SchemeCore.normalize(e.project), types: Array.isArray(e.types) ? e.types : null,
+        publish: e.publish && /^[A-Za-z0-9-]{8,64}$/.test(String(e.publish.id)) ? { id: String(e.publish.id), at: Number(e.publish.at) || 0 } : null,
+      }));
+      activeId = schemes.some((e) => e.id === s.activeId) ? s.activeId : schemes[0].id;
+      project = activeScheme().project;
+    } else if (valid(s.project)) {
+      // проект без версии формата не загружаем
+      project = window.SchemeCore.normalize(s.project);
+      schemes = [];
+    }
     if (s.ui && typeof s.ui === "object") {
       if (s.ui.mode) ui.mode = s.ui.mode;
       if (Array.isArray(s.ui.types)) ui.types = s.ui.types;
       ui.live = !!s.ui.live;
       if ([0, 10, 15, 20].includes(s.ui.alignTol)) ui.alignTol = s.ui.alignTol;
+      if ([0, 3, 5, 8].includes(s.ui.compress)) ui.compress = s.ui.compress;
+      if (typeof s.ui.viewerBase === "string" && /^https?:\/\//i.test(s.ui.viewerBase)) ui.viewerBase = s.ui.viewerBase;
     }
+    ensureSchemes();
+    // типы маршрутов — свойство схемы: у активной они перекрывают общие
+    const act = activeScheme();
+    if (act.types) ui.types = act.types; else act.types = ui.types;
     if (el.alignTol) el.alignTol.value = String(ui.alignTol);
-    if (initialized) { undoStack = []; redoStack = []; setMode(ui.mode); setLive(ui.live); }
+    if (el.compress) el.compress.value = String(ui.compress);
+    if (initialized) {
+      undoStack = []; redoStack = []; clearSelection();
+      refreshSchemeSelect();
+      if (schemeData) renderTypes();
+      setMode(ui.mode); setLive(ui.live);
+    }
   }
 
   return { init, getPersistedState, applyPersistedState, onLanguageChange, buildFromMtr };

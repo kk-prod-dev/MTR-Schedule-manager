@@ -397,6 +397,37 @@ app.post("/api/prefs", (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Живая публикация схемы сети: запись в открытом JSON-хранилище (jsonblob.com).
+// Запрос идёт с сервера приложения, а не из браузера: заголовок Location
+// у чужого API может быть недоступен из-за CORS. Без id — создаёт запись,
+// с id — заменяет её содержимое (ссылка остаётся прежней).
+const JSONBLOB_API = "https://jsonblob.com/api/jsonBlob";
+const BLOB_ID = /^[A-Za-z0-9-]{8,64}$/;
+app.post("/api/scheme-publish", async (req, res) => {
+  try {
+    const { id, data } = req.body || {};
+    if (!data || typeof data !== "object") return res.status(400).json({ error: "Нет данных схемы." });
+    if (id != null && !BLOB_ID.test(String(id))) return res.status(400).json({ error: "Некорректный id публикации." });
+    const body = JSON.stringify(data);
+    if (body.length > 4 * 1024 * 1024) return res.status(413).json({ error: "Схема слишком большая для публикации." });
+    const headers = { "Content-Type": "application/json", Accept: "application/json" };
+    if (id) {
+      const r = await fetch(`${JSONBLOB_API}/${id}`, { method: "PUT", headers, body, signal: AbortSignal.timeout(20000) });
+      if (r.status === 404) return res.status(404).json({ error: "Публикация не найдена на сервере (удалена?)." });
+      if (!r.ok) return res.status(502).json({ error: `Хранилище ответило ${r.status}.` });
+      return res.json({ id: String(id) });
+    }
+    const r = await fetch(JSONBLOB_API, { method: "POST", headers, body, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) return res.status(502).json({ error: `Хранилище ответило ${r.status}.` });
+    const loc = r.headers.get("location") || "";
+    const newId = loc.split("/").pop();
+    if (!BLOB_ID.test(newId)) return res.status(502).json({ error: "Хранилище не вернуло id записи." });
+    res.json({ id: newId });
+  } catch (e) {
+    res.status(502).json({ error: "Не удалось связаться с хранилищем: " + e.message });
+  }
+});
+
 app.delete("/api/drafts/:id", (req, res) => {
   const ok = drafts.remove(req.params.id);
   if (!ok) return res.status(404).json({ error: "Пробный маршрут не найден." });

@@ -27,11 +27,13 @@
 const SchemeCore = (function () {
   const VERSION = 1;
   const NS = "http://www.w3.org/2000/svg";
-  const LANE_GAP = 1.5;
+  const LANE_GAP = 1.5;   // значения по умолчанию; реальные — p.style.laneGap / cornerRadius
   const CORNER_R = 18;
   const FONT = '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
   const DASHES = ["solid", "dashed", "dotted", "double"];
-  const STATION_STYLES = ["auto", "tick", "circle", "pill"];
+  const SHAPE_DASHES = ["solid", "dashed", "dotted"];
+  const SHAPE_TYPES = ["rect", "ellipse", "line", "text"];
+  const STATION_STYLES = ["auto", "tick", "circle", "pill", "square", "diamond"];
   const LABEL_POS = ["auto", "n", "ne", "e", "se", "s", "sw", "w", "nw"];
   const LABEL_ANGLES = [0, -45, 45, -90, 90];
   const DIRS = {
@@ -48,6 +50,36 @@ const SchemeCore = (function () {
   const oneOf = (v, list, d) => (list.includes(v) ? v : d);
   const idList = (v) => (Array.isArray(v) ? v.map((x) => str(x, 80)).filter(Boolean) : []);
   const pt = (p) => (Array.isArray(p) ? { x: num(p[0], 0), y: num(p[1], 0) } : { x: num(p && p.x, 0), y: num(p && p.y, 0) });
+  const clamp = (v, lo, hi, d) => Math.max(lo, Math.min(hi, num(v, d)));
+  // цвет или "" (= по умолчанию)
+  const colorOpt = (v) => (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : "");
+  // цвет заливки/обводки фигуры: "none" = без заливки
+  const colorNone = (v, d) => (v === "none" || v === "" ? "none" : color(v, d));
+
+  function normalizeShape(s) {
+    s = s && typeof s === "object" ? s : {};
+    const type = oneOf(s.type, SHAPE_TYPES, "rect");
+    const sh = {
+      id: str(s.id, 80) || "sh-" + Math.random().toString(36).slice(2, 9),
+      type,
+      x: num(s.x, 0), y: num(s.y, 0),
+      w: clamp(s.w, -20000, 20000, 100), h: clamp(s.h, -20000, 20000, 60),
+      fill: colorNone(s.fill, type === "text" ? "#111827" : "#dbeafe"),
+      stroke: colorNone(s.stroke, type === "line" ? "#111827" : "none"),
+      strokeW: clamp(s.strokeW, 0, 60, 2),
+      opacity: clamp(s.opacity, 0.05, 1, 1),
+      dash: oneOf(s.dash, SHAPE_DASHES, "solid"),
+      rx: clamp(s.rx, 0, 500, 0),
+      rot: clamp(s.rot, -360, 360, 0),
+      layer: oneOf(s.layer, ["back", "front"], "back"),
+      text: str(s.text, 500),
+      fontSize: clamp(s.fontSize, 6, 200, 16),
+      bold: !!s.bold,
+      align: oneOf(s.align, ["start", "middle", "end"], "start"),
+    };
+    if (type !== "line" && type !== "text") { sh.w = Math.max(2, Math.abs(sh.w)); sh.h = Math.max(2, Math.abs(sh.h)); }
+    return sh;
+  }
 
   function emptyProject() {
     return normalize({});
@@ -68,7 +100,15 @@ const SchemeCore = (function () {
         labelSize: Math.max(6, Math.min(48, num(style.labelSize, 12))),
         bg: color(style.bg, "#ffffff"),
         labelColor: color(style.labelColor, "#111827"),
+        cornerRadius: clamp(style.cornerRadius, 0, 80, CORNER_R),
+        laneGap: clamp(style.laneGap, 0, 12, LANE_GAP),
+        stationScale: clamp(style.stationScale, 0.3, 4, 1),
+        stationFill: color(style.stationFill, "#ffffff"),
+        stationStroke: color(style.stationStroke, "#111827"),
+        labelAuto: style.labelAuto !== false,
+        transferScale: clamp(style.transferScale, 0.2, 4, 1),
       },
+      shapes: (Array.isArray(src.shapes) ? src.shapes : []).slice(0, 3000).map(normalizeShape),
       lines: (Array.isArray(src.lines) ? src.lines : []).slice(0, 2000).map((l) => {
         const line = {
           id: str(l.id, 80) || "line-" + Math.random().toString(36).slice(2, 9),
@@ -86,6 +126,7 @@ const SchemeCore = (function () {
         }
         if (l.mtrRouteIds) line.mtrRouteIds = idList(l.mtrRouteIds);
         if (l.mtrStationIds) line.mtrStationIds = idList(l.mtrStationIds);
+        if (l.mtrPassIds) line.mtrPassIds = idList(l.mtrPassIds);
         if (l.mtrType) line.mtrType = str(l.mtrType, 40);
         return line;
       }),
@@ -100,6 +141,13 @@ const SchemeCore = (function () {
           style: oneOf(s.style, STATION_STYLES, "auto"),
           label: { pos: oneOf(label.pos, LABEL_POS, "auto"), angle: oneOf(num(label.angle, 0), LABEL_ANGLES, 0) },
           lineIds: idList(s.lineIds),
+          passLineIds: idList(s.passLineIds),
+          fill: colorOpt(s.fill),
+          stroke: colorOpt(s.stroke),
+          strokeW: s.strokeW == null || s.strokeW === "" ? null : clamp(s.strokeW, 0, 20, 2),
+          size: clamp(s.size, 0.3, 5, 1),
+          labelSize: s.labelSize == null || s.labelSize === "" ? null : clamp(s.labelSize, 6, 48, 12),
+          labelColor: colorOpt(s.labelColor),
         };
         if (s.mtrStationId) st.mtrStationId = str(s.mtrStationId, 80);
         if (s.mtrName != null) st.mtrName = str(s.mtrName);
@@ -129,9 +177,12 @@ const SchemeCore = (function () {
     return {
       v: VERSION,
       t: p.title,
-      s: [p.style.lineWidth, p.style.labelSize, p.style.bg, p.style.labelColor],
+      s: [p.style.lineWidth, p.style.labelSize, p.style.bg, p.style.labelColor, p.style.cornerRadius, p.style.laneGap,
+        p.style.stationScale, p.style.stationFill, p.style.stationStroke, p.style.labelAuto ? 1 : 0, p.style.transferScale],
       l: p.lines.map((l) => [l.id, l.name, l.number, l.color, l.width, l.dash, l.offset, l.points.flatMap((q) => [r(q.x), r(q.y)]), l.lanes || null]),
-      st: p.stations.map((s) => [s.id, s.name, s.sub, r(s.x), r(s.y), s.style, s.label.pos, s.label.angle, s.lineIds]),
+      st: p.stations.map((s) => [s.id, s.name, s.sub, r(s.x), r(s.y), s.style, s.label.pos, s.label.angle, s.lineIds,
+        s.passLineIds, s.fill, s.stroke, s.strokeW, s.size, s.labelSize, s.labelColor]),
+      sh: p.shapes.map((x) => [x.type, x.x, x.y, x.w, x.h, x.fill, x.stroke, x.strokeW, x.opacity, x.dash, x.rx, x.rot, x.layer, x.text, x.fontSize, x.bold ? 1 : 0, x.align]),
       tr: p.transfers.map((t) => t.stationIds),
       lg: [p.legend.show ? 1 : 0, r(p.legend.x), r(p.legend.y), p.legend.title],
     };
@@ -144,7 +195,17 @@ const SchemeCore = (function () {
     const lg = arr(c.lg);
     return normalize({
       title: c.t,
-      style: { lineWidth: s[0], labelSize: s[1], bg: s[2], labelColor: s[3] },
+      style: {
+        lineWidth: s[0], labelSize: s[1], bg: s[2], labelColor: s[3], cornerRadius: s[4], laneGap: s[5],
+        stationScale: s[6], stationFill: s[7], stationStroke: s[8], labelAuto: s[9] !== 0, transferScale: s[10],
+      },
+      shapes: arr(c.sh).map((x, i) => {
+        x = arr(x);
+        return {
+          id: "sh-" + i, type: x[0], x: x[1], y: x[2], w: x[3], h: x[4], fill: x[5], stroke: x[6], strokeW: x[7], opacity: x[8],
+          dash: x[9], rx: x[10], rot: x[11], layer: x[12], text: x[13], fontSize: x[14], bold: x[15] === 1, align: x[16],
+        };
+      }),
       lines: arr(c.l).map((l) => {
         l = arr(l);
         const flat = arr(l[7]);
@@ -154,7 +215,10 @@ const SchemeCore = (function () {
       }),
       stations: arr(c.st).map((x) => {
         x = arr(x);
-        return { id: x[0], name: x[1], sub: x[2], x: x[3], y: x[4], style: x[5], label: { pos: x[6], angle: x[7] }, lineIds: x[8] };
+        return {
+          id: x[0], name: x[1], sub: x[2], x: x[3], y: x[4], style: x[5], label: { pos: x[6], angle: x[7] }, lineIds: x[8],
+          passLineIds: x[9], fill: x[10], stroke: x[11], strokeW: x[12], size: x[13], labelSize: x[14], labelColor: x[15],
+        };
       }),
       transfers: arr(c.tr).map((ids, i) => ({ id: "tr-" + i, stationIds: ids })),
       legend: { show: lg[0] !== 0, x: lg[1], y: lg[2], title: lg[3] },
@@ -257,7 +321,7 @@ const SchemeCore = (function () {
 
   const lineWidthOf = (p, l) => l.width || p.style.lineWidth;
   // смещение отрезка i в пикселях: полоса генератора + ручной сдвиг линии
-  const segOffset = (p, l, i) => (((l.lanes && l.lanes[i]) || 0) + (l.offset || 0)) * (lineWidthOf(p, l) + LANE_GAP);
+  const segOffset = (p, l, i) => (((l.lanes && l.lanes[i]) || 0) + (l.offset || 0)) * (lineWidthOf(p, l) + p.style.laneGap);
   const lineOffsets = (p, l) => l.points.slice(1).map((_, i) => segOffset(p, l, i));
 
   // Видимая позиция каждой вершины линии с учётом её полосы (там, где линия
@@ -300,7 +364,7 @@ const SchemeCore = (function () {
 
   function drawLinePath(g, p, line, pts, extraAttrs) {
     const w = lineWidthOf(p, line);
-    const d = roundedPath(pts, CORNER_R);
+    const d = roundedPath(pts, p.style.cornerRadius);
     const base = { d, fill: "none", "stroke-linecap": "round", "stroke-linejoin": "round" };
     if (line.dash === "double") {
       el("path", Object.assign({}, base, { stroke: line.color, "stroke-width": w * 1.3 }, extraAttrs), g);
@@ -315,12 +379,12 @@ const SchemeCore = (function () {
 
   // Сдвиг от вершины-излома k к середине её скругления (roundedPath): линия
   // на углу идёт по дуге внутри угла, и значок станции должен стоять на ней
-  function cornerShift(pts, k) {
+  function cornerShift(pts, k, R) {
     if (k <= 0 || k >= pts.length - 1) return { x: 0, y: 0 };
     const a = pts[k - 1], v = pts[k], b = pts[k + 1];
     const ua = unit(sub(a, v)), ub = unit(sub(b, v));
     if (Math.abs(cross(ua, ub)) < 1e-6) return { x: 0, y: 0 };
-    const rr = Math.min(CORNER_R, len(sub(a, v)) / 2, len(sub(b, v)) / 2);
+    const rr = Math.min(R, len(sub(a, v)) / 2, len(sub(b, v)) / 2);
     return { x: (ua.x + ub.x) * rr * 0.25, y: (ua.y + ub.y) * rr * 0.25 };
   }
 
@@ -347,7 +411,7 @@ const SchemeCore = (function () {
       const pts = items[0].line.points;
       const k = vertexAt(pts, here);
       if (k > 0 && k < pts.length - 1) {
-        const sh = cornerShift(pts, k);
+        const sh = cornerShift(pts, k, p.style.cornerRadius);
         c = { x: here.x + sh.x, y: here.y + sh.y };
         const ua = unit(sub(pts[k], pts[k - 1])), ub = unit(sub(pts[k + 1], pts[k]));
         if (Math.abs(cross(ua, ub)) > 1e-6) dir = unit({ x: ua.x + ub.x, y: ua.y + ub.y });
@@ -362,7 +426,7 @@ const SchemeCore = (function () {
       const pts = it.line.points;
       const k = vertexAt(pts, here);
       const segs = k >= 0 ? [k - 1, k].filter((s) => s >= 0 && s < pts.length - 1) : [it.near.seg];
-      const sh = cornerShift(pts, k);
+      const sh = cornerShift(pts, k, p.style.cornerRadius);
       const base = { x: here.x + sh.x, y: here.y + sh.y };
       it.pts = segs.map((s) => {
         const n = leftNormal(unit(sub(pts[s + 1], pts[s])));
@@ -403,14 +467,36 @@ const SchemeCore = (function () {
     return [Math.round(n.x), Math.round(n.y)];
   }
 
-  function drawStation(gMarks, gLabels, p, st, geo) {
-    const style = resolveStyle(st, geo);
+  // ------------------------------------------------------------
+  // Значок станции
+  // ------------------------------------------------------------
+  const stScale = (p, st) => p.style.stationScale * (st.size || 1);
+
+  // Радиус охвата значка (для отступа подписи) — без рисования
+  function markerReach(p, st, geo, style) {
+    const k = stScale(p, st);
+    if (style === "pill") {
+      const lanes = Math.max(Math.abs(geo.lo), Math.abs(geo.hi));
+      return lanes + geo.maxW * 0.95 * k;
+    }
+    if (style === "circle" || style === "square" || style === "diamond") {
+      const pos = geo.items[0] ? Math.abs(geo.items[0].pos) : 0;
+      return pos + geo.maxW * 0.8 * k * (style === "circle" ? 1 : style === "square" ? 1.05 : 1.3);
+    }
+    return Math.max(Math.abs(geo.lo), Math.abs(geo.hi)) + geo.maxW * 0.85 * k;
+  }
+
+  function drawMarker(gMarks, p, st, geo, style, ld) {
     const c = geo.c;
     const n = geo.nrm;
+    const k = stScale(p, st);
     const ang = Math.atan2(n.y, n.x) * 180 / Math.PI;
     const g = el("g", { "data-kind": "station", "data-id": st.id, class: "sc-station" }, gMarks);
     const primary = geo.items[0];
     const lineColor = primary ? primary.line.color : "#64748b";
+    const fill = st.fill || p.style.stationFill;
+    const stroke = st.stroke || p.style.stationStroke;
+    const sw = st.strokeW != null ? st.strokeW : null;
     let reach = Math.max(Math.abs(geo.lo), Math.abs(geo.hi));
 
     if (style === "pill") {
@@ -422,15 +508,13 @@ const SchemeCore = (function () {
       if (!pts.length) pts.push({ x: c.x, y: c.y, w: geo.maxW, n });
       const canon = (m) => (m.x < -1e-6 || (Math.abs(m.x) <= 1e-6 && m.y < 0) ? { x: -m.x, y: -m.y } : m);
       const axisKey = (v) => { const m = canon(v); return Math.round(Math.atan2(m.y, m.x) * 8 / Math.PI); };
-      // все линии идут одинаково (прямо или вместе поворачивают) — обычная
-      // капсула поперёк пучка (на повороте — по биссектрисе)
       const sig = (it) => [...new Set(it.pts.map((q) => axisKey(q.n || n)))].sort().join(",");
       const simple = geo.items.length && geo.items.every((it) => sig(it) === sig(geo.items[0]));
       const groups = new Map();
       for (const q of pts) {
-        const k = axisKey(q.n || n);
-        if (!groups.has(k)) groups.set(k, { m: canon(q.n || n), count: 0 });
-        groups.get(k).count++;
+        const key = axisKey(q.n || n);
+        if (!groups.has(key)) groups.set(key, { m: canon(q.n || n), count: 0 });
+        groups.get(key).count++;
       }
       const m = simple ? n : [...groups.values()].sort((a, b) => b.count - a.count)[0].m;
       const along = { x: -m.y, y: m.x };
@@ -439,71 +523,207 @@ const SchemeCore = (function () {
         const t = (q.x - c.x) * m.x + (q.y - c.y) * m.y;
         const s = (q.x - c.x) * along.x + (q.y - c.y) * along.y;
         tLo = Math.min(tLo, t - q.w / 2); tHi = Math.max(tHi, t + q.w / 2);
-        // вдоль основного направления полосы основного пучка — точки, а
-        // примыкающие под углом занимают свою ширину
         const crossing = !simple && Math.abs((q.n || m).x * m.x + (q.n || m).y * m.y) < 0.9;
         sLo = Math.min(sLo, s - (crossing ? q.w / 2 : 0)); sHi = Math.max(sHi, s + (crossing ? q.w / 2 : 0));
       }
-      const pad = geo.maxW * 0.55;
+      const pad = geo.maxW * 0.45 * k;
       const half = (tHi - tLo) / 2 + pad;
-      const thick = Math.max(geo.maxW * 1.7, sHi - sLo + pad * 2);
+      const thick = Math.max(geo.maxW * 1.35 * k, sHi - sLo + pad * 2);
       const mid = { x: c.x + m.x * (tLo + tHi) / 2 + along.x * (sLo + sHi) / 2, y: c.y + m.y * (tLo + tHi) / 2 + along.y * (sLo + sHi) / 2 };
       el("rect", {
         x: -half, y: -thick / 2, width: half * 2, height: thick, rx: Math.min(thick, half * 2) / 2,
-        fill: "#ffffff", stroke: "#111827", "stroke-width": Math.max(1.2, geo.maxW * 0.28),
+        fill, stroke, "stroke-width": sw != null ? sw : Math.max(1.1, geo.maxW * 0.2 * k),
         transform: `translate(${mid.x} ${mid.y}) rotate(${Math.atan2(m.y, m.x) * 180 / Math.PI})`,
       }, g);
       reach = len(sub(mid, c)) + Math.max(half, thick / 2);
-    } else if (style === "circle") {
+    } else if (style === "circle" || style === "square" || style === "diamond") {
       const pos = primary ? primary.pos : 0;
-      const r = geo.maxW * 0.95;
-      el("circle", {
-        cx: c.x + n.x * pos, cy: c.y + n.y * pos, r,
-        fill: "#ffffff", stroke: lineColor, "stroke-width": Math.max(1.2, geo.maxW * 0.45),
-      }, g);
-      reach = Math.abs(pos) + r;
+      const r = geo.maxW * 0.8 * k;
+      const cx = c.x + n.x * pos, cy = c.y + n.y * pos;
+      const common = { fill, stroke: st.stroke || lineColor, "stroke-width": sw != null ? sw : Math.max(1.1, geo.maxW * 0.38 * k) };
+      if (style === "circle") el("circle", Object.assign({ cx, cy, r }, common), g);
+      else {
+        const side = r * (style === "square" ? 1.9 : 1.7);
+        el("rect", Object.assign({
+          x: -side / 2, y: -side / 2, width: side, height: side, rx: style === "square" ? side * 0.12 : 0,
+          transform: `translate(${cx} ${cy}) rotate(${style === "diamond" ? ang + 45 : ang})`,
+        }, common), g);
+      }
+      reach = Math.abs(pos) + r * (style === "circle" ? 1 : style === "square" ? 1.05 : 1.3);
     } else {
       // засечка наружу, в сторону подписи
-      const ld = labelDir(st, geo);
       const side = ld[0] * n.x + ld[1] * n.y >= 0 ? 1 : -1;
       const from = side > 0 ? geo.hi : -geo.lo;
-      const tick = geo.maxW * 0.95;
+      const tick = geo.maxW * 0.85 * k;
+      const th = sw != null ? Math.max(1, sw * 2) : geo.maxW * 0.8 * k;
       el("rect", {
-        x: from - 0.5, y: -geo.maxW * 0.45, width: tick + 0.5, height: geo.maxW * 0.9,
-        fill: lineColor,
+        x: from - 0.5, y: -th / 2, width: tick + 0.5, height: th,
+        fill: st.fill || lineColor,
         transform: `translate(${c.x} ${c.y}) rotate(${side > 0 ? ang : ang + 180})`,
       }, g);
       reach = from + tick;
     }
     // невидимая зона попадания для мыши
     el("circle", { cx: c.x, cy: c.y, r: Math.max(8, reach + 2), fill: "transparent" }, g);
+    return reach;
+  }
 
-    // Подпись
-    if (!st.name && !st.sub) return;
-    const ld = labelDir(st, geo);
-    const dl = Math.hypot(ld[0], ld[1]) || 1;
-    const gap = reach + 5;
-    const ax = c.x + (ld[0] / dl) * gap, ay = c.y + (ld[1] / dl) * gap;
-    const size = p.style.labelSize;
+  // ------------------------------------------------------------
+  // Подписи станций: геометрия, автоподбор положения
+  // ------------------------------------------------------------
+  const CAND_DIRS = ["e", "w", "n", "s", "ne", "se", "nw", "sw"];
+  // порядок перебора кандидатов (положение, наклон) после «по умолчанию»
+  const CAND_LIST = CAND_DIRS.map((d) => [d, 0]).concat([["ne", -45], ["sw", -45], ["se", 45], ["nw", 45]]);
+
+  function textW(s, size, k) { return (s ? s.length : 0) * size * k; }
+
+  // Раскладка подписи: якорь, наклон и габарит в виде повёрнутого прямоугольника
+  function labelLayout(p, st, geo, reach, ld, angle) {
+    const size = st.labelSize || p.style.labelSize;
     const lines = [st.name, st.sub].filter(Boolean);
     const lh = size * 1.15;
-    const anchor = st.label.angle !== 0 ? (ld[0] < 0 ? "end" : "start") : ld[0] > 0 ? "start" : ld[0] < 0 ? "end" : "middle";
-    // вертикально: блок над/под/по центру точки привязки
+    const dl = Math.hypot(ld[0], ld[1]) || 1;
+    const gap = reach + 4;
+    const c = geo.c;
+    const ax = c.x + (ld[0] / dl) * gap, ay = c.y + (ld[1] / dl) * gap;
+    const anchor = angle !== 0 ? (ld[0] < 0 ? "end" : "start") : ld[0] > 0 ? "start" : ld[0] < 0 ? "end" : "middle";
     const blockH = lh * (lines.length - 1);
     const baseY = ld[1] < 0 ? -blockH - size * 0.25 : ld[1] > 0 ? size * 0.8 : size * 0.35 - blockH / 2;
+    const w = Math.max(textW(st.name, size, 0.58), textW(st.sub, size * 0.85, 0.52));
+    const x0 = anchor === "start" ? 0 : anchor === "end" ? -w : -w / 2;
+    const y0 = baseY - size * 0.85, y1 = baseY + blockH + size * 0.25;
+    const lcx = x0 + w / 2, lcy = (y0 + y1) / 2;
+    const a = angle * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+    return {
+      ax, ay, anchor, baseY, angle, lines, size, lh,
+      box: { cx: ax + lcx * ca - lcy * sa, cy: ay + lcx * sa + lcy * ca, ca, sa, hw: w / 2 + 1, hh: (y1 - y0) / 2 + 1 },
+    };
+  }
+
+  function obbCorners(b) {
+    const out = [];
+    for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
+      out.push({ x: b.cx + sx * b.hw * b.ca - sy * b.hh * b.sa, y: b.cy + sx * b.hw * b.sa + sy * b.hh * b.ca });
+    }
+    return out;
+  }
+  function obbOverlap(a, b) {
+    const axes = [{ x: a.ca, y: a.sa }, { x: -a.sa, y: a.ca }, { x: b.ca, y: b.sa }, { x: -b.sa, y: b.ca }];
+    const ca = obbCorners(a), cb = obbCorners(b);
+    for (const ax of axes) {
+      let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+      for (const q of ca) { const d = q.x * ax.x + q.y * ax.y; if (d < a0) a0 = d; if (d > a1) a1 = d; }
+      for (const q of cb) { const d = q.x * ax.x + q.y * ax.y; if (d < b0) b0 = d; if (d > b1) b1 = d; }
+      if (a1 < b0 || b1 < a0) return false;
+    }
+    return true;
+  }
+  // круг (x,y,r) пересекает повёрнутый прямоугольник
+  function obbHitsCircle(b, x, y, r) {
+    const dx = x - b.cx, dy = y - b.cy;
+    const lx = Math.abs(dx * b.ca + dy * b.sa), ly = Math.abs(-dx * b.sa + dy * b.ca);
+    const ex = Math.max(0, lx - b.hw), ey = Math.max(0, ly - b.hh);
+    return ex * ex + ey * ey <= r * r;
+  }
+
+  const CELL = 32;
+  class Hash {
+    constructor() { this.m = new Map(); }
+    add(x, y, r, tag) {
+      const key = Math.floor(x / CELL) + "," + Math.floor(y / CELL);
+      let a = this.m.get(key);
+      if (!a) this.m.set(key, (a = []));
+      a.push({ x, y, r, tag });
+    }
+    query(b, fn) {
+      const cs = obbCorners(b);
+      const x0 = Math.min(...cs.map((q) => q.x)), x1 = Math.max(...cs.map((q) => q.x));
+      const y0 = Math.min(...cs.map((q) => q.y)), y1 = Math.max(...cs.map((q) => q.y));
+      for (let cx = Math.floor((x0 - 20) / CELL); cx <= Math.floor((x1 + 20) / CELL); cx++) {
+        for (let cy = Math.floor((y0 - 20) / CELL); cy <= Math.floor((y1 + 20) / CELL); cy++) {
+          const a = this.m.get(cx + "," + cy);
+          if (a) for (const o of a) fn(o);
+        }
+      }
+    }
+  }
+
+  /**
+   * Выбирает положение и наклон каждой подписи. Ручные (label.pos ≠ auto)
+   * остаются как есть и служат препятствиями. Остальные — жадно, начиная с
+   * самых «занятых» станций: перебираются 8 направлений и наклон ±45°,
+   * штрафуются пересечения с другими подписями, линиями и значками.
+   */
+  function placeLabels(p, entries, offsetPts) {
+    const hash = new Hash();
+    for (const line of p.lines) {
+      const pts = offsetPts.get(line.id);
+      if (!pts) continue;
+      const r = lineWidthOf(p, line) / 2 + 1;
+      const step = Math.max(3, r * 1.5);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        const l = len(sub(b, a));
+        const n = Math.max(1, Math.ceil(l / step));
+        for (let k = 0; k <= n; k++) hash.add(a.x + ((b.x - a.x) * k) / n, a.y + ((b.y - a.y) * k) / n, r, "line");
+      }
+    }
+    for (const e of entries) hash.add(e.geo.c.x, e.geo.c.y, e.reach + 1, e.st.id);
+    const placed = [];
+    const result = new Map();
+    const fixed = (e) => e.st.label.pos !== "auto";
+    const dirs = (e) => (fixed(e) ? DIRS[e.st.label.pos] : labelDir(e.st, e.geo));
+    for (const e of entries) {
+      if (!(e.st.name || e.st.sub)) continue;
+      if (fixed(e) || !p.style.labelAuto) {
+        const lay = labelLayout(p, e.st, e.geo, e.reach, dirs(e), e.st.label.angle);
+        result.set(e.st.id, lay);
+        placed.push(lay.box);
+      }
+    }
+    const cost = (e, box) => {
+      let c = 0;
+      for (const o of placed) if (obbOverlap(box, o)) c += 1000;
+      hash.query(box, (o) => {
+        if (o.tag === e.st.id) return; // собственный значок
+        if (obbHitsCircle(box, o.x, o.y, o.r)) c += o.tag === "line" ? 40 : 500;
+      });
+      return c;
+    };
+    const todo = entries.filter((e) => (e.st.name || e.st.sub) && !result.has(e.st.id))
+      .sort((a, b) => b.geo.items.length - a.geo.items.length || (b.st.name || "").length - (a.st.name || "").length);
+    for (const e of todo) {
+      const userAng = e.st.label.angle;
+      const cands = [[dirs(e), userAng]];
+      if (userAng) for (const d of CAND_DIRS) cands.push([DIRS[d], userAng]);
+      else for (const [d, a] of CAND_LIST) cands.push([DIRS[d], a]);
+      let best = null;
+      for (let i = 0; i < cands.length; i++) {
+        const lay = labelLayout(p, e.st, e.geo, e.reach, cands[i][0], cands[i][1]);
+        const cst = cost(e, lay.box) + i * 3 + (cands[i][1] ? 8 : 0);
+        if (!best || cst < best.cst) best = { cst, lay };
+        if (cst === 0) break;
+      }
+      result.set(e.st.id, best.lay);
+      placed.push(best.lay.box);
+    }
+    return result;
+  }
+
+  function drawLabel(gLabels, p, st, lay) {
     const tg = el("g", {
       class: "sc-label", "data-kind": "station", "data-id": st.id,
-      transform: `translate(${ax} ${ay})${st.label.angle ? ` rotate(${st.label.angle})` : ""}`,
+      transform: `translate(${lay.ax} ${lay.ay})${lay.angle ? ` rotate(${lay.angle})` : ""}`,
     }, gLabels);
-    lines.forEach((txt, i) => {
+    lay.lines.forEach((txt, i) => {
       const isSub = i === 1;
       const t = el("text", {
-        x: 0, y: baseY + lh * i,
-        "text-anchor": anchor,
-        "font-size": isSub ? size * 0.85 : size,
+        x: 0, y: lay.baseY + lay.lh * i,
+        "text-anchor": lay.anchor,
+        "font-size": isSub ? lay.size * 0.85 : lay.size,
         "font-weight": isSub ? 400 : 600,
-        fill: isSub ? "#6b7280" : p.style.labelColor,
-        stroke: p.style.bg, "stroke-width": Math.max(2, size * 0.25), "paint-order": "stroke",
+        fill: isSub ? "#6b7280" : (st.labelColor || p.style.labelColor),
+        stroke: p.style.bg, "stroke-width": Math.max(2, lay.size * 0.25), "paint-order": "stroke",
         "stroke-linejoin": "round",
       }, tg);
       t.textContent = txt;
@@ -588,10 +808,10 @@ const SchemeCore = (function () {
       chain.push(rest.splice(bi, 1)[0]);
     }
     const d = chain.map((s, i) => `${i ? "L" : "M"}${s.x} ${s.y}`).join(" ");
-    const w = p.style.lineWidth * 1.4;
+    const w = p.style.lineWidth * 1.1 * p.style.transferScale;
     const tg = el("g", { "data-kind": "transfer", "data-id": tr.id, class: "sc-transfer" }, g);
-    el("path", { d, fill: "none", stroke: "#111827", "stroke-width": w + 3, "stroke-linecap": "round" }, tg);
-    el("path", { d, fill: "none", stroke: "#ffffff", "stroke-width": w, "stroke-linecap": "round" }, tg);
+    el("path", { d, fill: "none", stroke: p.style.stationStroke, "stroke-width": w + 2.5, "stroke-linecap": "round" }, tg);
+    el("path", { d, fill: "none", stroke: p.style.stationFill, "stroke-width": w, "stroke-linecap": "round" }, tg);
   }
 
   function drawLegend(g, p) {
@@ -628,6 +848,80 @@ const SchemeCore = (function () {
     box.setAttribute("height", String(y + pad * 0.5));
   }
 
+  // ------------------------------------------------------------
+  // Фигуры (прямоугольник, эллипс, линия, текст)
+  // ------------------------------------------------------------
+  // Габарит фигуры в её собственной (не повёрнутой) системе. Для текста —
+  // оценка по длине строк.
+  function shapeBox(sh) {
+    if (sh.type === "text") {
+      const lines = (sh.text || " ").split("\n");
+      const w = Math.max(...lines.map((l) => l.length), 1) * sh.fontSize * 0.58;
+      const h = lines.length * sh.fontSize * 1.2;
+      const x = sh.align === "middle" ? sh.x - w / 2 : sh.align === "end" ? sh.x - w : sh.x;
+      return { x, y: sh.y, w, h };
+    }
+    if (sh.type === "line") {
+      return { x: Math.min(sh.x, sh.x + sh.w), y: Math.min(sh.y, sh.y + sh.h), w: Math.abs(sh.w), h: Math.abs(sh.h) };
+    }
+    return { x: sh.x, y: sh.y, w: sh.w, h: sh.h };
+  }
+
+  function drawShape(g, p, sh) {
+    const b = shapeBox(sh);
+    const rot = sh.rot ? ` rotate(${sh.rot} ${b.x + b.w / 2} ${b.y + b.h / 2})` : "";
+    const root = el("g", { "data-kind": "shape", "data-id": sh.id, class: "sc-shape", transform: rot.trim() || null, opacity: sh.opacity < 1 ? sh.opacity : null }, g);
+    const dash = sh.dash === "dashed" ? `${sh.strokeW * 3} ${sh.strokeW * 2}` : sh.dash === "dotted" ? `0.1 ${sh.strokeW * 2}` : null;
+    const common = {
+      fill: sh.fill, stroke: sh.stroke, "stroke-width": sh.stroke === "none" ? 0 : sh.strokeW,
+      "stroke-dasharray": dash, "stroke-linecap": "round", "stroke-linejoin": "round",
+    };
+    if (sh.type === "rect") {
+      el("rect", Object.assign({ x: sh.x, y: sh.y, width: sh.w, height: sh.h, rx: Math.min(sh.rx, sh.w / 2, sh.h / 2) }, common), root);
+    } else if (sh.type === "ellipse") {
+      el("ellipse", Object.assign({ cx: sh.x + sh.w / 2, cy: sh.y + sh.h / 2, rx: sh.w / 2, ry: sh.h / 2 }, common), root);
+    } else if (sh.type === "line") {
+      // широкая прозрачная зона попадания
+      el("line", { x1: sh.x, y1: sh.y, x2: sh.x + sh.w, y2: sh.y + sh.h, stroke: "transparent", "stroke-width": Math.max(10, sh.strokeW + 8), "stroke-linecap": "round" }, root);
+      el("line", Object.assign({ x1: sh.x, y1: sh.y, x2: sh.x + sh.w, y2: sh.y + sh.h }, common, { fill: "none", stroke: sh.stroke === "none" ? "#111827" : sh.stroke, "stroke-width": Math.max(1, sh.strokeW) }), root);
+    } else {
+      el("rect", { x: b.x, y: b.y, width: b.w, height: b.h, fill: "transparent" }, root);
+      const lines = (sh.text || "").split("\n");
+      lines.forEach((ln, i) => {
+        const t = el("text", {
+          x: sh.x, y: sh.y + sh.fontSize * (0.95 + 1.2 * i), "text-anchor": sh.align, "font-size": sh.fontSize,
+          "font-weight": sh.bold ? 700 : 400, fill: sh.fill === "none" ? "#111827" : sh.fill,
+          stroke: sh.stroke === "none" ? null : sh.stroke, "stroke-width": sh.stroke === "none" ? null : sh.strokeW,
+          "paint-order": "stroke", "stroke-linejoin": "round",
+        }, root);
+        t.textContent = ln;
+      });
+    }
+  }
+
+  // Часть полилинии в радиусе R (вдоль линии) от ближайшей к c точки
+  function slicePolyline(pts, c, R) {
+    const near = nearestOnPolyline(pts, c);
+    if (!near) return [];
+    const out = [near.point];
+    let rem = R;
+    for (let i = near.seg + 1; i < pts.length && rem > 0; i++) {
+      const prev = out[out.length - 1];
+      const d = len(sub(pts[i], prev));
+      if (d >= rem) { out.push({ x: prev.x + ((pts[i].x - prev.x) / d) * rem, y: prev.y + ((pts[i].y - prev.y) / d) * rem }); rem = 0; }
+      else { out.push(pts[i]); rem -= d; }
+    }
+    const back = [];
+    rem = R;
+    let cur = near.point;
+    for (let i = near.seg; i >= 0 && rem > 0; i--) {
+      const d = len(sub(pts[i], cur));
+      if (d >= rem) { back.push({ x: cur.x + ((pts[i].x - cur.x) / d) * rem, y: cur.y + ((pts[i].y - cur.y) / d) * rem }); rem = 0; }
+      else { back.push(pts[i]); rem -= d; cur = pts[i]; }
+    }
+    return back.reverse().concat(out);
+  }
+
   /**
    * Рисует схему в группу root (очищает её). opts.live — живые данные
    * (только редактор): { conflictStations: Map(mtrStationId→count),
@@ -641,13 +935,18 @@ const SchemeCore = (function () {
     const stById = new Map(p.stations.map((s) => [s.id, s]));
     const transferStations = new Set(p.transfers.flatMap((t) => t.stationIds));
 
+    const gShapesBack = el("g", { class: "sc-shapes-back" }, root);
     const gLive = el("g", { class: "sc-live" }, root);
     const gLines = el("g", { class: "sc-lines" }, root);
     const gTransfers = el("g", { class: "sc-transfers" }, root);
     const gMarks = el("g", { class: "sc-stations" }, root);
+    const gThrough = el("g", { class: "sc-through", "pointer-events": "none" }, root);
     const gBadges = el("g", { class: "sc-badges" }, root);
+    const gShapesFront = el("g", { class: "sc-shapes-front" }, root);
     const gLabels = el("g", { class: "sc-labels" }, root);
     const gLegend = el("g", { class: "sc-legend-layer" }, root);
+
+    for (const sh of p.shapes) drawShape(sh.layer === "front" ? gShapesFront : gShapesBack, p, sh);
 
     const live = opts.live || null;
     const offsetPts = new Map();
@@ -657,13 +956,13 @@ const SchemeCore = (function () {
       offsetPts.set(line.id, pts);
       const g = el("g", { "data-kind": "line", "data-id": line.id, class: "sc-line" }, gLines);
       // широкая прозрачная зона попадания
-      el("path", { d: roundedPath(pts, CORNER_R), fill: "none", stroke: "transparent", "stroke-width": lineWidthOf(p, line) + 10, "stroke-linecap": "round" }, g);
+      el("path", { d: roundedPath(pts, p.style.cornerRadius), fill: "none", stroke: "transparent", "stroke-width": lineWidthOf(p, line) + 10, "stroke-linecap": "round" }, g);
       drawLinePath(g, p, line, pts);
       if (live && live.delayedRoutes && (line.mtrRouteIds || []).some((r) => live.delayedRoutes.has(r))) {
         const ms = Math.max(...line.mtrRouteIds.map((r) => live.delayedRoutes.get(r) || 0));
         const lg = el("g", { "data-kind": "line", "data-id": line.id }, gLive);
         el("path", {
-          d: roundedPath(pts, CORNER_R), fill: "none", stroke: "#ef4444", "stroke-opacity": 0.35,
+          d: roundedPath(pts, p.style.cornerRadius), fill: "none", stroke: "#ef4444", "stroke-opacity": 0.35,
           "stroke-width": lineWidthOf(p, line) + 10, "stroke-linecap": "round", "stroke-linejoin": "round",
           class: "sc-live-delay",
         }, lg);
@@ -675,10 +974,28 @@ const SchemeCore = (function () {
 
     const drawn = { transferStations };
     const geos = new Map();
+    const entries = [];
     for (const st of p.stations) {
       const geo = stationGeometry(p, st, linesById, drawn);
       geos.set(st.id, geo);
-      drawStation(gMarks, gLabels, p, st, geo);
+      const style = resolveStyle(st, geo);
+      entries.push({ st, geo, style, reach: markerReach(p, st, geo, style) });
+    }
+    const labels = placeLabels(p, entries, offsetPts);
+    for (const { st, geo, style } of entries) {
+      const lay = labels.get(st.id);
+      // засечка смотрит в сторону выбранной подписи
+      const ld = lay ? [lay.ax - geo.c.x, lay.ay - geo.c.y] : labelDir(st, geo);
+      const reach = drawMarker(gMarks, p, st, geo, style, ld);
+      if (lay) drawLabel(gLabels, p, st, lay);
+      // линии, проходящие станцию без остановки (экспресс), — поверх значка
+      for (const lid of st.passLineIds || []) {
+        const pts = offsetPts.get(lid);
+        const line = linesById.get(lid);
+        if (!pts || !line) continue;
+        const part = slicePolyline(pts, geo.c, reach + lineWidthOf(p, line) * 1.2);
+        if (part.length > 1) drawLinePath(gThrough, p, line, part);
+      }
       if (geo.ends.length) drawEndBadges(gBadges, p, st, geo);
       if (live && live.conflictStations && st.mtrStationId && live.conflictStations.has(st.mtrStationId)) {
         const cg = el("g", { "data-kind": "station", "data-id": st.id, class: "sc-live-conflict" }, gLive);
@@ -696,6 +1013,7 @@ const SchemeCore = (function () {
     const add = (x, y) => { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; };
     p.stations.forEach((s) => add(s.x, s.y));
     p.lines.forEach((l) => l.points.forEach((q) => add(q.x, q.y)));
+    p.shapes.forEach((sh) => { const b = shapeBox(sh); add(b.x, b.y); add(b.x + b.w, b.y + b.h); });
     if (minX === Infinity) return null;
     return { minX, minY, maxX, maxY };
   }
@@ -751,10 +1069,10 @@ const SchemeCore = (function () {
   }
 
   return {
-    VERSION, NS, STATION_STYLES, LABEL_POS, LABEL_ANGLES, DASHES,
+    VERSION, NS, STATION_STYLES, LABEL_POS, LABEL_ANGLES, DASHES, SHAPE_DASHES, SHAPE_TYPES, DIRS,
     normalize, emptyProject, toPublished, fromPublished,
     render, bounds, toSvgElement, toSvgString, toPngBlob,
-    nearestOnPolyline, offsetPolylineVar, vertexDisplayPoints, el,
+    nearestOnPolyline, offsetPolylineVar, vertexDisplayPoints, el, normalizeShape, shapeBox,
   };
 })();
 
