@@ -307,8 +307,8 @@ const NetworkScheme = (function () {
         const seqR = fwd ? [...ids].reverse() : ids;
         const idxR = seq.length - 2 - idx;
         const entry = { line, order, seq, idx, seqR, idxR, dir: fwd ? 1 : -1, hopIdx: i };
-        // объединённые линии идут по перегону одной полосой
-        const twin = line.group && h.entries.find((x) => x.line !== line && x.line.group === line.group);
+        // объединённые линии (и повторный проезд одной линии по тому же перегону) — одной полосой
+        const twin = line.group && h.entries.find((x) => x.line.group === line.group);
         if (twin) (twin.dups || (twin.dups = [])).push(entry); else h.entries.push(entry);
       }
     });
@@ -1344,7 +1344,7 @@ const NetworkScheme = (function () {
     }
     if (!targets.length) { setStatus(tt("schemeStyleNoTarget")); return; }
     pushHistory();
-    targets.forEach((o) => Object.assign(o, JSON.parse(JSON.stringify(styleClip.props))));
+    targets.forEach((o) => { Object.assign(o, JSON.parse(JSON.stringify(styleClip.props))); if (styleClip.kind === "line") shareGroupProps(o); });
     changed();
     setStatus(tt("schemeStylePasted", { n: targets.length }));
   }
@@ -1703,7 +1703,7 @@ const NetworkScheme = (function () {
         pick.addEventListener("change", () => { if (pick.checked) mergePick.add(l.id); else mergePick.delete(l.id); });
         wrap.append(h("div", { class: "scheme-list-row" + (l.group ? " is-merged" : "") }, [
           pick,
-          bindEdit(h("input", { type: "color", value: l.color, class: "scheme-list-color" }), (v) => { l.color = v; }),
+          bindEdit(h("input", { type: "color", value: l.color, class: "scheme-list-color" }), (v) => { l.color = v; shareGroupProps(l); }),
           bindEdit(h("input", { type: "text", value: l.number, class: "scheme-list-num", title: tt("schemeFieldNumber") }), (v) => { l.number = v.slice(0, 24); }),
           bindEdit(h("input", { type: "text", value: l.name, class: "scheme-list-name", title: tt("schemeFieldName") }), (v) => { l.name = v; }),
           h("button", { type: "button", class: "icon-btn", text: "◎", title: tt("schemeSelectLine"), onclick: () => { clearSelection(); sel = { kind: "line", id: l.id }; renderOverlay(); renderProps(); } }),
@@ -1824,14 +1824,14 @@ const NetworkScheme = (function () {
       const line = project.lines.find((l) => l.id === sel.id);
       if (!line) { sel = null; return renderProps(); }
       const offsetVal = h("span", { class: "scheme-offset-val", text: String(line.offset) });
-      const bump = (d) => () => { pushHistory(); line.offset = Math.max(-8, Math.min(8, line.offset + d)); offsetVal.textContent = String(line.offset); render(); scheduleSave(); };
+      const bump = (d) => () => { pushHistory(); line.offset = Math.max(-8, Math.min(8, line.offset + d)); shareGroupProps(line); offsetVal.textContent = String(line.offset); render(); scheduleSave(); };
       box.append(
         title("schemePropLine"),
         field("schemeFieldName", textInput(line.name, (v) => { line.name = v; })),
         field("schemeFieldNumber", textInput(line.number, (v) => { line.number = v; })),
-        field("schemeFieldColor", colorInput(line.color, (v) => { line.color = v; })),
-        field("schemeFieldWidth", numInput(line.width, 1, 30, (v) => { line.width = v === "" ? null : Math.max(1, Math.min(30, Number(v) || 1)); }, String(project.style.lineWidth))),
-        field("schemeFieldDash", selectInput(line.dash, C().DASHES.map((d) => [d, tt("schemeDash_" + d)]), (v) => { line.dash = v; })),
+        field("schemeFieldColor", colorInput(line.color, (v) => { line.color = v; shareGroupProps(line); })),
+        field("schemeFieldWidth", numInput(line.width, 1, 30, (v) => { line.width = v === "" ? null : Math.max(1, Math.min(30, Number(v) || 1)); shareGroupProps(line); }, String(project.style.lineWidth))),
+        field("schemeFieldDash", selectInput(line.dash, C().DASHES.map((d) => [d, tt("schemeDash_" + d)]), (v) => { line.dash = v; shareGroupProps(line); })),
         field("schemeFieldOffset", h("span", { class: "scheme-offset" }, [
           h("button", { type: "button", class: "icon-btn", text: "−", onclick: bump(-1) }), offsetVal,
           h("button", { type: "button", class: "icon-btn", text: "+", onclick: bump(1) }),
@@ -2066,6 +2066,46 @@ const NetworkScheme = (function () {
   }
 
   const mergePick = new Set();
+  // Спокойные, но контрастные цвета для объединённых линий
+  const GROUP_COLORS = ["#4e79a7", "#e15759", "#59a14f", "#f28e2b", "#b07aa1", "#76b7b2", "#edc948", "#9c755f", "#d37295", "#8c8c3a", "#5778a4", "#a0a0a0"];
+  const rgb = (hex) => {
+    const h6 = hex.replace("#", "");
+    const f6 = h6.length === 3 ? h6.split("").map((ch) => ch + ch).join("") : h6.slice(0, 6);
+    const n = parseInt(f6, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const colorDist = (a, b) => { const p = rgb(a), q = rgb(b); return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]); };
+  // цвет из палитры, максимально далёкий от уже используемых другими линиями
+  function pickGroupColor(exceptLines) {
+    const used = project.lines.filter((l) => !exceptLines.includes(l)).map((l) => l.color);
+    let best = GROUP_COLORS[0], bestD = -1;
+    for (const col of GROUP_COLORS) {
+      const d = used.length ? Math.min(...used.map((u) => colorDist(col, u))) : 999;
+      if (d > bestD) { bestD = d; best = col; }
+    }
+    return best;
+  }
+  // Линия вместе со всей своей группой: цвет, вид, толщина и сдвиг — общие
+  const groupOf = (line) => (line.group ? project.lines.filter((l) => l.group === line.group) : [line]);
+  const GROUP_SHARED = ["color", "width", "dash", "offset"];
+  function shareGroupProps(line) {
+    if (!line.group) return;
+    groupOf(line).forEach((l) => { if (l !== line) GROUP_SHARED.forEach((k) => { l[k] = line[k]; }); });
+  }
+  // Чтобы общие участки совпадали по перегонам, вершины одного маршрута
+  // группы, лежащие на отрезке другого, вставляются и в него
+  function splitAtMemberVertices(members) {
+    for (const l of members) {
+      for (const o of members) {
+        if (o === l) continue;
+        for (const q of o.points.slice()) {
+          if (l.points.some((p) => p.x === q.x && p.y === q.y)) continue;
+          const near = C().nearestOnPolyline(l.points, q);
+          if (near && near.dist < 0.5) insertPoint(l, near.seg + 1, { x: q.x, y: q.y });
+        }
+      }
+    }
+  }
 
   function mergeLines() {
     const picked = project.lines.filter((l) => mergePick.has(l.id));
@@ -2076,10 +2116,11 @@ const NetworkScheme = (function () {
     pushHistory();
     const master = members[0];
     const gid = master.group || "g" + Date.now().toString(36);
-    members.forEach((l) => {
-      l.group = gid;
-      if (l !== master) { l.color = master.color; l.number = master.number; l.width = master.width; l.dash = master.dash; l.name = master.name; }
-    });
+    // новая группа получает собственный цвет; номера и названия остаются у
+    // каждого маршрута (на конечных у каждого свой номер)
+    const color = master.group ? master.color : pickGroupColor(members);
+    members.forEach((l) => { l.group = gid; l.color = color; l.width = master.width; l.dash = master.dash; l.offset = master.offset; });
+    splitAtMemberVertices(members);
     relayoutLanes();
     mergePick.clear();
     changed();

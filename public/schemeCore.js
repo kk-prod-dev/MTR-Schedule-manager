@@ -867,10 +867,14 @@ const SchemeCore = (function () {
       const cy = y + rowH / 2;
       el("line", { x1: pad, y1: cy, x2: pad + size * 2.6, y2: cy, stroke: l.color, "stroke-width": Math.min(rowH * 0.5, lineWidthOf(p, l)), "stroke-linecap": "round" }, lg);
       let x = pad + size * 3.2;
-      if (l.number) {
-        drawBadge(lg, x + Math.max(size * 1.5, l.number.length * size * 0.62 + size * 0.8) / 2, cy, l, size * 0.8);
-        x += Math.max(size * 1.5, l.number.length * size * 0.62 + size * 0.8) + size * 0.5;
+      // объединённая линия: номера всех маршрутов группы (не больше 4)
+      const nums = [...new Set(p.lines.filter((m) => (l.group ? m.group === l.group : m === l)).map((m) => m.number).filter(Boolean))].slice(0, 4);
+      for (const nm of nums) {
+        const bw = Math.max(size * 1.5, nm.length * size * 0.62 + size * 0.8);
+        drawBadge(lg, x + bw / 2, cy, { number: nm, color: l.color }, size * 0.8);
+        x += bw + size * 0.4;
       }
+      if (nums.length) x += size * 0.1;
       const t = el("text", { x, y: cy + size * 0.35, "font-size": size, fill: "#111827" }, lg);
       t.textContent = l.name || "";
       maxW = Math.max(maxW, x + (l.name || "").length * size * 0.56 + pad);
