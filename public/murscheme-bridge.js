@@ -54,12 +54,36 @@
     return JSON.parse(JSON.stringify(out));
   }
 
+  // MURScheme местами вставляет имена через innerHTML (списки станций/линий,
+  // легенда, value="..." в инпутах), а имена приходят с MTR-сервера — их
+  // задают чужие люди. iframe одного origin с приложением, так что скрипт
+  // из имени дотянулся бы до window.parent. Заменяем HTML-значимые символы
+  // на визуально похожие — экранирование сущностями сломало бы SVG-подписи,
+  // которые MURScheme ставит через textContent.
+  const TEXT_KEYS = new Set(["name", "subname", "badgeText", "text", "subtext", "labelText",
+    "sublabelText", "title", "subtitle", "titleText", "subtitleText", "termPrefix", "mtrName"]);
+  const SAFE = { "<": "‹", ">": "›", '"': "″", "'": "’", "`": "ʼ" };
+  const safeText = (s) => s.replace(/[<>"'`]/g, (c) => SAFE[c]);
+  function sanitize(v, key) {
+    if (typeof v === "string") return TEXT_KEYS.has(key) ? safeText(v) : v;
+    if (Array.isArray(v)) return v.map((x) => sanitize(x, key));
+    if (v && typeof v === "object") {
+      const out = {};
+      for (const k of Object.keys(v)) {
+        // i18n: { ru: "...", en: "..." } — тоже подписи
+        out[k] = key === "i18n" && typeof v[k] === "string" ? safeText(v[k]) : sanitize(v[k], k);
+      }
+      return out;
+    }
+    return v;
+  }
+
   // Та же логика, что у кнопки «Загрузить .json» в MURScheme
   function loadProject(parsed, opts) {
     opts = opts || {};
     if (!parsed || typeof parsed !== "object") return;
     if (opts.undoable) pushHistory();
-    parsed = JSON.parse(JSON.stringify(parsed));
+    parsed = sanitize(JSON.parse(JSON.stringify(parsed)), "");
     if (parsed.terminalsSettings) parsed.terminalsSettings = Object.assign({}, STATE.terminalsSettings, parsed.terminalsSettings);
     if (parsed.globalStyles) parsed.globalStyles = Object.assign({}, STATE.globalStyles, parsed.globalStyles);
     if (parsed.legend) parsed.legend = Object.assign({}, STATE.legend, parsed.legend);
