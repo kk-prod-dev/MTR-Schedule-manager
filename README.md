@@ -117,7 +117,3 @@ Join the Discord: **https://discord.gg/qEuc7xCfwe**
 ## License
 
 MIT
-
-### Third-party components
-
-- **MURScheme** (network map editor in the Editor tab) — © tringoli, [github.com/tringoli/MURStack](https://github.com/tringoli/MURStack), licensed under **GPL-3.0**. Shipped unmodified in `public/vendor/murscheme/` together with its license text.

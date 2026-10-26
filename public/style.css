@@ -1210,17 +1210,76 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .board-mode-btn + .board-mode-btn { border-left: 1px solid var(--border); }
 .board-mode-btn.active { background: var(--accent); color: #fff; }
 
-/* Схема сети: iframe с MURScheme */
-.scheme-frame-host { width: 100%; }
-.scheme-frame {
-  display: block;
-  width: 100%;
-  height: calc(100vh - 260px);
+/* Схема сети: инструменты | холст | свойства */
+.scheme-layout {
+  display: grid;
+  grid-template-columns: 44px 1fr 260px;
+  gap: 8px;
+  height: calc(100vh - 290px);
   min-height: 520px;
+}
+.scheme-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 4px;
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
+  align-items: center;
+}
+.scheme-tools-sep { width: 24px; height: 1px; background: var(--border); margin: 4px 0; }
+.scheme-canvas {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
   background: #fff;
 }
+#schemeSvg { display: block; width: 100%; height: 100%; cursor: default; user-select: none; }
+#schemeSvg[data-tool="line"], #schemeSvg[data-tool="station"] { cursor: crosshair; }
+#schemeSvg[data-tool="transfer"] { cursor: pointer; }
+#schemeSvg.panning { cursor: grabbing; }
+#schemeSvg[data-tool="select"] .sc-station,
+#schemeSvg[data-tool="select"] .sc-label,
+#schemeSvg[data-tool="select"] .sc-legend { cursor: move; }
+#schemeSvg[data-tool="select"] .sc-line,
+#schemeSvg[data-tool="select"] .sc-transfer { cursor: pointer; }
+.sc-handle { fill: #ffffff; stroke: #64748b; cursor: move; }
+.sc-handle:hover, .sc-handle.mine { stroke: var(--accent); }
+.sc-handle.active { fill: var(--accent); stroke: var(--accent); }
+.sc-sel-ring { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-dasharray: 5 3; pointer-events: none; }
+.sc-sel-ring.pending { stroke: var(--amber); }
+.sc-draw-preview { fill: none; stroke-linecap: round; stroke-linejoin: round; opacity: 0.7; pointer-events: none; }
+.sc-cursor { fill: var(--accent); pointer-events: none; }
+.sc-live-delay { animation: sc-pulse 1.6s ease-in-out infinite; }
+@keyframes sc-pulse { 50% { stroke-opacity: 0.12; } }
+.scheme-zoom { position: absolute; right: 10px; bottom: 10px; }
+.scheme-tool-hint {
+  position: absolute; left: 10px; bottom: 10px;
+  font-size: 12px; color: #374151;
+  background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 6px;
+  pointer-events: none;
+}
+.scheme-props {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scheme-props-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 4px; }
+.scheme-props-item { font-size: 13px; }
+.scheme-field { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--muted); }
+.scheme-field input[type="text"], .scheme-field input[type="number"], .scheme-field select { width: 100%; }
+.scheme-field input[type="checkbox"] { align-self: flex-start; }
+.scheme-field input[type="color"] { width: 100%; height: 28px; padding: 2px; }
+.scheme-offset { display: inline-flex; align-items: center; gap: 8px; color: var(--text); }
+.scheme-offset-val { min-width: 20px; text-align: center; }
+.scheme-props .danger { color: var(--red); }
 
 /* Выпадающие панели конструктора (столбцы / фильтры) */
 .board-dd { position: relative; }

@@ -1195,17 +1195,22 @@ function getLiveDelays(minDeviationMs) {
 }
 
 /**
- * Данные для генерации схемы сети (MURScheme во вкладке «Редактор»):
+ * Данные для генерации схемы сети (вкладка «Редактор» → «Схема сети»):
  * станции с мировыми координатами и маршруты с упорядоченными станциями.
  * Координата станции = среднее координат её платформ по всем маршрутам
  * (MTR отдаёт x/z у остановки маршрута, т.е. у платформы, а не у станции).
  * Черновики не включаются — у них нет координат.
+ * id из MTR пропускаются только по строгому шаблону: они уходят в DOM
+ * (data-атрибуты) и в публикуемые ссылки.
  */
+const SAFE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 function getSchemeData() {
   const topology = store.getTopology();
   if (!topology) return null;
   const revMap = getReverseRouteMap(topology.routes, topology.fetchedAt);
-  const visible = topology.routes.filter((r) => !r.hidden && (r.stations || []).length >= 2);
+  const visible = topology.routes
+    .filter((r) => !r.hidden && SAFE_ID.test(r.id) && (r.stations || []).length >= 2)
+    .map((r) => ({ ...r, stations: r.stations.filter((s) => SAFE_ID.test(s.id)) }));
 
   const acc = new Map(); // stationId -> { sx, sz, n }
   for (const r of visible) {
@@ -1238,7 +1243,7 @@ function getSchemeData() {
       type: r.type,
       circular: r.circularState && r.circularState !== "NONE" ? r.circularState : null,
       stationIds: r.stations.map((s) => s.id).filter((id) => acc.has(id)),
-      reverseRouteId: revMap.get(r.id) || null,
+      reverseRouteId: SAFE_ID.test(revMap.get(r.id) || "") ? revMap.get(r.id) : null,
     };
   });
   return { stations, routes, fetchedAt: topology.fetchedAt };

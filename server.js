@@ -59,7 +59,7 @@ app.get("/api/routes", (req, res) => {
   res.json(listRoutes());
 });
 
-// Станции с координатами + маршруты — для генерации схемы сети (MURScheme)
+// Станции с координатами + маршруты — для генерации схемы сети
 app.get("/api/scheme-data", (req, res) => {
   const result = schedule.getSchemeData();
   if (!result) return res.status(503).json({ error: "Данные ещё не получены от сервера MTR, подождите немного." });
@@ -115,7 +115,10 @@ app.get("/api/analytics/conflict-scan", (req, res) => {
   const offset = Math.max(0, Number(req.query.offset) || 0);
   const limit = Math.max(1, Math.min(200, Number(req.query.limit) || 50));
   try {
-    const ids = schedule.conflictCandidateIds();
+    // ids=a,b,c — проверить только эти станции (схема сети)
+    const ids = req.query.ids
+      ? String(req.query.ids).split(",").filter((id) => /^[A-Za-z0-9_-]{1,64}$/.test(id)).slice(0, 200)
+      : schedule.conflictCandidateIds();
     const slice = ids.slice(offset, offset + limit);
     const conflicts = schedule.scanStationsForConflicts(slice, minMs);
     res.json({ total: ids.length, offset, limit, scanned: slice.length, conflicts });

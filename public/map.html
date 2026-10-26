@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
+<title>Network map — MTR Schedule Manager</title>
+<!--
+  Просмотр схемы сети, опубликованной из MTR Schedule Manager
+  (вкладка «Редактор» → «Схема сети» → «Опубликовать ссылкой»).
+  Вся схема лежит в адресе: #m=<lz-string(JSON)>. Ничего не загружается
+  с серверов — страница статическая (GitHub Pages / локальный сервер
+  приложения). Данные из адреса недоверенные: SchemeCore.fromPublished
+  нормализует их, отрисовка идёт только через DOM-API.
+-->
+<style>
+  :root { --bar: #171a21; --text: #e5e7eb; --muted: #9ca3af; --accent: #6366f1; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; }
+  body { background: #ffffff; }
+  header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 2;
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 14px; background: var(--bar); color: var(--text);
+  }
+  header h1 { font-size: 15px; font-weight: 600; margin: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  header .by { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  header button {
+    background: #262a35; color: var(--text); border: 1px solid #343846; border-radius: 6px;
+    padding: 5px 10px; font-size: 13px; cursor: pointer;
+  }
+  header button:hover { border-color: var(--accent); }
+  #map { position: fixed; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #map.dragging { cursor: grabbing; }
+  #error {
+    display: none; position: fixed; inset: 0; align-items: center; justify-content: center;
+    padding: 24px; text-align: center; color: #374151; font-size: 15px; background: #f9fafb;
+  }
+  @media (max-width: 560px) { header .by { display: none; } }
+</style>
+</head>
+<body>
+<svg id="map" xmlns="http://www.w3.org/2000/svg"><g id="world"></g></svg>
+<header>
+  <h1 id="title"></h1>
+  <span class="by">MTR Schedule Manager</span>
+  <button id="fitBtn" type="button"></button>
+  <button id="pngBtn" type="button"></button>
+</header>
+<div id="error"></div>
+
+<script src="vendor/lz-string.min.js"></script>
+<script src="schemeCore.js"></script>
+<script>
+(function () {
+  "use strict";
+  var ru = /^ru\b/i.test(navigator.language || "");
+  var T = ru
+    ? { fit: "Вписать", png: "Скачать PNG", untitled: "Схема сети", bad: "Ссылка на схему повреждена или неполная. Попросите автора опубликовать её заново." }
+    : { fit: "Fit", png: "Download PNG", untitled: "Network map", bad: "The map link is damaged or incomplete. Ask the author to publish it again." };
+  document.documentElement.lang = ru ? "ru" : "en";
+  document.getElementById("fitBtn").textContent = T.fit;
+  document.getElementById("pngBtn").textContent = T.png;
+
+  var svg = document.getElementById("map");
+  var world = document.getElementById("world");
+  var project;
+  try {
+    var m = /[#&]m=([^&]+)/.exec(location.hash);
+    if (!m) throw new Error("no data");
+    var json = LZString.decompressFromEncodedURIComponent(m[1]);
+    if (!json) throw new Error("decompress failed");
+    project = SchemeCore.fromPublished(JSON.parse(json));
+  } catch (e) {
+    var err = document.getElementById("error");
+    err.textContent = T.bad;
+    err.style.display = "flex";
+    document.getElementById("title").textContent = T.untitled;
+    return;
+  }
+
+  var title = project.title || project.legend.title || T.untitled;
+  document.getElementById("title").textContent = title;
+  document.title = title;
+  document.body.style.background = project.style.bg;
+  SchemeCore.render(world, project);
+
+  var view = { x: 0, y: 0, z: 1 };
+  function apply() { world.setAttribute("transform", "translate(" + view.x + " " + view.y + ") scale(" + view.z + ")"); }
+  function fit() {
+    var bb = world.getBBox();
+    var w = svg.clientWidth, h = svg.clientHeight, top = 48, pad = 30;
+    if (!bb.width || !bb.height) return;
+    view.z = Math.min((w - pad * 2) / bb.width, (h - top - pad * 2) / bb.height, 4);
+    view.x = w / 2 - (bb.x + bb.width / 2) * view.z;
+    view.y = top + (h - top) / 2 - (bb.y + bb.height / 2) * view.z;
+    apply();
+  }
+  function zoomAt(px, py, k) {
+    var z = Math.max(0.03, Math.min(12, view.z * k));
+    view.x = px - (px - view.x) / view.z * z;
+    view.y = py - (py - view.y) / view.z * z;
+    view.z = z;
+    apply();
+  }
+  fit();
+  window.addEventListener("resize", fit);
+  document.getElementById("fitBtn").addEventListener("click", fit);
+  document.getElementById("pngBtn").addEventListener("click", function () {
+    SchemeCore.toPngBlob(project, 2).then(function (blob) {
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "network-map.png";
+      a.click();
+    });
+  });
+
+  svg.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
+
+  // перетаскивание мышью/пальцем, щипок двумя пальцами
+  var pointers = new Map(), last = null, pinch = null;
+  svg.addEventListener("pointerdown", function (e) {
+    svg.setPointerCapture(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    svg.classList.add("dragging");
+    if (pointers.size === 1) last = { x: e.clientX, y: e.clientY };
+    if (pointers.size === 2) {
+      var p = Array.from(pointers.values());
+      pinch = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    }
+  });
+  svg.addEventListener("pointermove", function (e) {
+    if (!pointers.has(e.pointerId)) return;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.size === 2 && pinch) {
+      var p = Array.from(pointers.values());
+      var d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      zoomAt((p[0].x + p[1].x) / 2, (p[0].y + p[1].y) / 2, d / pinch);
+      pinch = d;
+      return;
+    }
+    if (last) {
+      view.x += e.clientX - last.x;
+      view.y += e.clientY - last.y;
+      last = { x: e.clientX, y: e.clientY };
+      apply();
+    }
+  });
+  function up(e) {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinch = null;
+    if (!pointers.size) { last = null; svg.classList.remove("dragging"); }
+    else { var p = Array.from(pointers.values())[0]; last = { x: p.x, y: p.y }; }
+  }
+  svg.addEventListener("pointerup", up);
+  svg.addEventListener("pointercancel", up);
+})();
+</script>
+</body>
+</html>
