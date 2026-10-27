@@ -5,14 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MTR Schedule Manager</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="ui-next.css">
+<script>
+  // Экспериментальный UI: класс ставим до первой отрисовки, иначе при запуске мелькает
+  // классический вид (prefs грузятся асинхронно уже после). Синхронный запрос к своему
+  // же локальному серверу — копейки; при любой ошибке остаётся классический вид.
+  try {
+    var x = new XMLHttpRequest();
+    x.open("GET", "/api/prefs", false);
+    x.send();
+    if (x.status === 200 && JSON.parse(x.responseText).experimentalUi === true) {
+      document.documentElement.classList.add("ui-next");
+    }
+  } catch (e) {}
+</script>
 </head>
 <body>
   <header class="topbar">
     <h1 data-i18n="appTitle">MTR Schedule Manager</h1>
+    <span id="nextPageTitle" class="next-only next-page-title"></span>
     <div id="statusBadge" class="status-badge" data-i18n="statusConnecting">Подключение...</div>
   </header>
 
   <nav class="tabs">
+    <div class="next-only next-brand" aria-hidden="true">
+      <svg width="26" height="26" viewBox="120 123 266 266"><path fill="#F68349" d="M327.558 131C336.068 131 343.947 135.316 348.399 142.364L348.819 143.054L378 192.903L341.026 213.605L317.061 172.667H259.167L359.961 345.154C369.295 361.126 357.502 381 338.691 381H239.373C230.589 381 222.477 376.401 218.113 368.946L181.225 305.934L218.2 285.233L249.871 339.333H307.488L210.095 172.667H190.547L164.974 216.352L128 195.648L158.789 143.054L159.209 142.364C163.661 135.316 171.54 131 180.049 131H327.558Z"/></svg>
+      <b>Schedule Manager</b>
+    </div>
     <button class="tab-btn active" data-tab="schedule" data-i18n="tabSchedule">Расписание по станции</button>
     <button class="tab-btn" data-tab="graph" data-i18n="tabGraph">График движения</button>
     <button class="tab-btn" data-tab="routes" data-i18n="tabRoutes">Маршруты</button>
@@ -482,6 +501,17 @@
                 <option value="3">3</option>
               </select>
             </label>
+            <label class="board-sections" data-i18n-title="schemeMinGapTitle" title="Новые станции ставятся не ближе этого числа клеток друг к другу">
+              <span data-i18n="schemeMinGapLabel">Мин. расстояние</span>
+              <select id="schemeMinGap">
+                <option value="0" data-i18n="schemeMinGapAuto">авто</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+              </select>
+            </label>
             <button id="schemeGenerateBtn" type="button" data-i18n="schemeGenerateBtn">Построить из MTR</button>
             <label class="board-sections" data-i18n-title="schemeLiveTitle" title="Конфликты на станциях и опоздания линий прямо на схеме">
               <input type="checkbox" id="schemeLiveToggle">
@@ -616,6 +646,15 @@
           <span class="hint small" style="margin:0;" data-i18n="formulaMinutesShort">мин</span>
         </div>
         <p class="hint small" id="notifPermissionHint" style="color:var(--amber);"></p>
+      </div>
+
+      <div class="settings-block">
+        <label data-i18n="interfaceSectionLabel">Интерфейс</label>
+        <label class="switch-row">
+          <input type="checkbox" id="experimentalUiToggle">
+          <span data-i18n="experimentalUiLabel">Экспериментальный интерфейс</span>
+        </label>
+        <p class="hint small" data-i18n="experimentalUiHint">Новый вид приложения: боковое меню, тёмная палитра и шрифты нового логотипа. Логика и данные те же — выключите, чтобы вернуть классический вид.</p>
       </div>
 
       <div class="settings-block">

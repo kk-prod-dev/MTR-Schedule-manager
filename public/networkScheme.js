@@ -19,6 +19,8 @@
 //    привязаны к сетке, совпадения разводятся по спирали;
 //  - перегоны не под 0/45/90° получают один излом, выбранный ОДИН раз на
 //    пару станций — линии на общем перегоне идут одной трассой;
+//  - станция, в которой линия поворачивает, сдвигается на прямой участок,
+//    излом остаётся на старом месте (slideOffBends);
 //  - линии на общих перегонах разводятся offset'ом (он считается от
 //    направления полилинии, поэтому сравнивается offset × направление);
 //  - станции MTR с connections → пересадки.
@@ -30,6 +32,8 @@ const NetworkScheme = (function () {
   const P_LINE = "mtr-line-", P_ST = "mtr-st-", P_TR = "mtr-tr-";
   const DEFAULT_TYPES = ["train_metro", "train_sbahn", "train_light_rail", "train_tram"];
   const SPACING_CELLS = 3;
+  // «Мин. расстояние» между станциями, клеток (0 — без ограничения)
+  const MIN_GAPS = [0, 2, 3, 4, 5, 6];
   const SAVE_DELAY = 1500;
   const HISTORY_LIMIT = 60;
   const LIVE_REFRESH_MS = 90000;
@@ -41,7 +45,7 @@ const NetworkScheme = (function () {
   const C = () => window.SchemeCore;
   let project = null;
   // alignTol — допуск выравнивания перегонов при построении, градусы (0 = выкл)
-  let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, viewerBase: "" };
+  let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, minGap: 0, viewerBase: "" };
   let schemeData = null;
   let initialized = false;
   const el = {};
@@ -61,6 +65,8 @@ const NetworkScheme = (function () {
   let group = null;          // { stations:Set, nodes:Set<ключ позиции>, shapes:Set } — выделение рамкой
   let styleClip = null;      // скопированный стиль { kind, props }
   let marquee = null;        // { x0, y0, x1, y1, add }
+  let guides = [];           // направляющие привязки при перетаскивании [{ x1, y1, x2, y2 }]
+  let lastDrawn = null;      // результат последнего C().render (позиции подписей)
 
   function tt(key, vars) { return typeof t === "function" ? t(key, vars) : key; }
   const isMtr = (id, p) => typeof id === "string" && id.startsWith(p);
@@ -82,7 +88,13 @@ const NetworkScheme = (function () {
     return ("," + big.join(",") + ",").includes(s) || ("," + [...big].reverse().join(",") + ",").includes(s);
   }
 
+  // Маршрут с номером вливается в линию с тем же номером и типом, если его
+  // станции — непрерывный кусок её пути (обратное направление без
+  // reverseRouteId, укороченный вариант); цвет при этом не важен. Без номера —
+  // как раньше, только при совпадении цвета. first — первый по порядку MTR
+  // маршрут линии: цвет и название берутся из него
   function groupRoutes(routes, types) {
+    const order = new Map(routes.map((r, i) => [r.id, i]));
     const sel = routes.filter((r) => types.has(r.type) && r.stationIds.length >= 2);
     const selIds = new Set(sel.map((r) => r.id));
     sel.sort((a, b) => b.stationIds.length - a.stationIds.length || (a.id < b.id ? -1 : 1));
@@ -96,13 +108,21 @@ const NetworkScheme = (function () {
         used.add(r.reverseRouteId);
         ids.push(r.reverseRouteId);
       }
-      const host = groups.find((g) => g.main.color === r.color && (g.main.number || "") === (r.number || "")
-        && containsPath(g.main.stationIds, r.stationIds));
+      const host = groups.find((g) => (g.main.number || "") === (r.number || "") && g.main.type === r.type
+        && (r.number || g.main.color === r.color) && containsPath(g.main.stationIds, r.stationIds));
       if (host) { host.routeIds.push(...ids); continue; }
       groups.push({ main: r, routeIds: ids });
     }
+    const byId = new Map(sel.map((r) => [r.id, r]));
+    for (const g of groups) {
+      g.first = g.routeIds.map((id) => byId.get(id)).sort((a, b) => order.get(a.id) - order.get(b.id))[0];
+    }
     return groups;
   }
+
+  // Ключ «одинакового номера»: такие линии (ветки, которые одной
+  // полилинией не нарисовать) объединяются группой — одна полоса, общий цвет
+  const numberKey = (r) => (r.number ? r.type + "|" + r.number : "");
 
   // Шаг между станциями в клетках: 3, а для плотных сетей больше — чтобы
   // типичный широкий пучок (90-й перцентиль числа линий на перегоне)
@@ -123,7 +143,7 @@ const NetworkScheme = (function () {
     return Math.max(SPACING_CELLS, Math.min(8, Math.ceil((bundle * 1.2) / grid)));
   }
 
-  function computeMeta(groups, stById, grid, style) {
+  function computeMeta(groups, stById, grid, style, minGap) {
     const ds = [];
     let sx = 0, sz = 0, n = 0;
     const seen = new Set();
@@ -139,22 +159,41 @@ const NetworkScheme = (function () {
     }
     ds.sort((a, b) => a - b);
     const median = ds.length ? ds[Math.floor(ds.length / 2)] : 100;
-    return { scale: (spacingCells(groups, grid, style || {}) * grid) / median, cx: n ? sx / n : 0, cz: n ? sz / n : 0, grid };
+    // при заданном минимальном расстоянии типичный перегон — на клетку
+    // длиннее него: иначе станции расталкиваются по спирали далеко от своих
+    // мест, а станцию в изломе некуда сдвинуть на прямой участок
+    const cells = Math.max(spacingCells(groups, grid, style || {}), minGap > 1 ? minGap + 1 : 0);
+    return { scale: (cells * grid) / median, cx: n ? sx / n : 0, cz: n ? sz / n : 0, grid };
   }
 
   const pkey = (p) => p.x + "," + p.y;
 
-  function placeFree(raw, grid, occ) {
+  // Можно ли поставить станцию в клетку c: клетка не занята и (если задано
+  // минимальное расстояние occ.minGap) ближе minGap клеток по каждой оси нет
+  // другой станции. occ — Set занятых клеток; occ.pos/occ.grid/occ.minGap
+  // задаёт buildFromMtr, self — id двигаемой станции
+  function cellFree(occ, c, self) {
+    if (occ.has(pkey(c))) return false;
+    if (!(occ.minGap > 1) || !occ.pos) return true;
+    const lim = (occ.minGap - 0.5) * occ.grid;
+    for (const [id, q] of occ.pos) {
+      if (id === self || id[0] === "~") continue;
+      if (Math.abs(q.x - c.x) < lim && Math.abs(q.y - c.y) < lim) return false;
+    }
+    return true;
+  }
+
+  function placeFree(raw, grid, occ, self) {
     const sn = (v) => Math.round(v / grid) * grid;
     const base = { x: sn(raw.x), y: sn(raw.y) };
-    if (!occ.has(pkey(base))) return base;
+    if (cellFree(occ, base, self)) return base;
     for (let r = 1; r <= 12; r++) {
       let best = null, bestD = Infinity;
       for (let dx = -r; dx <= r; dx++) {
         for (let dy = -r; dy <= r; dy++) {
           if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
           const c = { x: base.x + dx * grid, y: base.y + dy * grid };
-          if (occ.has(pkey(c))) continue;
+          if (!cellFree(occ, c, self)) continue;
           const d = Math.hypot(c.x - raw.x, c.y - raw.y);
           if (d < bestD) { bestD = d; best = c; }
         }
@@ -185,7 +224,9 @@ const NetworkScheme = (function () {
       .map((e) => [...gridCellsBetween(a, e, grid), e, ...gridCellsBetween(e, b, grid)]);
   }
 
-  function buildPath(ids, pos, occ, elbows, grid) {
+  // via: hopKey -> точки трассы перегона, заданные заранее (от станции с
+  // меньшим id); так slideOffBends оставляет излом там, откуда ушла станция
+  function buildPath(ids, pos, occ, elbows, grid, via) {
     const pts = [];
     let prevDir = null;
     const sgn = Math.sign;
@@ -199,7 +240,13 @@ const NetworkScheme = (function () {
       const a = pts[pts.length - 1];
       const dx = b.x - a.x, dy = b.y - a.y;
       if (!dx && !dy) continue;
-      if (dx && dy && Math.abs(dx) !== Math.abs(dy)) {
+      const fixed = via && via.get(hopKey(ids[i - 1], ids[i]));
+      if (fixed && fixed.length) {
+        const list = ids[i - 1] < ids[i] ? fixed : fixed.slice().reverse();
+        for (const q of list) pts.push({ x: q.x, y: q.y });
+        const e = list[list.length - 1];
+        prevDir = sgn(b.x - e.x) + ":" + sgn(b.y - e.y);
+      } else if (dx && dy && Math.abs(dx) !== Math.abs(dy)) {
         const segKey = [ids[i - 1], ids[i]].sort().join("|");
         let e = elbows.get(segKey);
         if (!e) {
@@ -207,7 +254,13 @@ const NetworkScheme = (function () {
           const eDiag = { x: a.x + sgn(dx) * m, y: a.y + sgn(dy) * m };
           const eStraight = { x: b.x - sgn(dx) * m, y: b.y - sgn(dy) * m };
           const dirOf = (p, q) => sgn(q.x - p.x) + ":" + sgn(q.y - p.y);
-          const score = (c) => through(a, c, b) * 10 + (prevDir && dirOf(a, c) !== prevDir ? 1 : 0);
+          // и дальше: если следующий перегон ровный, в станцию лучше
+          // приходить в его направлении — иначе станция окажется в изломе
+          const c2 = i + 1 < ids.length ? pos.get(ids[i + 1]) : null;
+          const ox = c2 && c2.x - b.x, oy = c2 && c2.y - b.y;
+          const nextDir = c2 && (ox || oy) && (!ox || !oy || Math.abs(ox) === Math.abs(oy)) ? dirOf(b, c2) : null;
+          const score = (c) => through(a, c, b) * 10 + (prevDir && dirOf(a, c) !== prevDir ? 1 : 0)
+            + (nextDir && dirOf(c, b) !== nextDir ? 1 : 0);
           e = score(eDiag) < score(eStraight) ? eDiag : eStraight;
           elbows.set(segKey, e);
         }
@@ -235,6 +288,218 @@ const NetworkScheme = (function () {
       out.push({ x: p.x, y: p.y });
     }
     return out;
+  }
+
+  /**
+   * Станция не должна стоять в изломе: на повороте линия идёт дугой, и
+   * значок оказывается на кривой. Если хоть одна линия поворачивает в
+   * станции, станция сдвигается вдоль общего для всех её линий плеча на
+   * k клеток (сколько нужно, чтобы дуга самой широкой полосы пучка не
+   * доставала до значка, но не ближе клетки к следующей вершине), а излом
+   * остаётся на старом месте — внутри функции это узел "~<id станции>" в
+   * последовательности линий (полосам его потом даёт withJunctions).
+   * Двигаются только новые станции; клетка-излом остаётся занятой, чтобы
+   * туда не встала другая станция. Возвращает пути групп (fixed[i] — путь,
+   * который уже задан и не перестраивается).
+   */
+  function slideOffBends(groups, fixed, pos, occ, movable, elbows, grid, style) {
+    const via = new Map();
+    const idsOf = groups.map((gr) => gr.fullIds.filter((id) => pos.has(id)).filter((id, i, arr) => i === 0 || id !== arr[i - 1]));
+    const build = (gi) => buildPath(idsOf[gi], pos, occ, elbows, grid, via);
+    const paths = groups.map((_, gi) => fixed[gi] || build(gi));
+    const byStation = new Map();
+    groups.forEach((_, gi) => {
+      if (fixed[gi]) return;
+      for (const id of new Set(idsOf[gi])) {
+        if (!movable.has(id)) continue;
+        if (!byStation.has(id)) byStation.set(id, []);
+        byStation.get(id).push(gi);
+      }
+    });
+    // индексы точек пути, в которых стоят станции ids (−1 — не нашли)
+    const stationIdx = (pts, ids) => {
+      const out = [];
+      let k = 0;
+      for (const id of ids) {
+        const p = pos.get(id);
+        while (k < pts.length && (pts[k].x !== p.x || pts[k].y !== p.y)) k++;
+        out.push(k < pts.length ? k : -1);
+        if (k >= pts.length) k = 0;
+      }
+      return out;
+    };
+    const onSeg = (p, a, b) => (b.x - a.x) * (p.y - a.y) === (b.y - a.y) * (p.x - a.x)
+      && p.x >= Math.min(a.x, b.x) && p.x <= Math.max(a.x, b.x) && p.y >= Math.min(a.y, b.y) && p.y <= Math.max(a.y, b.y);
+    const lw = style.lineWidth, step = lw + style.laneGap;
+    const order = [...byStation.keys()].sort((a, b) => byStation.get(b).length - byStation.get(a).length);
+    for (const sid of order) {
+      const gis = byStation.get(sid);
+      const p0 = pos.get(sid);
+      const occs = [];
+      let broken = false;
+      for (const gi of gis) {
+        const pts = paths[gi], ids = idsOf[gi], sIdx = stationIdx(pts, ids);
+        ids.forEach((id, j) => {
+          if (id !== sid) return;
+          const k = sIdx[j];
+          if (k < 0) { broken = true; return; }
+          const arms = [];
+          for (const [nj, nk] of [[j - 1, k - 1], [j + 1, k + 1]]) {
+            if (nj < 0 || nj >= ids.length) continue;
+            const q = pts[nk], end = sIdx[nj];
+            if (!q || end < 0) { broken = true; continue; }
+            const between = nj < j ? pts.slice(end + 1, k).reverse() : pts.slice(k + 1, end);
+            arms.push({ dx: Math.sign(q.x - p0.x), dy: Math.sign(q.y - p0.y), len: Math.max(Math.abs(q.x - p0.x), Math.abs(q.y - p0.y)) / grid, nb: ids[nj], before: nj < j, between });
+          }
+          occs.push({ gi, j, arms });
+        });
+      }
+      if (broken || !occs.length) continue;
+      // поворот = два плеча не на одной прямой; разворот назад не трогаем
+      let turn = 0;
+      for (const { arms } of occs) {
+        if (arms.length < 2) continue;
+        const [a, b] = arms;
+        if (a.dx === b.dx && a.dy === b.dy) { turn = -1; break; }
+        if (a.dx === -b.dx && a.dy === -b.dy) continue;
+        const ang = Math.acos(Math.max(-1, Math.min(1, -(a.dx * b.dx + a.dy * b.dy) / Math.hypot(a.dx, a.dy) / Math.hypot(b.dx, b.dy))));
+        turn = Math.max(turn, ang);
+      }
+      if (turn <= 0) continue;
+      // сколько пикселей нужно от значка до излома: внутренняя полоса пучка
+      // поворачивает раньше на off·tan(θ/2), затем дуга радиуса R, затем
+      // половина значка
+      const maxOff = ((gis.length - 1) / 2) * step + lw / 2;
+      const needPx = maxOff * Math.tan(turn / 2) + style.cornerRadius + lw;
+      let best = null;
+      for (let ux = -1; ux <= 1; ux++) {
+        for (let uy = -1; uy <= 1; uy++) {
+          if (!ux && !uy) continue;
+          let minLen = Infinity;
+          for (const { arms } of occs) {
+            const a = arms.find((x) => x.dx === ux && x.dy === uy);
+            minLen = a ? Math.min(minLen, a.len) : -1;
+            if (minLen < 0) break;
+          }
+          // до следующей вершины плеча остаётся не меньше половины его
+          // длины — иначе станция прилипает к соседней
+          const maxK = Math.floor(minLen) - Math.max(1, Math.ceil(minLen / 2));
+          if (maxK < 1) continue;
+          const cell = grid * Math.hypot(ux, uy);
+          const k = Math.min(maxK, Math.max(1, Math.ceil(needPx / cell)));
+          const np = { x: p0.x + ux * k * grid, y: p0.y + uy * k * grid };
+          if (!cellFree(occ, np, sid)) continue;
+          // в новой клетке не должно быть чужих линий
+          const foreign = paths.some((pts, gi) => !gis.includes(gi) && pts.some((q, i) => i > 0 && onSeg(np, pts[i - 1], q)));
+          if (foreign) continue;
+          const score = Math.min(k * cell, needPx) * 100 + minLen;
+          if (!best || score > best.score) best = { ux, uy, np, score };
+        }
+      }
+      if (!best) continue;
+      // плечо вдоль сдвига сохраняет свою трассу; остальные плечи идут
+      // станция → излом (прямо) → прежняя трасса до соседа
+      const vid = "~" + sid;
+      const ins = new Map(); // gi -> индексы вставки излома
+      for (const { gi, j, arms } of occs) {
+        for (const a of arms) {
+          const setVia = (x, list) => via.set(hopKey(x, a.nb), x < a.nb ? list : list.slice().reverse());
+          if (a.dx === best.ux && a.dy === best.uy) { setVia(sid, a.between); continue; }
+          setVia(vid, a.between);
+          if (!ins.has(gi)) ins.set(gi, []);
+          ins.get(gi).push(a.before ? j : j + 1);
+        }
+      }
+      for (const [gi, at] of ins) at.sort((a, b) => b - a).forEach((k) => idsOf[gi].splice(k, 0, vid));
+      // старая клетка остаётся занятой изломом
+      pos.set(vid, p0);
+      pos.set(sid, best.np);
+      occ.add(pkey(best.np));
+      for (const gi of gis) paths[gi] = build(gi);
+    }
+    for (const id of [...pos.keys()]) if (id[0] === "~") pos.delete(id);
+    return paths;
+  }
+
+  /**
+   * Последовательность узлов линии для assignLanes: станции плюс
+   * вершины-развилки — не станция, но линии через неё уходят в разные
+   * стороны (излом, с которого slideOffBends увёл станцию). Отрезок до
+   * развилки общий для всех этих линий, и пучок на нём должен быть один;
+   * если считать его частью разных перегонов, полосы на нём наложатся.
+   * Выводится из геометрии, поэтому пересборка с сохранёнными точками
+   * даёт те же полосы. Развилки добавляются в pos как "~x,y".
+   */
+  // Отрезки разных линий, совпадающие на части длины (изгиб одной линии
+  // лежит на прямом отрезке другой): полосы считаются по перегонам, и такие
+  // куски были бы РАЗНЫМИ перегонами на одной трассе — линия рисовалась
+  // посреди чужого пучка, пересекая его. Чужая вершина, от которой линии
+  // идут вместе, вставляется в отрезок (через ins — со сдвигом lanes), и
+  // withJunctions делает её развилкой
+  function splitOverlaps(lines, ins) {
+    const onSeg = (p, a, b) => (b.x - a.x) * (p.y - a.y) === (b.y - a.y) * (p.x - a.x)
+      && Math.min(a.x, b.x) <= p.x && p.x <= Math.max(a.x, b.x) && Math.min(a.y, b.y) <= p.y && p.y <= Math.max(a.y, b.y)
+      && !(p.x === a.x && p.y === a.y) && !(p.x === b.x && p.y === b.y);
+    const par = (a, b, c, d) => (b.x - a.x) * (d.y - c.y) === (b.y - a.y) * (d.x - c.x);
+    for (let pass = 0; pass < 4; pass++) {
+      let changed = false;
+      for (const l of lines) {
+        for (let i = 0; i + 1 < l.points.length; i++) {
+          const a = l.points[i], b = l.points[i + 1];
+          let hit = null;
+          for (const o of lines) {
+            if (o === l) continue;
+            for (let j = 0; j < o.points.length && !hit; j++) {
+              const v = o.points[j];
+              if (!onSeg(v, a, b)) continue;
+              // совпадение, а не просто пересечение: соседний отрезок o
+              // идёт вдоль a→b
+              const nb = [o.points[j - 1], o.points[j + 1]].filter(Boolean);
+              if (nb.some((q) => par(a, b, v, q) && (q.x !== v.x || q.y !== v.y))) hit = v;
+            }
+            if (hit) break;
+          }
+          if (hit) { ins(l, i + 1, { x: hit.x, y: hit.y }); changed = true; }
+        }
+      }
+      if (!changed) break;
+    }
+  }
+
+  function withJunctions(lines, stationIds, pos) {
+    const stKeys = new Set(stationIds.map((id) => pos.get(id)).filter(Boolean).map(pkey));
+    const dir = (v, q) => Math.sign(q.x - v.x) + ":" + Math.sign(q.y - v.y);
+    const arms = new Map();
+    for (const l of lines) {
+      for (let i = 1; i + 1 < l.points.length; i++) {
+        const v = l.points[i], k = pkey(v);
+        if (stKeys.has(k)) continue;
+        if (!arms.has(k)) arms.set(k, new Set());
+        arms.get(k).add([dir(v, l.points[i - 1]), dir(v, l.points[i + 1])].sort().join("|"));
+      }
+    }
+    const junction = new Set([...arms].filter(([, s]) => s.size > 1).map(([k]) => k));
+    for (const l of lines) {
+      const ids = l._fullIds.filter((id) => pos.has(id)).filter((id, i, arr) => i === 0 || id !== arr[i - 1]);
+      const out = [];
+      let k = 0, ok = true;
+      for (const id of ids) {
+        const p = pos.get(id);
+        const from = k;
+        while (k < l.points.length && (l.points[k].x !== p.x || l.points[k].y !== p.y)) k++;
+        if (k >= l.points.length) { ok = false; break; }
+        if (out.length) {
+          for (let i = from + 1; i < k; i++) {
+            const q = l.points[i], key = pkey(q);
+            if (!junction.has(key)) continue;
+            pos.set("~" + key, { x: q.x, y: q.y });
+            out.push("~" + key);
+          }
+        }
+        out.push(id);
+      }
+      if (ok) l._fullIds = out;
+    }
   }
 
   // Перегоны линии: пары соседних РАЗНЫХ станций по порядку
@@ -309,7 +574,7 @@ const NetworkScheme = (function () {
           for (let dy = -1; dy <= 1; dy++) {
             if (!dx && !dy) continue;
             const c = { x: cur.x + dx * grid, y: cur.y + dy * grid };
-            if (occ.has(pkey(c))) continue;
+            if (!cellFree(occ, c, id)) continue;
             const s = score(id, c);
             if (s > bestS) { best = c; bestS = s; }
           }
@@ -373,7 +638,7 @@ const NetworkScheme = (function () {
           for (let dy = -1; dy <= 1; dy++) {
             if (!dx && !dy) continue;
             const c = { x: cur.x + dx * grid, y: cur.y + dy * grid };
-            if (occ.has(pkey(c))) continue;
+            if (!cellFree(occ, c, id)) continue;
             moveTo(id, c);
             const s = total() * 10 - aligned(id);
             if (s < bestS) { best = c; bestS = s; }
@@ -381,6 +646,106 @@ const NetworkScheme = (function () {
           }
         }
         if (best !== cur) { moveTo(id, best); changed = true; }
+      }
+      if (!changed) break;
+    }
+  }
+
+  /**
+   * Станция на клетку в стороне от прямой соседей (коридор идёт по x=1, а
+   * станция на x=0) даёт V-образный крюк всех её линий: два излома рядом со
+   * станцией и станция в изломе. Локальный поиск: новая станция переходит
+   * на соседнюю свободную клетку, если от этого у её линий меньше изломов —
+   * в перегонах, в самой станции и в соседних станциях (их следующий
+   * перегон берётся, если он ровный). Проход трассы через чужую станцию —
+   * штраф ×10, как в untangle.
+   */
+  function unbend(pos, groups, movable, occ, grid) {
+    const seqs = groups.map((g) => g.fullIds.filter((id) => pos.has(id)).filter((id, i, a) => i === 0 || id !== a[i - 1]));
+    const occBy = new Map();
+    seqs.forEach((s, si) => s.forEach((id, i) => {
+      if (!movable.has(id)) return;
+      if (!occBy.has(id)) occBy.set(id, []);
+      occBy.get(id).push([si, i]);
+    }));
+    const at = new Map();
+    for (const [id, p] of pos) at.set(pkey(p), id);
+    const allHops = [];
+    const seenHop = new Set();
+    for (const s of seqs) for (const [a, b] of hopsOf(s)) { const k = hopKey(a, b); if (!seenHop.has(k)) { seenHop.add(k); allHops.push([a, b]); } }
+    const dirOf = (p, q) => Math.sign(q.x - p.x) + ":" + Math.sign(q.y - p.y);
+    const octiHop = (p, q) => { const dx = q.x - p.x, dy = q.y - p.y; return (dx || dy) && (!dx || !dy || Math.abs(dx) === Math.abs(dy)); };
+    // варианты трассы a→b: первый/последний шаг, излом, проходы сквозь станции
+    const variants = (aId, bId) => {
+      const a = pos.get(aId), b = pos.get(bId);
+      const rs = hopRoutes(a, b, grid);
+      return rs.map((r) => ({
+        first: dirOf(a, r[0] || b), last: dirOf(r[r.length - 1] || a, b), elbow: rs.length > 1 ? 1 : 0,
+        through: r.filter((q) => { const id = at.get(pkey(q)); return id && id !== aId && id !== bId; }).length,
+      }));
+    };
+    // сколько чужих перегонов неизбежно (во всех вариантах) идёт через клетку
+    const forcedThrough = (c, self) => {
+      let n = 0;
+      for (const [a, b] of allHops) {
+        if (a === self || b === self) continue;
+        const pa = pos.get(a), pb = pos.get(b);
+        // трасса не выходит из габарита концов — дальние перегоны не считаем
+        if (c.x < Math.min(pa.x, pb.x) || c.x > Math.max(pa.x, pb.x) || c.y < Math.min(pa.y, pb.y) || c.y > Math.max(pa.y, pb.y)) continue;
+        const rs = hopRoutes(pa, pb, grid);
+        if (rs.every((r) => r.some((q) => q.x === c.x && q.y === c.y))) n++;
+      }
+      return n;
+    };
+    const localCost = (id) => {
+      let cost = 0;
+      for (const [si, i] of occBy.get(id)) {
+        const s = seqs[si];
+        const vin = i > 0 ? variants(s[i - 1], id) : [null];
+        const vout = i + 1 < s.length ? variants(id, s[i + 1]) : [null];
+        const before = i > 1 && octiHop(pos.get(s[i - 2]), pos.get(s[i - 1])) ? dirOf(pos.get(s[i - 2]), pos.get(s[i - 1])) : null;
+        const after = i + 2 < s.length && octiHop(pos.get(s[i + 1]), pos.get(s[i + 2])) ? dirOf(pos.get(s[i + 1]), pos.get(s[i + 2])) : null;
+        let best = Infinity;
+        for (const a of vin) {
+          for (const b of vout) {
+            let c = 0;
+            if (a) c += a.elbow + 10 * a.through + (before && a.first !== before ? 3 : 0);
+            if (b) c += b.elbow + 10 * b.through + (after && b.last !== after ? 3 : 0);
+            if (a && b && a.last !== b.first) c += 3;
+            best = Math.min(best, c);
+          }
+        }
+        cost += best;
+      }
+      return cost;
+    };
+    const moveTo = (id, c) => {
+      const cur = pos.get(id);
+      occ.delete(pkey(cur)); at.delete(pkey(cur));
+      pos.set(id, c); occ.add(pkey(c)); at.set(pkey(c), id);
+    };
+    for (let pass = 0; pass < 4; pass++) {
+      let changed = false;
+      // сначала самые «изломанные»: иначе сосед успевает подстроиться под
+      // станцию с крюком, и коридор съезжает на клетку вместе с ней
+      const ordered = [...occBy.keys()].map((id) => [id, localCost(id)]).sort((a, b) => b[1] - a[1]).map((x) => x[0]);
+      for (const id of ordered) {
+        const cur = pos.get(id);
+        const base = localCost(id) + 10 * forcedThrough(cur, id);
+        if (!base) continue;
+        let best = null, bestS = base;
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            if (!dx && !dy) continue;
+            const c = { x: cur.x + dx * grid, y: cur.y + dy * grid };
+            if (!cellFree(occ, c, id)) continue;
+            moveTo(id, c);
+            const s = localCost(id) + 10 * forcedThrough(c, id);
+            moveTo(id, cur);
+            if (s < bestS) { best = c; bestS = s; }
+          }
+        }
+        if (best) { moveTo(id, best); changed = true; }
       }
       if (!changed) break;
     }
@@ -505,7 +870,42 @@ const NetworkScheme = (function () {
     const posIn = new Map(); // hopKey -> Map(laneKey -> позиция; больше = левее в системе перегона a→b)
     const sIn = (hk, v) => (hops.get(hk).b === v ? 1 : -1); // приезд в v по перегону: совпадает с a→b?
     const sOut = (hk, v) => (hops.get(hk).a === v ? 1 : -1); // отъезд из v
+    const assign = (m, e, base) => {
+      m.set(laneKey(e.line), base);
+      e.line._hopLanes[e.hopIdx] = base * e.dir;
+      (e.dups || []).forEach((d) => { d.line._hopLanes[d.hopIdx] = base * d.dir; });
+    };
+    // Перегон, ВСЕ линии которого приходят через узел v с одного уже
+    // упорядоченного соседнего перегона g (пучок только теряет линии или
+    // идёт целиком), берёт порядок g — иначе линии меняются местами в узле.
+    // В развилке вне станции (узел "~", её не прикрывает значок) берутся и
+    // сами позиции: пересчёт к центру давал ступеньку у оставшихся линий.
+    // Если ушедшая линия была в середине, до следующей станции остаётся
+    // пустая полоса — к центру пучок вернётся под значком станции
+    function inheritFrom(hk) {
+      const list = hops.get(hk).entries;
+      for (const r of byH.get(hk) || []) {
+        if (r.g === hk || !posIn.has(r.g) || !list.every((e) => r.keys.has(laneKey(e.line)))) continue;
+        const pg = posIn.get(r.g), sg = sIn(r.g, r.v) * sOut(hk, r.v);
+        const val = (e) => pg.get(laneKey(e.line)) * sg; // больше = левее в системе hk
+        if (list.some((e) => val(e) == null || Number.isNaN(val(e)))) continue;
+        const sorted = list.slice().sort((a, b) => val(b) - val(a));
+        const vals = sorted.map(val);
+        // в станции — тоже, если пучок без дыр и смещён от оси не больше
+        // чем на полосу: одиночная линия после развилки иначе делала
+        // ступеньку прямо у тонкого значка
+        const tight = vals.every((v, i) => !i || Math.abs(vals[i - 1] - v - 1) < 1e-6);
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        const keep = r.v[0] === "~" || (tight && Math.abs(mean) <= 1);
+        const n = list.length, m = new Map();
+        sorted.forEach((e, k) => assign(m, e, keep ? vals[k] : (n - 1) / 2 - k));
+        posIn.set(hk, m);
+        return true;
+      }
+      return false;
+    }
     function orderHop(hk) {
+      if (inheritFrom(hk)) return;
       const list = hops.get(hk).entries;
       const n = list.length;
       const score = new Array(n).fill(0);
@@ -525,13 +925,7 @@ const NetworkScheme = (function () {
       }
       const idx = list.map((_, i) => i).sort((i, j) => score[j] - score[i] || cmp(list[i], list[j]));
       const m = new Map();
-      idx.forEach((i, k) => {
-        const e = list[i];
-        const base = (n - 1) / 2 - k;
-        m.set(laneKey(e.line), base);
-        e.line._hopLanes[e.hopIdx] = base * e.dir;
-        (e.dups || []).forEach((d) => { d.line._hopLanes[d.hopIdx] = base * d.dir; });
-      });
+      idx.forEach((i, k) => assign(m, list[i], (n - 1) / 2 - k));
       posIn.set(hk, m);
     }
     const frontier = new Map();
@@ -545,6 +939,36 @@ const NetworkScheme = (function () {
       }
       orderHop(best);
       for (const r of byG.get(best) || []) frontier.set(r.h, (frontier.get(r.h) || 0) + r.keys.size);
+    }
+    // Развилки вне станций (узлы "~"): линии, продолжающие путь с соседнего
+    // перегона g, сохраняют на перегоне свои позиции с g, а новые (пришли
+    // с другой стороны) встают С КРАЮ — следом за крайней продолжающей.
+    // Иначе пучок пересчитывался к центру и все линии делали ступеньку;
+    // так бывает и при «стволе», упорядоченном позже ветки, и когда в одном
+    // узле линии и приходят, и уходят. Если новая линия по порядку попала
+    // между продолжающими или порядок продолжающих не совпал — не трогаем
+    for (let pass = 0; pass < 3; pass++) {
+      for (const hk of allHops) {
+        const list = hops.get(hk).entries, cur = posIn.get(hk);
+        const byCur = list.slice().sort((a, b) => cur.get(laneKey(b.line)) - cur.get(laneKey(a.line)));
+        let best = null;
+        for (const r of byH.get(hk) || []) {
+          if (r.v[0] !== "~" || r.g === hk || !posIn.has(r.g)) continue;
+          const cont = byCur.filter((e) => r.keys.has(laneKey(e.line)));
+          if (cont.length && (!best || cont.length > best.cont.length)) best = { r, cont };
+        }
+        if (!best) continue;
+        const { r, cont } = best;
+        const pg = posIn.get(r.g), sg = sIn(r.g, r.v) * sOut(hk, r.v);
+        const val = (e) => pg.get(laneKey(e.line)) * sg;
+        if (cont.some((e, i) => i && !(val(cont[i - 1]) > val(e)))) continue;
+        const first = byCur.indexOf(cont[0]), last = byCur.indexOf(cont[cont.length - 1]);
+        if (last - first + 1 !== cont.length) continue;
+        const m = new Map();
+        byCur.forEach((e, k) => assign(m, e, k < first ? val(cont[0]) + (first - k)
+          : k > last ? val(cont[cont.length - 1]) - (k - last) : val(e)));
+        posIn.set(hk, m);
+      }
     }
     // полосы перегонов → полосы отрезков полилинии (между станциями бывают изломы)
     for (const line of lines) {
@@ -655,7 +1079,7 @@ const NetworkScheme = (function () {
     const prevStations = new Map(prev.stations.filter((s) => isMtr(s.id, P_ST)).map((s) => [s.mtrStationId, s]));
     const prevTransfers = new Map(prev.transfers.filter((t) => isMtr(t.id, P_TR)).map((t) => [t.id, t]));
     const hadMtr = prevLines.some((l) => isMtr(l.id, P_LINE));
-    let meta = prev.mtrMeta && prev.mtrMeta.grid === grid ? prev.mtrMeta : computeMeta(groups, stById, grid, prev.style);
+    let meta = prev.mtrMeta && prev.mtrMeta.grid === grid ? prev.mtrMeta : computeMeta(groups, stById, grid, prev.style, opts.minGap);
 
     const lineIdOf = (g) => P_LINE + g.main.id;
     const stLines = new Map();
@@ -668,6 +1092,7 @@ const NetworkScheme = (function () {
     }
 
     const pos = new Map(), occ = new Set();
+    Object.assign(occ, { pos, grid, minGap: MIN_GAPS.includes(opts.minGap) ? opts.minGap : 0 });
     for (const id of stLines.keys()) {
       const p = prevStations.get(id);
       if (p) { pos.set(id, { x: p.x, y: p.y }); occ.add(pkey(p)); }
@@ -706,30 +1131,54 @@ const NetworkScheme = (function () {
     }
     const alignable = straighten(raw, allHops, new Set(pos.keys()), opts.alignTol);
     for (const id of fresh) {
-      const p = placeFree(raw.get(id), grid, occ);
+      const p = placeFree(raw.get(id), grid, occ, id);
       pos.set(id, p);
       occ.add(pkey(p));
     }
     const freshSet = new Set(fresh);
     gridAlign(pos, allHops, alignable, freshSet, occ, grid);
     untangle(pos, allHops, alignable, freshSet, occ, grid);
+    unbend(pos, groups, freshSet, occ, grid);
 
-    const elbows = new Map();
     const usedPrev = new Set();
-    const lines = groups.map((g) => {
+    const plan = groups.map((g) => {
       const id = lineIdOf(g);
       const old = prevLines.find((l) => l.id === id)
         || prevLines.find((l) => isMtr(l.id, P_LINE) && !usedPrev.has(l) && (l.mtrRouteIds || []).some((r) => g.routeIds.includes(r)));
       if (old) usedPrev.add(old);
       const ids = g.main.stationIds.filter((s) => stById.has(s));
-      const nm = splitName(g.main.name);
       const sameRoute = old && JSON.stringify(old.mtrStationIds) === JSON.stringify(ids)
         && JSON.stringify(old.mtrPassIds || []) === JSON.stringify(g.pass)
         && !g.fullIds.some((s) => freshSet.has(s)) && old.points.length >= 2;
+      return { id, old, ids, sameRoute };
+    });
+    const paths = slideOffBends(groups, plan.map((x) => (x.sameRoute ? x.old.points : null)), pos, occ, freshSet, new Map(), grid, prev.style);
+    // первый по порядку MTR маршрут каждого номера — его цвет и название
+    const firstOfNumber = new Map();
+    for (const g of groups) {
+      const k = numberKey(g.first);
+      const cur = firstOfNumber.get(k);
+      if (k && (!cur || data.routes.indexOf(g.first) < data.routes.indexOf(cur))) firstOfNumber.set(k, g.first);
+    }
+    const numberCount = new Map();
+    for (const g of groups) { const k = numberKey(g.first); if (k) numberCount.set(k, (numberCount.get(k) || 0) + 1); }
+    const lines = groups.map((g, gi) => {
+      const { id, old, ids } = plan[gi];
+      const nk = numberKey(g.first);
+      const src = firstOfNumber.get(nk) || g.first;
+      const nm = splitName(src.name);
       const line = Object.assign(
-        { name: nm.name, number: g.main.number || "", color: g.main.color, width: null, dash: /_bus$/.test(g.main.type) ? "dashed" : "solid", offset: 0 },
+        { name: nm.name, number: g.first.number || "", color: src.color, width: null, dash: "solid", offset: 0 },
         old || {},
-        { id, mtrRouteIds: g.routeIds, mtrStationIds: ids, mtrPassIds: g.pass, mtrType: g.main.type, points: sameRoute ? old.points : buildPath(g.fullIds, pos, occ, elbows, grid) });
+        { id, mtrRouteIds: g.routeIds, mtrStationIds: ids, mtrPassIds: g.pass, mtrType: g.main.type, points: paths[gi] });
+      // несколько линий с одним номером — группа (одна полоса на общих
+      // перегонах, одна строка легенды). Ручную группу не трогаем; цвет и
+      // название — только при первом объединении, дальше их можно править
+      if (numberCount.get(nk) > 1 && !line.group) {
+        line.group = "n:" + nk;
+        line.color = src.color;
+        line.name = nm.name;
+      }
       line._fullIds = g.fullIds;
       // проекты до полос по перегонам хранили авто-сдвиг в offset — сбрасываем
       if (old && !old.lanes) line.offset = 0;
@@ -737,7 +1186,10 @@ const NetworkScheme = (function () {
     });
     // скрытые линии полос не занимают (как в relayoutLanes): иначе после
     // пересборки в пучках видимых линий оставались дыры под скрытых соседей
-    assignLanes(lines.filter((l) => !l.hidden), pos);
+    const visible = lines.filter((l) => !l.hidden);
+    splitOverlaps(visible, insertPoint);
+    withJunctions(visible, [...stLines.keys()], pos);
+    assignLanes(visible, pos);
     lines.forEach((l) => { if (l.hidden) { delete l.lanes; delete l._fullIds; } });
     const lineIds = new Set(lines.map((l) => l.id));
     const userLines = prevLines.filter((l) => !isMtr(l.id, P_LINE));
@@ -878,7 +1330,7 @@ const NetworkScheme = (function () {
   function render() {
     if (!el.svg) return;
     el.svg.style.background = project.style.bg;
-    C().render(el.scene, project, { live: ui.live ? liveData : null });
+    lastDrawn = C().render(el.scene, project, { live: ui.live ? liveData : null });
     applyView();
     renderOverlay();
   }
@@ -1005,6 +1457,7 @@ const NetworkScheme = (function () {
         "stroke-width": project.style.lineWidth, stroke: drawing.color,
       }, g);
     }
+    for (const gd of guides) mk("line", { x1: gd.x1, y1: gd.y1, x2: gd.x2, y2: gd.y2, class: "sc-guide", "stroke-width": 1 / z }, g);
     if (marquee) {
       mk("rect", {
         x: Math.min(marquee.x0, marquee.x1), y: Math.min(marquee.y0, marquee.y1),
@@ -1090,6 +1543,8 @@ const NetworkScheme = (function () {
 
     // select
     if (hit && hit.kind === "shandle") { startShapeHandle(hit); return; }
+    // подпись в выделении группы / с Shift — как станция
+    if (hit && hit.kind === "label" && (e.shiftKey || (group && group.stations.has(hit.id)))) hit.kind = "station";
     if (!hit) {
       // пустое место: рамка выделения (Shift — добавить к выделенному)
       if (!e.shiftKey) clearSelection();
@@ -1120,6 +1575,14 @@ const NetworkScheme = (function () {
       startDrag(e, "vertex", hit.id);
       renderOverlay();
       renderProps();
+      return;
+    }
+    if (hit.kind === "label" || hit.kind === "badge") {
+      // подпись и блок номеров двигаются сами по себе, выделяется станция
+      sel = { kind: "station", id: hit.id };
+      renderOverlay();
+      renderProps();
+      startDrag(e, hit.kind, hit.id);
       return;
     }
     sel = { kind: hit.kind, id: hit.id };
@@ -1343,6 +1806,127 @@ const NetworkScheme = (function () {
     if (line.lanes && line.lanes.length) line.lanes.splice(Math.min(idx, line.lanes.length - 1), 1);
   }
 
+  // Автоподпись → ручная: направление, которое выбрал авторазмещатель, и
+  // его «дальний» отступ как сдвиг — подпись остаётся на месте
+  function freezeLabel(st) {
+    const lay = lastDrawn && lastDrawn.labels && lastDrawn.labels.get(st.id);
+    const geo = lastDrawn && lastDrawn.geos && lastDrawn.geos.get(st.id);
+    if (!lay || !geo) { st.label.pos = "e"; return; }
+    const vx = lay.ax - geo.c.x, vy = lay.ay - geo.c.y;
+    let best = "e", bd = -Infinity;
+    for (const k of C().LABEL_POS) {
+      if (k === "auto") continue;
+      const d = C().DIRS[k], l = Math.hypot(d[0], d[1]) || 1;
+      const dot = (vx * d[0] + vy * d[1]) / l;
+      if (dot > bd) { bd = dot; best = k; }
+    }
+    const d = C().DIRS[best], l = Math.hypot(d[0], d[1]) || 1;
+    st.label.pos = best;
+    st.label.angle = lay.angle || 0;
+    st.label.dx = Math.round((d[0] / l) * (lay.far || 0));
+    st.label.dy = Math.round((d[1] / l) * (lay.far || 0));
+  }
+
+  /**
+   * Привязка при перетаскивании, как в графических редакторах: координата
+   * x или y «прилипает» к другой станции / углу линии в кадре (порог 8 px
+   * экрана), а станция и угол — ещё и к диагонали 45° от соседних по линии
+   * вершин, чтобы перегон получался ровным. Направляющие (guides) рисует
+   * overlay. Alt — без привязки (только сетка).
+   */
+  function smartSnap(raw, d, e) {
+    guides = [];
+    const gridObj = d.type === "station" || d.type === "node" || d.type === "vertex";
+    const p = gridObj ? { x: snap(raw.x), y: snap(raw.y) } : { x: Math.round(raw.x), y: Math.round(raw.y) };
+    if ((e && e.altKey) || !(gridObj || d.type === "shape" || d.type === "legend")) return p;
+    const v = project.view, z = v.zoom, T = 8 / z;
+    const r = el.svg.getBoundingClientRect();
+    const vx0 = -v.x / z, vy0 = -v.y / z, vx1 = vx0 + r.width / z, vy1 = vy0 + r.height / z;
+    const self = d.last ? pkey(d.last) : "";
+    const pts = new Map();
+    const take = (q) => {
+      const k = pkey(q);
+      if (k !== self && q.x >= vx0 && q.x <= vx1 && q.y >= vy0 && q.y <= vy1) pts.set(k, q);
+    };
+    project.stations.forEach(take);
+    project.lines.forEach((l) => l.points.forEach(take));
+    let bx = null, by = null;
+    for (const q of pts.values()) {
+      if (Math.abs(raw.x - q.x) < T && (!bx || Math.abs(raw.x - q.x) < Math.abs(raw.x - bx.x))) bx = q;
+      if (Math.abs(raw.y - q.y) < T && (!by || Math.abs(raw.y - q.y) < Math.abs(raw.y - by.y))) by = q;
+    }
+    if (bx) p.x = bx.x;
+    if (by) p.y = by.y;
+    // соседи по линиям — для диагонали
+    const nbs = [];
+    if (gridObj && d.last) {
+      for (const l of project.lines) {
+        l.points.forEach((q, i) => {
+          if (q.x !== d.last.x || q.y !== d.last.y) return;
+          if (d.type === "vertex" && (l.id !== d.id || i !== (sel && sel.vidx))) return;
+          for (const n of [l.points[i - 1], l.points[i + 1]]) if (n && (n.x !== q.x || n.y !== q.y)) nbs.push(n);
+        });
+      }
+    }
+    let diag = null;
+    if (!(bx && by)) {
+      for (const n of nbs) {
+        for (const sg of [1, -1]) {
+          const dist = Math.abs((raw.y - n.y) - sg * (raw.x - n.x)) / Math.SQRT2;
+          if (dist >= T || (diag && dist >= diag.dist)) continue;
+          let q;
+          if (bx) q = { x: p.x, y: n.y + sg * (p.x - n.x) };
+          else if (by) q = { x: n.x + sg * (p.y - n.y), y: p.y };
+          else {
+            const t = Math.round(((raw.x - n.x) + sg * (raw.y - n.y)) / 2 / project.grid) * project.grid;
+            q = { x: n.x + t, y: n.y + sg * t };
+          }
+          diag = { dist, n, q };
+        }
+      }
+    }
+    if (diag) { p.x = diag.q.x; p.y = diag.q.y; guides.push({ x1: diag.n.x, y1: diag.n.y, x2: p.x, y2: p.y }); }
+    if (bx) guides.push({ x1: bx.x, y1: bx.y, x2: p.x, y2: p.y });
+    if (by) guides.push({ x1: by.x, y1: by.y, x2: p.x, y2: p.y });
+    return p;
+  }
+
+  /**
+   * Масштаб схемы (раздвинуть / сжать): все координаты и ШАГ СЕТКИ
+   * умножаются на f — станции остаются в узлах (новой) сетки, прямые и 45°
+   * остаются точными, толщина линий и подписи не меняются. Вид сдвигается
+   * так, чтобы центр схемы остался на месте экрана. mtrMeta (масштаб,
+   * сетка, карта сжатия) — на тот же множитель, чтобы пересборка клала новые
+   * станции в ту же систему.
+   */
+  function scaleMap(f) {
+    const g = project.grid * f;
+    if (g < 8 || g > 96) { setStatus(tt("schemeMapScaleLimit")); return; }
+    pushHistory();
+    const b = C().bounds(project);
+    const v = project.view;
+    const sc = (q) => ({ x: q.x * f, y: q.y * f });
+    project.stations.forEach((s) => { s.x *= f; s.y *= f; });
+    project.lines.forEach((l) => { l.points = l.points.map(sc); });
+    project.shapes.forEach((sh) => { sh.x *= f; sh.y *= f; sh.w *= f; sh.h *= f; });
+    project.legend.x *= f; project.legend.y *= f;
+    project.grid = g;
+    const m = project.mtrMeta;
+    if (m) {
+      m.scale *= f;
+      m.grid = g;
+      if (m.cmp) for (const ax of [m.cmp.x, m.cmp.y]) { ax.xs = ax.xs.map((x) => x * f); ax.ys = ax.ys.map((y) => y * f); }
+    }
+    if (b) {
+      const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+      v.x -= cx * (f - 1) * v.zoom;
+      v.y -= cy * (f - 1) * v.zoom;
+    }
+    clearSelection();
+    changed();
+    applyView();
+  }
+
   function startDrag(e, type, id) {
     const w = toWorld(e);
     let orig;
@@ -1350,6 +1934,8 @@ const NetworkScheme = (function () {
     else if (type === "node") orig = { x: sel.x, y: sel.y };
     else if (type === "vertex") { const q = project.lines.find((l) => l.id === id).points[sel.vidx]; orig = { x: q.x, y: q.y }; }
     else if (type === "shape") { const s = project.shapes.find((x) => x.id === id); orig = { x: s.x, y: s.y }; }
+    else if (type === "label") { const s = project.stations.find((x) => x.id === id); orig = { x: s.label.dx, y: s.label.dy }; }
+    else if (type === "badge") { const s = project.stations.find((x) => x.id === id); orig = { x: s.badge.dx, y: s.badge.dy }; }
     else orig = { x: project.legend.x, y: project.legend.y };
     drag = { type, id, start: w, orig, last: orig, snapshot: JSON.stringify(project), moved: false };
   }
@@ -1396,10 +1982,19 @@ const NetworkScheme = (function () {
         render();
         return;
       }
+      if (!drag.moved && drag.type === "label") {
+        // автоподпись при первом сдвиге фиксируется в том положении, где стоит
+        const st = project.stations.find((x) => x.id === drag.id);
+        if (st.label.pos === "auto") {
+          pushDragHistory(drag);
+          freezeLabel(st);
+          drag.orig = { x: st.label.dx, y: st.label.dy };
+          drag.last = drag.orig;
+        }
+      }
       const raw = { x: drag.orig.x + (w.x - drag.start.x), y: drag.orig.y + (w.y - drag.start.y) };
-      const free = drag.type === "legend" || drag.type === "shape";
-      const np = free ? { x: Math.round(raw.x), y: Math.round(raw.y) } : { x: snap(raw.x), y: snap(raw.y) };
-      if (np.x === drag.last.x && np.y === drag.last.y) return;
+      const np = smartSnap(raw, drag, e);
+      if (np.x === drag.last.x && np.y === drag.last.y) { renderOverlay(); return; }
       if (!drag.moved) {
         pushDragHistory(drag);
         if (drag.type === "station") anchorStation(project.stations.find((x) => x.id === drag.id));
@@ -1408,6 +2003,8 @@ const NetworkScheme = (function () {
       else if (drag.type === "node") { moveNode(drag.last, np); sel = { kind: "node", x: np.x, y: np.y }; }
       else if (drag.type === "vertex") { project.lines.find((l) => l.id === drag.id).points[sel.vidx] = np; }
       else if (drag.type === "shape") { const sh = project.shapes.find((x) => x.id === drag.id); sh.x = np.x; sh.y = np.y; }
+      else if (drag.type === "label") { const st = project.stations.find((x) => x.id === drag.id); st.label.dx = np.x; st.label.dy = np.y; }
+      else if (drag.type === "badge") { const st = project.stations.find((x) => x.id === drag.id); st.badge.dx = np.x; st.badge.dy = np.y; }
       else { project.legend.x = np.x; project.legend.y = np.y; }
       drag.last = np;
       render();
@@ -1423,6 +2020,7 @@ const NetworkScheme = (function () {
     if (!drag) return;
     const d = drag;
     drag = null;
+    if (guides.length) { guides = []; renderOverlay(); }
     el.svg.classList.remove("panning");
     if (d.type === "marquee") { finishMarquee(); return; }
     if (d.type === "shapeCreate") { finishShapeCreate(d); return; }
@@ -1487,6 +2085,7 @@ const NetworkScheme = (function () {
     const hit = hitOf(e);
     if (tool === "line") { finishLine(); return; }
     if (!hit || tool !== "select") return;
+    if (hit.kind === "label") { sel = { kind: "station", id: hit.id }; group = null; renameSelection(); return; }
     if (hit.kind === "station") {
       const st = project.stations.find((s) => s.id === hit.id);
       if (!st) return;
@@ -1856,7 +2455,23 @@ const NetworkScheme = (function () {
       field("schemeFieldLabelAngle", selectInput(st.label.angle, C().LABEL_ANGLES.map((a) => [a, a + "°"]), (v) => { st.label.angle = Number(v); })),
       field("schemeFieldLabelSize", optNum(st.labelSize, 6, 48, 1, (v) => { st.labelSize = v; }, String(project.style.labelSize))),
       field("schemeFieldLabelColor", optColor(st.labelColor, project.style.labelColor, (v) => { st.labelColor = v; })),
+      ...stationExtraFields(st),
     ];
+  }
+
+  // Подпись и блок номеров маршрутов двигаются мышью; здесь — сброс сдвига
+  // и «показывать номера» (блок есть только у станций, где кончаются линии)
+  function stationExtraFields(st) {
+    const rows = [];
+    const reset = (key, fn) => button(key, () => { pushHistory(); fn(); changed(); });
+    if (st.label.dx || st.label.dy) rows.push(h("div", { class: "scheme-btn-row" }, [reset("schemeLabelReset", () => { st.label.dx = 0; st.label.dy = 0; })]));
+    const isEnd = project.lines.some((l) => st.lineIds.includes(l.id) && l.points.length > 1
+      && [l.points[0], l.points[l.points.length - 1]].some((q) => q.x === st.x && q.y === st.y));
+    if (isEnd) {
+      rows.push(field("schemeFieldBadgeShow", checkInput(!st.badge.hide, (v) => { st.badge.hide = !v; })));
+      if (st.badge.dx || st.badge.dy) rows.push(h("div", { class: "scheme-btn-row" }, [reset("schemeBadgeReset", () => { st.badge.dx = 0; st.badge.dy = 0; })]));
+    }
+    return rows;
   }
 
   function shapeFields(sh) {
@@ -2083,6 +2698,10 @@ const NetworkScheme = (function () {
     box.append(
       title("schemePropScheme"),
       field("schemeFieldTitle", textInput(project.title, (v) => { project.title = v; })),
+      field("schemeFieldMapScale", h("span", { class: "scheme-btn-row" }, [
+        h("button", { type: "button", class: "secondary-btn", text: "−", title: tt("schemeMapScaleDown"), onclick: () => scaleMap(0.8) }),
+        h("button", { type: "button", class: "secondary-btn", text: "+", title: tt("schemeMapScaleUp"), onclick: () => scaleMap(1.25) }),
+      ])),
       title("schemePropLook"),
       field("schemeFieldLineWidth", slider(st.lineWidth, 1, 24, 1, (v) => { st.lineWidth = v; })),
       field("schemeFieldLaneGap", slider(st.laneGap, 0, 8, 0.5, (v) => { st.laneGap = v; })),
@@ -2198,7 +2817,7 @@ const NetworkScheme = (function () {
       const types = new Set(ui.types || []);
       if (!types.size) { setStatus(tt("schemeNoTypes")); return; }
       pushHistory();
-      const res = buildFromMtr(data, types, project, { alignTol: ui.alignTol, compress: ui.compress });
+      const res = buildFromMtr(data, types, project, { alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap });
       project = res.project;
       sel = null; group = null;
       changed();
@@ -2268,10 +2887,14 @@ const NetworkScheme = (function () {
   // вручную остаются как есть.
   function relayoutLanes() {
     const pos = new Map();
+    // вершина без станции — узел "~": в развилке там полосы сохраняют
+    // позиции (без ступеньки), как в buildFromMtr
+    const stKeys = new Set(project.stations.map(pkey));
+    splitOverlaps(project.lines.filter((l) => l.points.length >= 2 && !l.hidden), insertPoint);
     const tmp = project.lines.filter((l) => l.points.length >= 2 && !l.hidden).map((l) => {
       const ids = [];
       l.points.forEach((q) => {
-        const k = pkey(q);
+        const k = (stKeys.has(pkey(q)) ? "" : "~") + pkey(q);
         pos.set(k, { x: q.x, y: q.y });
         if (!ids.length || ids[ids.length - 1] !== k) ids.push(k);
       });
@@ -2638,6 +3261,9 @@ const NetworkScheme = (function () {
     el.compress = $("schemeCompress");
     el.compress.value = String(ui.compress);
     el.compress.addEventListener("change", () => { ui.compress = Number(el.compress.value) || 0; scheduleSave(); });
+    el.minGap = $("schemeMinGap");
+    el.minGap.value = String(ui.minGap);
+    el.minGap.addEventListener("change", () => { ui.minGap = Number(el.minGap.value) || 0; scheduleSave(); });
     $("schemeToBoardBtn").addEventListener("click", sendToBoard);
     el.livePublish.addEventListener("click", livePublish);
     el.liveViewer.addEventListener("change", () => {
@@ -2681,7 +3307,7 @@ const NetworkScheme = (function () {
     syncActive();
     return {
       project,
-      ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol, compress: ui.compress, viewerBase: ui.viewerBase },
+      ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap, viewerBase: ui.viewerBase },
       schemes: schemes.map((e) => ({ id: e.id, name: e.name, project: e.project, types: e.types, publish: e.publish })),
       activeId,
     };
@@ -2709,6 +3335,7 @@ const NetworkScheme = (function () {
       ui.live = !!s.ui.live;
       if ([0, 10, 15, 20].includes(s.ui.alignTol)) ui.alignTol = s.ui.alignTol;
       if ([0, 3, 5, 8].includes(s.ui.compress)) ui.compress = s.ui.compress;
+      if (MIN_GAPS.includes(s.ui.minGap)) ui.minGap = s.ui.minGap;
       if (typeof s.ui.viewerBase === "string" && /^https?:\/\//i.test(s.ui.viewerBase)) ui.viewerBase = s.ui.viewerBase;
     }
     ensureSchemes();
@@ -2717,6 +3344,7 @@ const NetworkScheme = (function () {
     if (act.types) ui.types = act.types; else act.types = ui.types;
     if (el.alignTol) el.alignTol.value = String(ui.alignTol);
     if (el.compress) el.compress.value = String(ui.compress);
+    if (el.minGap) el.minGap.value = String(ui.minGap);
     if (initialized) {
       undoStack = []; redoStack = []; clearSelection();
       refreshSchemeSelect();

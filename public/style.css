@@ -1242,7 +1242,9 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 #schemeSvg.panning { cursor: grabbing; }
 #schemeSvg[data-tool="select"] .sc-station,
 #schemeSvg[data-tool="select"] .sc-label,
+#schemeSvg[data-tool="select"] .sc-badge,
 #schemeSvg[data-tool="select"] .sc-legend { cursor: move; }
+.sc-guide { stroke: #ec4899; stroke-dasharray: 4 3; fill: none; pointer-events: none; }
 #schemeSvg[data-tool="select"] .sc-line,
 #schemeSvg[data-tool="select"] .sc-transfer { cursor: pointer; }
 .sc-handle { fill: #ffffff; stroke: #64748b; cursor: move; }

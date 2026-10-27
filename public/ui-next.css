@@ -1,0 +1,355 @@
+/* ============================================================
+   Экспериментальный интерфейс (Настройки → Интерфейс).
+   Всё ниже действует только под html.ui-next — классический вид
+   не меняется. Разметка и логика общие: здесь только оформление
+   (палитра, шрифты, боковое меню вместо вкладок, окно без полей).
+   ============================================================ */
+
+/* DM Sans / DM Mono не содержат кириллицы — русские буквы берутся
+   из Manrope (похожий геометрический гротеск). Файлы: vendor/fonts, OFL. */
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/dm-sans-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url(vendor/fonts/dm-sans-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url(vendor/fonts/dm-sans-latin-600-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url(vendor/fonts/dm-sans-latin-700-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/dm-sans-latin-ext-400-normal.woff2) format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 500; font-display: swap; src: url(vendor/fonts/dm-sans-latin-ext-500-normal.woff2) format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 600; font-display: swap; src: url(vendor/fonts/dm-sans-latin-ext-600-normal.woff2) format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "DM Sans"; font-style: normal; font-weight: 700; font-display: swap; src: url(vendor/fonts/dm-sans-latin-ext-700-normal.woff2) format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/manrope-cyrillic-400-normal.woff2) format("woff2"); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 500; font-display: swap; src: url(vendor/fonts/manrope-cyrillic-500-normal.woff2) format("woff2"); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 600; font-display: swap; src: url(vendor/fonts/manrope-cyrillic-600-normal.woff2) format("woff2"); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: "Manrope"; font-style: normal; font-weight: 700; font-display: swap; src: url(vendor/fonts/manrope-cyrillic-700-normal.woff2) format("woff2"); unicode-range: U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116; }
+@font-face { font-family: "DM Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/dm-mono-latin-400-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "DM Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(vendor/fonts/dm-mono-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD; }
+@font-face { font-family: "DM Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url(vendor/fonts/dm-mono-latin-ext-400-normal.woff2) format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+@font-face { font-family: "DM Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url(vendor/fonts/dm-mono-latin-ext-500-normal.woff2) format("woff2"); unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF; }
+
+/* Элементы, которые есть только в новом виде */
+.next-only { display: none !important; }
+
+html.ui-next {
+  /* Те же переменные, что в style.css, — большинство компонентов перекрашивается само */
+  --bg: #0B0B0E;
+  --panel: #141418;
+  --panel2: #1E1D24;
+  --border: rgba(251, 229, 220, 0.09);
+  --text: #FBE5DC;
+  --muted: #A0928E;
+  --accent: #F68349;
+  --green: #D6FFF6;
+  --amber: #FFC86B;
+  --red: #FF6B81;
+  /* Новые */
+  --nx-hover: #26252E;
+  --nx-active: #292741;
+  --nx-ink: #241651;      /* текст на светлом и оранжевом */
+  --nx-mint: #D6FFF6;
+  --nx-soft: #C9BAB4;
+  --nx-radius: 14px;
+  --nx-font: "DM Sans", "Manrope", "Segoe UI", system-ui, sans-serif;
+  --nx-mono: "DM Mono", "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+
+/* ---------- Каркас: меню слева, шапка и рабочая область на всё окно ---------- */
+html.ui-next body {
+  font-family: var(--nx-font);
+  display: grid;
+  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px;
+  height: 100vh;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+html.ui-next input,
+html.ui-next select,
+html.ui-next button,
+html.ui-next textarea { font-family: var(--nx-font); }
+html.ui-next :focus-visible { outline: 2px solid var(--nx-mint); outline-offset: 2px; }
+
+html.ui-next ::-webkit-scrollbar { width: 10px; height: 10px; }
+html.ui-next ::-webkit-scrollbar-track { background: transparent; }
+html.ui-next ::-webkit-scrollbar-thumb { background: #2A2932; border-radius: 6px; border: 2px solid var(--panel); }
+html.ui-next ::-webkit-scrollbar-thumb:hover { background: #3A3843; }
+
+/* Боковое меню (бывшая строка вкладок) */
+html.ui-next nav.tabs {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 2px;
+  padding: 14px 10px 10px;
+  border: 1px solid rgba(214, 255, 246, 0.07);
+  border-radius: var(--nx-radius);
+  background: var(--panel);
+  overflow-y: auto;
+  min-height: 0;
+}
+html.ui-next .next-brand {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 8px 14px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid rgba(251, 229, 220, 0.16);
+  order: 0;
+}
+html.ui-next .next-brand b { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+
+html.ui-next .tab-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--nx-soft);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+}
+html.ui-next .tab-btn:hover { background: var(--nx-hover); color: var(--text); opacity: 1; }
+html.ui-next .tab-btn.active { background: var(--nx-active); color: var(--text); }
+html.ui-next .tab-btn.active::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 9px; bottom: 9px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+/* Иконки пунктов — маской, чтобы не трогать текст кнопок (его пишет applyI18n) */
+html.ui-next .tab-btn::before {
+  content: "";
+  flex-shrink: 0;
+  width: 19px; height: 19px;
+  background: currentColor;
+  -webkit-mask: var(--nx-ic) center / contain no-repeat;
+          mask: var(--nx-ic) center / contain no-repeat;
+}
+/* Порядок как в макетах: станции и маршруты → расписания → проблемы → редактор, справка и настройки внизу */
+html.ui-next .tab-btn[data-tab="routes"]   { order: 1; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 21V8l6-4v17 M10 21h10V11l-6-3 M14 13h2.5 M14 17h2.5 M6.5 10.5v.01 M6.5 14.5v.01 M3 21h18'/></svg>"); }
+html.ui-next .tab-btn[data-tab="schedule"] { order: 2; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M9 3h6 M12 21a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15z M12 10v3.5l2.5 1.5'/></svg>"); }
+html.ui-next .tab-btn[data-tab="graph"]    { order: 3; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3v18h18 M7 15l4-6 3 4 6-8'/></svg>"); }
+html.ui-next .tab-btn[data-tab="problems"] { order: 4; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7.5v5.5 M12 16.5v.01'/></svg>"); }
+html.ui-next .tab-btn[data-tab="board"]    { order: 5; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z M9 4v13.5 M15 6.5V20'/></svg>"); }
+html.ui-next .tab-btn[data-tab="instructions"] { order: 10; margin-top: auto; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7 M12 17v.01'/></svg>"); }
+html.ui-next .tab-btn[data-tab="settings"] { order: 11; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z'/></svg>"); }
+
+/* Шапка: заголовок текущего раздела + статус MTR */
+html.ui-next .topbar {
+  grid-column: 2;
+  grid-row: 1;
+  justify-content: flex-start;
+  gap: 16px;
+  padding: 14px 20px;
+  border: 1px solid rgba(214, 255, 246, 0.07);
+  border-radius: var(--nx-radius);
+  background: var(--panel);
+}
+html.ui-next .topbar h1 { display: none; }
+html.ui-next .next-page-title {
+  display: block !important;
+  flex: 1;
+  min-width: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html.ui-next .status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--panel2);
+  color: var(--muted);
+  font-size: 12px;
+}
+html.ui-next .status-badge::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+html.ui-next .status-badge.ok { color: var(--nx-mint); box-shadow: none; }
+html.ui-next .status-badge.ok::before { box-shadow: 0 0 0 3px rgba(214, 255, 246, 0.16); }
+html.ui-next .status-badge.warn { color: var(--amber); }
+html.ui-next .status-badge.error { color: var(--red); }
+
+/* Рабочая область — вся оставшаяся ширина и высота, без max-width */
+html.ui-next main {
+  grid-column: 2;
+  grid-row: 2;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+}
+
+/* ---------- Базовые элементы ---------- */
+html.ui-next input,
+html.ui-next select,
+html.ui-next textarea {
+  background: var(--panel2);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text);
+}
+html.ui-next input:hover,
+html.ui-next select:hover { border-color: rgba(251, 229, 220, 0.12); }
+html.ui-next input:focus,
+html.ui-next select:focus,
+html.ui-next textarea:focus { outline: none; border-color: rgba(214, 255, 246, 0.5); }
+html.ui-next input[type="checkbox"],
+html.ui-next input[type="radio"] { accent-color: var(--accent); }
+html.ui-next input[type="range"] { background: var(--panel2); border: 0; }
+
+html.ui-next button {
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  color: var(--nx-ink);
+  font-weight: 600;
+}
+html.ui-next button:hover { opacity: 1; background: #FF9564; border-color: #FF9564; }
+html.ui-next .secondary-btn,
+html.ui-next .icon-btn {
+  background: var(--panel2);
+  border-color: transparent;
+  color: var(--text);
+  font-weight: 500;
+}
+html.ui-next .secondary-btn:hover,
+html.ui-next .icon-btn:hover { background: #2A2932; border-color: transparent; }
+html.ui-next .link-btn { background: none; border: 0; color: var(--nx-mint); font-weight: 500; }
+html.ui-next .link-btn:hover { background: none; }
+
+html.ui-next .hint { color: var(--muted); }
+
+/* Панели */
+html.ui-next .sidebar,
+html.ui-next .dashboard-wrap,
+html.ui-next .graph-wrap,
+html.ui-next .graph-y-panel,
+html.ui-next table,
+html.ui-next .nearest-board-wrap,
+html.ui-next .problems-section,
+html.ui-next .board-toolbar,
+html.ui-next .instructions-list > * {
+  background: var(--panel);
+  border: 1px solid rgba(214, 255, 246, 0.07);
+  border-radius: var(--nx-radius);
+}
+html.ui-next .sidebar { top: 0; width: 248px; padding: 14px 16px; }
+html.ui-next .sidebar-section h4 { color: var(--muted); letter-spacing: 0.08em; font-weight: 600; }
+html.ui-next .layout-with-sidebar { gap: 8px; }
+html.ui-next .controls { gap: 8px; margin-bottom: 8px; }
+html.ui-next .graph-wrap { max-height: calc(100vh - 240px); }
+
+html.ui-next th { color: var(--muted); letter-spacing: 0.06em; }
+html.ui-next tr:hover td { background: rgba(251, 229, 220, 0.025); }
+html.ui-next tr.clickable-row:hover td { background: rgba(246, 131, 73, 0.10); }
+
+/* Автокомплит */
+html.ui-next .autocomplete-list { background: var(--panel2); border-color: rgba(251, 229, 220, 0.12); border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55); }
+html.ui-next .autocomplete-item:hover { background: var(--accent); color: var(--nx-ink); }
+
+/* Избранное */
+html.ui-next .fav-chip { border-radius: 13px; background: var(--panel2); border-color: transparent; }
+html.ui-next .fav-chip:hover { background: #2A2932; border-color: transparent; }
+html.ui-next .fav-chip.fav-active { background: rgba(246, 131, 73, 0.16); border-color: transparent; color: var(--accent); }
+
+/* Живой индикатор и линия «сейчас» — мятные */
+html.ui-next .live-dot { background: var(--nx-mint); animation: none; box-shadow: 0 0 0 3px rgba(214, 255, 246, 0.16); }
+html.ui-next .now-line { background: var(--nx-mint); box-shadow: 0 0 10px rgba(214, 255, 246, 0.55); }
+
+/* Дашборд станции */
+html.ui-next .dashboard-corner,
+html.ui-next .dashboard-ruler-scroll { background: transparent; }
+html.ui-next .dashboard-ruler .tick { font-family: var(--nx-mono); color: var(--muted); }
+html.ui-next .dashboard-ruler .tick-minor { border-left-color: rgba(251, 229, 220, 0.05); }
+html.ui-next .platform-label { color: var(--text); }
+html.ui-next .entry-block { border-radius: 5px; border-color: rgba(0, 0, 0, 0.3); }
+html.ui-next .entry-block .eb-time { font-family: var(--nx-mono); font-weight: 500; }
+html.ui-next .entry-block .eb-warning { color: var(--nx-ink); }
+html.ui-next .entry-tooltip { background: var(--panel2); border-color: rgba(251, 229, 220, 0.12); border-radius: 10px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55); }
+
+/* График движения */
+html.ui-next .graph-legend-item { background: var(--panel2); border-color: transparent; }
+
+/* Карточка маршрута и прочие модалки: шире, чтобы не было пустых полей */
+html.ui-next .modal-overlay { background: rgba(5, 5, 8, 0.72); }
+html.ui-next .modal {
+  max-width: min(1280px, calc(100vw - 64px));
+  max-height: calc(100vh - 64px);
+  border: 1px solid rgba(214, 255, 246, 0.07);
+  border-radius: 16px;
+  background: var(--panel);
+}
+
+/* Проблемные места */
+html.ui-next .problem-card { background: var(--panel2); border-color: transparent; border-radius: 11px; }
+html.ui-next .problem-card:hover { background: #2A2932; }
+html.ui-next .problems-section-header:hover { background: var(--panel2); }
+html.ui-next .problems-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+/* Редактор: табло и схема */
+html.ui-next .board-toolbar { padding: 8px 10px; }
+html.ui-next .board-mode-switch { display: inline-flex; padding: 3px; gap: 2px; border: 0; border-radius: 10px; background: var(--panel2); }
+html.ui-next .board-mode-btn { border: 0 !important; border-radius: 7px; background: transparent; color: var(--nx-soft); font-weight: 500; }
+html.ui-next .board-mode-btn:hover { background: var(--nx-hover); }
+html.ui-next .board-mode-btn.active { background: var(--text); color: var(--nx-ink); font-weight: 600; }
+html.ui-next .scheme-layout { height: calc(100vh - 250px); }
+html.ui-next .scheme-tools,
+html.ui-next .scheme-props { background: var(--panel); border-color: rgba(214, 255, 246, 0.07); border-radius: var(--nx-radius); }
+html.ui-next .scheme-canvas { border-radius: var(--nx-radius); border-color: rgba(214, 255, 246, 0.07); }
+
+/* Настройки: карточки сеткой на всю ширину вместо узкого столбца */
+html.ui-next #tab-settings.active {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: 8px;
+  align-content: start;
+}
+html.ui-next .settings-block {
+  max-width: none;
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid rgba(214, 255, 246, 0.07);
+  border-radius: var(--nx-radius);
+  background: var(--panel);
+}
+html.ui-next .settings-block > label:first-child { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+
+/* Узкое окно: меню превращается в полосу сверху */
+@media (max-width: 900px) {
+  html.ui-next body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+  html.ui-next nav.tabs { grid-column: 1; grid-row: 1; flex-direction: row; overflow-x: auto; padding: 6px; }
+  html.ui-next .next-brand { display: none !important; }
+  html.ui-next .tab-btn[data-tab="instructions"] { margin-top: 0; }
+  html.ui-next .topbar { grid-column: 1; grid-row: 2; }
+  html.ui-next main { grid-column: 1; grid-row: 3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.ui-next * { transition: none !important; animation: none !important; }
+}

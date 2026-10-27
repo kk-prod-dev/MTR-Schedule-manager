@@ -214,6 +214,9 @@ const I18N = {
     diagReportSaved: "Отчёт сохранён: {path}",
     diagReportError: "Не удалось сохранить отчёт",
     betaUpdatesHint: "Приложение будет обновляться на пре-релизы — новые функции раньше всех, но возможны ошибки. Выключите, чтобы вернуться к стабильным версиям (обновление придёт, когда стабильная станет новее беты).",
+    interfaceSectionLabel: "Интерфейс",
+    experimentalUiLabel: "Экспериментальный интерфейс",
+    experimentalUiHint: "Новый вид приложения: боковое меню, тёмная палитра и шрифты нового логотипа. Логика и данные те же — выключите, чтобы вернуть классический вид.",
     liveDotHint: "Автообновление активно",
     swapStationsHint: "Поменять местами А и Б",
     boardHourGapTitle: "% высоты строки",
@@ -464,6 +467,16 @@ const I18N = {
     schemeDelTitle: "Удалить схему",
     schemeCompressTitle: "Длинные перегоны без станций (между городами) сокращаются до этого числа клеток — действует на новые станции при построении",
     schemeCompressLabel: "Сжатие пустот",
+    schemeMinGapLabel: "Мин. расстояние",
+    schemeFieldMapScale: "Масштаб схемы",
+    schemeMapScaleDown: "Сжать схему относительно центра (линии и подписи прежнего размера)",
+    schemeMapScaleUp: "Раздвинуть схему относительно центра (линии и подписи прежнего размера)",
+    schemeMapScaleLimit: "Дальше масштабировать нельзя: шаг сетки должен быть от 8 до 96",
+    schemeLabelReset: "Вернуть подпись на место",
+    schemeBadgeReset: "Вернуть номера на место",
+    schemeFieldBadgeShow: "Номера маршрутов",
+    schemeMinGapAuto: "авто",
+    schemeMinGapTitle: "Новые станции ставятся не ближе этого числа клеток друг к другу (по каждой оси); при первом построении на это растягивается и масштаб схемы. Уже стоящие станции не двигаются — чтобы применить ко всей схеме, начните с пустой.",
     schemeToBoard: "В табло",
     schemeToBoardTitle: "Вставить схему картинкой на холст табло",
     schemeToBoardDone: "Схема вставлена в табло",
@@ -840,6 +853,9 @@ const I18N = {
     diagReportSaved: "Report saved: {path}",
     diagReportError: "Couldn't save the report",
     betaUpdatesHint: "The app will update to pre-releases — new features first, but bugs are possible. Turn this off to go back to stable builds (you'll get an update once a stable release is newer than the beta).",
+    interfaceSectionLabel: "Interface",
+    experimentalUiLabel: "Experimental interface",
+    experimentalUiHint: "New look of the app: sidebar navigation, dark palette and the new logo fonts. Same features and data — turn it off to return to the classic look.",
     liveDotHint: "Auto-refresh is active",
     swapStationsHint: "Swap A and B",
     boardHourGapTitle: "% of row height",
@@ -1033,6 +1049,16 @@ const I18N = {
     schemeDelTitle: "Delete map",
     schemeCompressTitle: "Long hops without stations (between cities) are shortened to this many cells — applies to new stations when building",
     schemeCompressLabel: "Compress gaps",
+    schemeMinGapLabel: "Min. spacing",
+    schemeFieldMapScale: "Map scale",
+    schemeMapScaleDown: "Shrink the map around its centre (lines and labels keep their size)",
+    schemeMapScaleUp: "Spread the map around its centre (lines and labels keep their size)",
+    schemeMapScaleLimit: "Can't scale further: the grid step must stay between 8 and 96",
+    schemeLabelReset: "Reset label position",
+    schemeBadgeReset: "Reset route numbers position",
+    schemeFieldBadgeShow: "Route numbers",
+    schemeMinGapAuto: "auto",
+    schemeMinGapTitle: "New stations are placed at least this many cells apart (on each axis); on the first build the map scale grows to match. Stations already placed don't move — start from an empty map to apply it everywhere.",
     schemeToBoard: "To board",
     schemeToBoardTitle: "Insert the map as an image on the timetable canvas",
     schemeToBoardDone: "Map inserted into the board",
@@ -1203,6 +1229,7 @@ const settings = {
   notifCooldownMin: 5,    // пауза между уведомлениями, минут
   delayThresholdMin: 5,   // порог опоздания для уведомления, минут
   betaUpdates: false,     // ставить бета-версии (пре-релизы GitHub) автообновлением
+  experimentalUi: false,  // новый интерфейс (класс ui-next на <html>, стили в ui-next.css)
 };
 function currentLang() {
   return settings.langMode === "auto" ? detectSystemLang() : settings.langMode;
@@ -1287,6 +1314,7 @@ function applyI18n() {
     el.title = t(el.dataset.i18nTitle) + (el.dataset.hotkey ? ` (${el.dataset.hotkey})` : "");
   });
   try { window.NetworkScheme && window.NetworkScheme.onLanguageChange(); } catch (e) {}
+  updateNextPageTitle();
 }
 
 // ============================================================
@@ -2219,6 +2247,20 @@ function initNotifSettings() {
     }
   }
 
+  // Экспериментальный интерфейс — тоже до раннего return, по той же причине.
+  const uiNextCb = document.getElementById("experimentalUiToggle");
+  if (uiNextCb) {
+    uiNextCb.checked = !!settings.experimentalUi;
+    if (!uiNextCb._hasListener) {
+      uiNextCb._hasListener = true;
+      uiNextCb.addEventListener("change", () => {
+        settings.experimentalUi = uiNextCb.checked;
+        applyExperimentalUi();
+        savePrefsToServer();
+      });
+    }
+  }
+
   if (!conflictCb || !onlyFavCb || !cooldownSel) return;
 
   conflictCb.checked = !!settings.notifConflict;
@@ -2291,11 +2333,29 @@ function initNotifSettings() {
   updatePermHint();
 }
 
+// Экспериментальный UI — только оформление: класс ui-next на <html> включает
+// ui-next.css (боковое меню, новая палитра, шрифты). DOM и логика те же, что
+// в классическом виде. При запуске класс ставит скрипт в <head> index.html,
+// чтобы не мелькал старый вид; здесь — переключение из настроек и после загрузки prefs.
+function applyExperimentalUi() {
+  document.documentElement.classList.toggle("ui-next", !!settings.experimentalUi);
+  const cb = document.getElementById("experimentalUiToggle");
+  if (cb) cb.checked = !!settings.experimentalUi;
+  updateNextPageTitle();
+}
+// Заголовок страницы в шапке нового UI = подпись активной вкладки.
+function updateNextPageTitle() {
+  const el = document.getElementById("nextPageTitle");
+  const active = document.querySelector(".tab-btn.active");
+  if (el && active) el.textContent = active.textContent;
+}
+
 function switchToTab(tabName) {
   document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
   document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add("active");
   document.getElementById(`tab-${tabName}`).classList.add("active");
+  updateNextPageTitle();
   if (tabName === "routes") loadRoutes();
   if (tabName === "problems") {
     // Если маршруты ещё не загружены — загружаем сначала
@@ -6055,6 +6115,7 @@ function buildPrefsPayload() {
     notifCooldownMin: settings.notifCooldownMin,
     delayThresholdMin: settings.delayThresholdMin,
     betaUpdates: settings.betaUpdates,
+    experimentalUi: settings.experimentalUi,
     serverUrl: settings.serverUrl,
     serverList: settings.serverList || [],
     ...boardEditorPrefsFields(),
@@ -6109,6 +6170,7 @@ async function buildDiagnosticReport() {
   line("Server list", JSON.stringify(settings.serverList || []));
   line("Min interval (min)", state.minIntervalMin);
   line("Beta updates", settings.betaUpdates);
+  line("Experimental UI", settings.experimentalUi);
   line("Notifications", `conflict=${settings.notifConflict} delay=${settings.notifDelay} onlyFav=${settings.notifOnlyFav} cooldown=${settings.notifCooldownMin} threshold=${settings.delayThresholdMin}`);
 
   // Состояние приложения
@@ -6281,6 +6343,7 @@ async function restoreFromUrlHash() {
   const tabPanel = document.getElementById(`tab-${h.tab}`);
   if (tabBtn) tabBtn.classList.add("active");
   if (tabPanel) tabPanel.classList.add("active");
+  updateNextPageTitle();
 
   if (h.tab === "schedule" && h.station) {
     const st = state.stations.find((s) => s.id === h.station);
@@ -6347,6 +6410,7 @@ async function savePrefsToServer() {
         notifCooldownMin: settings.notifCooldownMin,
         delayThresholdMin: settings.delayThresholdMin,
         betaUpdates: settings.betaUpdates,
+        experimentalUi: settings.experimentalUi,
         ...boardEditorPrefsFields(),
         ...networkSchemePrefsFields(),
       }),
@@ -6375,6 +6439,8 @@ async function loadPrefsFromServer() {
     if (Number.isFinite(Number(p.notifCooldownMin))) settings.notifCooldownMin = Number(p.notifCooldownMin);
     if (Number.isFinite(Number(p.delayThresholdMin))) settings.delayThresholdMin = Number(p.delayThresholdMin);
     if (typeof p.betaUpdates === "boolean") settings.betaUpdates = p.betaUpdates;
+    if (typeof p.experimentalUi === "boolean") settings.experimentalUi = p.experimentalUi;
+    applyExperimentalUi();
     try {
       if (window.BoardEditor && typeof window.BoardEditor.applyPersistedState === "function") {
         window.BoardEditor.applyPersistedState({
