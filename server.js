@@ -397,35 +397,29 @@ app.post("/api/prefs", (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// Живая публикация схемы сети: запись в открытом JSON-хранилище (jsonblob.com).
-// Запрос идёт с сервера приложения, а не из браузера: заголовок Location
-// у чужого API может быть недоступен из-за CORS. Без id — создаёт запись,
-// с id — заменяет её содержимое (ссылка остаётся прежней).
-const JSONBLOB_API = "https://jsonblob.com/api/jsonBlob";
-const BLOB_ID = /^[A-Za-z0-9-]{8,64}$/;
-app.post("/api/scheme-publish", async (req, res) => {
-  try {
-    const { id, data } = req.body || {};
-    if (!data || typeof data !== "object") return res.status(400).json({ error: "Нет данных схемы." });
-    if (id != null && !BLOB_ID.test(String(id))) return res.status(400).json({ error: "Некорректный id публикации." });
-    const body = JSON.stringify(data);
-    if (body.length > 4 * 1024 * 1024) return res.status(413).json({ error: "Схема слишком большая для публикации." });
-    const headers = { "Content-Type": "application/json", Accept: "application/json" };
-    if (id) {
-      const r = await fetch(`${JSONBLOB_API}/${id}`, { method: "PUT", headers, body, signal: AbortSignal.timeout(20000) });
-      if (r.status === 404) return res.status(404).json({ error: "Публикация не найдена на сервере (удалена?)." });
-      if (!r.ok) return res.status(502).json({ error: `Хранилище ответило ${r.status}.` });
-      return res.json({ id: String(id) });
-    }
-    const r = await fetch(JSONBLOB_API, { method: "POST", headers, body, signal: AbortSignal.timeout(20000) });
-    if (!r.ok) return res.status(502).json({ error: `Хранилище ответило ${r.status}.` });
-    const loc = r.headers.get("location") || "";
-    const newId = loc.split("/").pop();
-    if (!BLOB_ID.test(newId)) return res.status(502).json({ error: "Хранилище не вернуло id записи." });
-    res.json({ id: newId });
-  } catch (e) {
-    res.status(502).json({ error: "Не удалось связаться с хранилищем: " + e.message });
-  }
+// Просмотр схемы сети в системном браузере: редактор кладёт сюда схему
+// (формат toPublished), страница map.html#v=<id> забирает её и опрашивает,
+// чтобы правки появлялись во вкладке сами. Только в памяти — живёт, пока
+// запущено приложение (поделиться с другими — HTML-файлом из редактора).
+const schemeViews = new Map(); // id → { rev, data }
+const SCHEME_VIEW_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const SCHEME_VIEW_MAX = 20;
+app.post("/api/scheme-view", (req, res) => {
+  const { id, data } = req.body || {};
+  if (!SCHEME_VIEW_ID.test(String(id || ""))) return res.status(400).json({ error: "Некорректный id схемы." });
+  if (!data || typeof data !== "object") return res.status(400).json({ error: "Нет данных схемы." });
+  const prev = schemeViews.get(id);
+  schemeViews.delete(id); // Map хранит порядок вставки — свежие в конце
+  schemeViews.set(id, { rev: (prev ? prev.rev : 0) + 1, data });
+  while (schemeViews.size > SCHEME_VIEW_MAX) schemeViews.delete(schemeViews.keys().next().value);
+  res.json({ ok: true });
+});
+app.get("/api/scheme-view/:id", (req, res) => {
+  const v = schemeViews.get(req.params.id);
+  res.set("Cache-Control", "no-store");
+  if (!v) return res.status(404).json({ error: "Схема не открыта в приложении." });
+  if (String(v.rev) === String(req.query.rev)) return res.status(204).end();
+  res.json(v);
 });
 
 app.delete("/api/drafts/:id", (req, res) => {

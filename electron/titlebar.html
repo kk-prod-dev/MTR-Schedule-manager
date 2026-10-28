@@ -1,0 +1,84 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>MTR Schedule Manager</title>
+<!--
+  Своя панель заголовка окна (см. TITLEBAR_H в main.js). Вся полоса — область
+  перетаскивания (двойной клик разворачивает окно). Кнопки окна справа рисует
+  система (titleBarOverlay), на macOS слева — «светофор». Цвета приходят из
+  приложения через applyTheme(). В новом интерфейсе (layout: "next", макет
+  Claude Design): полоса 40px, знак цвета текста, название по центру, справа
+  статус MTR.
+-->
+<style>
+  /* шрифты нового вида — те же файлы, что у приложения (public/vendor/fonts) */
+  @font-face { font-family: "DM Sans"; font-weight: 500; src: url(../public/vendor/fonts/dm-sans-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+2000-206F; }
+  @font-face { font-family: "DM Sans"; font-weight: 500; src: url(../public/vendor/fonts/manrope-cyrillic-500-normal.woff2) format("woff2"); unicode-range: U+0400-045F; }
+  :root { --bg: #0f1115; --fg: #e5e7eb; --muted: #9ca3af; --accent: #6366f1; --live: #D6FFF6; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--fg);
+    font: 12.5px -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    user-select: none; cursor: default;
+  }
+  /* страница занимает всё окно (ниже её закрывает view приложения),
+     поэтому высота полосы — явная, из TITLEBAR_H (?h=). Drag — ТОЛЬКО на полосе:
+     область перетаскивания в Windows — это хит-тест всего окна, и drag на body
+     перехватывал клики по приложению под ним (оно переставало нажиматься) */
+  .bar {
+    -webkit-app-region: drag;
+    height: var(--h, 34px); display: flex; align-items: center; gap: 9px;
+    padding: 0 150px 0 12px; box-sizing: border-box;
+  }
+  .mac .bar { padding: 0 12px 0 80px; }
+  .logo { width: 16px; height: 16px; flex: none; }
+  .logo path { fill: var(--accent); }
+  .name { font-weight: 600; letter-spacing: .1px; white-space: nowrap; }
+  .status { display: none; }
+  body:not(.focused) .bar { opacity: .6; }
+
+  .next body { font: 13px "DM Sans", "Segoe UI", system-ui, sans-serif; }
+  .next .bar { gap: 12px; padding: 0 150px 0 16px; }
+  .next.mac .bar { padding: 0 16px 0 80px; }
+  .next .logo { width: 18px; height: 18px; }
+  .next .logo path { fill: var(--fg); }
+  .next .name { flex: 1; text-align: center; font-weight: 500; }
+  .next .nm-pre { display: none; }
+  .next .status { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--live); white-space: nowrap; }
+  .next .status:empty { display: none; }
+  .next .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(214, 255, 246, .16); }
+  .next .status.warn { color: #FFC86B; }
+  .next .status.error { color: #FF6B81; }
+  .next .status.warn::before, .next .status.error::before { box-shadow: none; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <svg class="logo" viewBox="120 123 266 266" aria-hidden="true"><path d="M327.558 131C336.068 131 343.947 135.316 348.399 142.364L348.819 143.054L378 192.903L341.026 213.605L317.061 172.667H259.167L359.961 345.154C369.295 361.126 357.502 381 338.691 381H239.373C230.589 381 222.477 376.401 218.113 368.946L181.225 305.934L218.2 285.233L249.871 339.333H307.488L210.095 172.667H190.547L164.974 216.352L128 195.648L158.789 143.054L159.209 142.364C163.661 135.316 171.54 131 180.049 131H327.558Z"/></svg>
+  <span class="name"><span class="nm-pre">MTR </span>Schedule Manager</span>
+  <span class="status" id="status"></span>
+</div>
+<script>
+  var q = new URLSearchParams(location.search);
+  var root = document.documentElement;
+  if (q.get("platform") === "darwin") root.classList.add("mac");
+  if (q.get("layout") === "next") root.classList.add("next");
+  if (/^\d{2}$/.test(q.get("h") || "")) root.style.setProperty("--h", q.get("h") + "px");
+  // неактивное окно — приглушённая полоса, как у системных заголовков
+  function syncFocus() { document.body.classList.toggle("focused", document.hasFocus()); }
+  window.addEventListener("focus", syncFocus);
+  window.addEventListener("blur", syncFocus);
+  syncFocus();
+  window.applyTheme = function (t) {
+    if (!t) return;
+    ["bg", "fg", "muted", "accent"].forEach(function (k) { if (t[k]) root.style.setProperty("--" + k, t[k]); });
+    root.classList.toggle("next", t.layout === "next");
+    if (typeof t.h === "number" && t.h >= 20 && t.h <= 80) root.style.setProperty("--h", t.h + "px");
+    var el = document.getElementById("status");
+    el.textContent = t.status && t.status.text ? t.status.text : "";
+    el.className = "status" + (t.status && t.status.state ? " " + t.status.state : "");
+  };
+</script>
+</body>
+</html>

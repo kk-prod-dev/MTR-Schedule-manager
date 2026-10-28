@@ -38,14 +38,13 @@ const NetworkScheme = (function () {
   const HISTORY_LIMIT = 60;
   const LIVE_REFRESH_MS = 90000;
   const PALETTE = ["#e11d48", "#2563eb", "#16a34a", "#f59e0b", "#9333ea", "#0891b2", "#ea580c", "#4b5563"];
-  // Страница просмотра опубликованных схем (GitHub Pages репозитория,
-  // публикуется из корня ветки main — public/map.html)
-  const PUBLISH_BASE = "https://kk-prod-dev.github.io/MTR-Schedule-manager/public/map.html";
+  // Пауза перед отправкой правок во вкладку браузера (map.html#v=…)
+  const VIEW_PUSH_DELAY = 600;
 
   const C = () => window.SchemeCore;
   let project = null;
   // alignTol — допуск выравнивания перегонов при построении, градусы (0 = выкл)
-  let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, minGap: 0, viewerBase: "" };
+  let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, minGap: 0 };
   let schemeData = null;
   let initialized = false;
   const el = {};
@@ -60,7 +59,7 @@ const NetworkScheme = (function () {
   let undoStack = [], redoStack = [];
   let saveTimer = null;
   let liveData = null, liveTimer = null;
-  let schemes = [];          // [{ id, name, project, types, publish }] — несколько схем
+  let schemes = [];          // [{ id, name, project, types }] — несколько схем
   let activeId = null;
   let group = null;          // { stations:Set, nodes:Set<ключ позиции>, shapes:Set } — выделение рамкой
   let styleClip = null;      // скопированный стиль { kind, props }
@@ -987,6 +986,67 @@ const NetworkScheme = (function () {
   }
 
   /**
+   * Уплотнение пучков: если на отрезке между полосами нет ни одной линии (дыра —
+   * соседей по пучку здесь нет, они присоединяются дальше), полосы сдвигаются
+   * вплотную вокруг прежней середины. Линии идут рядом сразу после поворота и
+   * расходятся к своим местам в пучке только там, где присоединяются остальные.
+   * Порядок линий не меняется, равные полосы (общая группа) остаются равными.
+   */
+  function compactLanes(lines) {
+    const segs = new Map();
+    for (const l of lines) {
+      if (!l.lanes) continue;
+      for (let i = 0; i + 1 < l.points.length; i++) {
+        const a = l.points[i], b = l.points[i + 1];
+        const fwd = a.x < b.x || (a.x === b.x && a.y < b.y);
+        const key = (fwd ? [a, b] : [b, a]).map(pkey).join(">");
+        if (!segs.has(key)) segs.set(key, []);
+        segs.get(key).push({ l, i, sign: fwd ? 1 : -1 });
+      }
+    }
+    // предложение: новые полосы отрезков, где есть дыры
+    const prop = new Map(); // key → [{e, lane}]
+    for (const [key, arr] of segs) {
+      if (arr.length < 2) continue;
+      const val = (e) => Math.round((e.l.lanes[e.i] || 0) * e.sign * 100) / 100;
+      const vs = [...new Set(arr.map(val))].sort((x, y) => x - y);
+      if (vs.length < 2 || !vs.some((v, j) => j && v - vs[j - 1] > 1.01)) continue;
+      const m = [0];
+      for (let j = 1; j < vs.length; j++) m.push(m[j - 1] + Math.min(1, vs[j] - vs[j - 1]));
+      const shift = (vs[0] + vs[vs.length - 1]) / 2 - (m[0] + m[m.length - 1]) / 2;
+      prop.set(key, arr.map((e) => ({ e, lane: e.sign * (m[vs.indexOf(val(e))] + shift) })));
+    }
+    // Полоса меняется только на повороте: смена на прямом участке давала бы
+    // ступеньку-зигзаг рядом со станцией. Такие предложения отбрасываем.
+    const bend = (l, i) => {
+      const pts = l.points;
+      const u = unitV(pts[i - 1], pts[i]), w = unitV(pts[i], pts[i + 1]);
+      return Math.abs(u.x * w.y - u.y * w.x) > 1e-3;
+    };
+    const unitV = (a, b) => { const d = Math.hypot(b.x - a.x, b.y - a.y) || 1; return { x: (b.x - a.x) / d, y: (b.y - a.y) / d }; };
+    const cur = (e) => e.l.__nl && e.l.__nl.has(e.i) ? e.l.__nl.get(e.i) : e.l.lanes[e.i];
+    for (const arr of prop.values()) for (const { e, lane } of arr) { (e.l.__nl = e.l.__nl || new Map()).set(e.i, lane); }
+    for (let pass = 0; pass < 6; pass++) {
+      const reject = new Set();
+      for (const [key, arr] of prop) {
+        for (const { e } of arr) {
+          const n = e.l.points.length - 1;
+          const bad = (j) => j >= 0 && j < n && e.l.lanes[e.i] === e.l.lanes[j] && cur(e) !== (e.l.__nl.has(j) ? e.l.__nl.get(j) : e.l.lanes[j]);
+          if ((e.i > 0 && bad(e.i - 1) && !bend(e.l, e.i)) || (e.i + 1 < n && bad(e.i + 1) && !bend(e.l, e.i + 1))) { reject.add(key); break; }
+        }
+      }
+      if (!reject.size) break;
+      for (const key of reject) {
+        for (const { e } of prop.get(key)) e.l.__nl.delete(e.i);
+        prop.delete(key);
+      }
+    }
+    for (const l of lines) {
+      if (l.__nl) { for (const [i, v] of l.__nl) l.lanes[i] = v; delete l.__nl; }
+    }
+  }
+
+  /**
    * Экспресс-линии: если участок линии A→C пропускает станции, по которым
    * проходит другая линия (A…B…C подряд), экспресс рисуется по её трассе и
    * идёт в пучке рядом с остальными, а B помечается как «проходит без
@@ -1190,6 +1250,7 @@ const NetworkScheme = (function () {
     splitOverlaps(visible, insertPoint);
     withJunctions(visible, [...stLines.keys()], pos);
     assignLanes(visible, pos);
+    compactLanes(visible);
     lines.forEach((l) => { if (l.hidden) { delete l.lanes; delete l._fullIds; } });
     const lineIds = new Set(lines.map((l) => l.id));
     const userLines = prevLines.filter((l) => !isMtr(l.id, P_LINE));
@@ -1305,6 +1366,7 @@ const NetworkScheme = (function () {
     saveTimer = setTimeout(() => {
       try { if (typeof savePrefsToServer === "function") savePrefsToServer(); } catch (e) {}
     }, SAVE_DELAY);
+    scheduleViewPush();
   }
 
   // ------------------------------------------------------------
@@ -1377,6 +1439,12 @@ const NetworkScheme = (function () {
     mk("circle", { cx: knob.x, cy: knob.y, r: s * 0.65, class: "sc-handle mine", "data-kind": "shandle", "data-h": "rot", "stroke-width": 1.5 / z }, g);
   }
 
+  // Где реально нарисован значок станции (он может стоять не в вершине, а за изломом)
+  function markPos(st) {
+    const geo = lastDrawn && lastDrawn.geos && lastDrawn.geos.get(st.id);
+    return geo ? geo.c : st;
+  }
+
   function renderOverlay() {
     const g = el.overlay;
     while (g.firstChild) g.removeChild(g.firstChild);
@@ -1385,7 +1453,7 @@ const NetworkScheme = (function () {
     const ringR = project.style.lineWidth * 2.2;
     if (sel && sel.kind === "station") {
       const st = project.stations.find((s) => s.id === sel.id);
-      if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring" }, g);
+      if (st) mk("circle", { cx: markPos(st).x, cy: markPos(st).y, r: ringR, class: "sc-sel-ring" }, g);
     }
     // Точки редактирования на каждом угле линий. Угол пучка — общая вершина
     // нескольких линий, одна точка двигает их все (moveNode). Вершины в
@@ -1426,7 +1494,7 @@ const NetworkScheme = (function () {
     if (group) {
       group.stations.forEach((id) => {
         const st = project.stations.find((x) => x.id === id);
-        if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring" }, g);
+        if (st) mk("circle", { cx: markPos(st).x, cy: markPos(st).y, r: ringR, class: "sc-sel-ring" }, g);
       });
       group.shapes.forEach((id) => {
         const sh = project.shapes.find((x) => x.id === id);
@@ -1443,12 +1511,12 @@ const NetworkScheme = (function () {
       const tr = project.transfers.find((x) => x.id === sel.id);
       if (tr) tr.stationIds.forEach((id) => {
         const st = project.stations.find((x) => x.id === id);
-        if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring" }, g);
+        if (st) mk("circle", { cx: markPos(st).x, cy: markPos(st).y, r: ringR, class: "sc-sel-ring" }, g);
       });
     }
     if (transferFirst) {
       const st = project.stations.find((x) => x.id === transferFirst);
-      if (st) mk("circle", { cx: st.x, cy: st.y, r: ringR, class: "sc-sel-ring pending" }, g);
+      if (st) mk("circle", { cx: markPos(st).x, cy: markPos(st).y, r: ringR, class: "sc-sel-ring pending" }, g);
     }
     if (drawing && drawing.points.length) {
       const pts = hoverPt ? [...drawing.points, hoverPt] : drawing.points;
@@ -1900,21 +1968,27 @@ const NetworkScheme = (function () {
    * станции в ту же систему.
    */
   function scaleMap(f) {
-    const g = project.grid * f;
-    if (g < 8 || g > 96) { setStatus(tt("schemeMapScaleLimit")); return; }
-    pushHistory();
+    // Сетка остаётся прежней: карта растягивается / сжимается ОТНОСИТЕЛЬНО неё
+    // (плотную схему можно «раздвинуть» на холсте; ширина линий и подписи не меняются)
     const b = C().bounds(project);
     const v = project.view;
-    const sc = (q) => ({ x: q.x * f, y: q.y * f });
-    project.stations.forEach((s) => { s.x *= f; s.y *= f; });
-    project.lines.forEach((l) => { l.points = l.points.map(sc); });
+    // Только целые кратные: тогда всё остаётся в узлах сетки, а прямые и 45° —
+    // точными. Дробный масштаб с округлением к сетке превращал диагонали в
+    // ступеньки и добавлял лишние узлы.
+    const g = project.grid;
+    const cells = [];
+    project.stations.forEach((s) => cells.push(s.x / g, s.y / g));
+    project.lines.forEach((l) => l.points.forEach((q) => cells.push(q.x / g, q.y / g)));
+    const exact = cells.every((c) => Math.abs(c * f - Math.round(c * f)) < 1e-6);
+    if (!exact) { setStatus(tt("schemeMapScaleLimit")); return; }
+    pushHistory();
+    project.stations.forEach((s) => { s.x = Math.round(s.x * f / g) * g; s.y = Math.round(s.y * f / g) * g; });
+    project.lines.forEach((l) => { l.points = l.points.map((q) => ({ x: Math.round(q.x * f / g) * g, y: Math.round(q.y * f / g) * g })); });
     project.shapes.forEach((sh) => { sh.x *= f; sh.y *= f; sh.w *= f; sh.h *= f; });
     project.legend.x *= f; project.legend.y *= f;
-    project.grid = g;
     const m = project.mtrMeta;
     if (m) {
       m.scale *= f;
-      m.grid = g;
       if (m.cmp) for (const ax of [m.cmp.x, m.cmp.y]) { ax.xs = ax.xs.map((x) => x * f); ax.ys = ax.ys.map((y) => y * f); }
     }
     if (b) {
@@ -2001,7 +2075,18 @@ const NetworkScheme = (function () {
       }
       if (drag.type === "station") moveStation(drag.id, drag.last, np);
       else if (drag.type === "node") { moveNode(drag.last, np); sel = { kind: "node", x: np.x, y: np.y }; }
-      else if (drag.type === "vertex") { project.lines.find((l) => l.id === drag.id).points[sel.vidx] = np; }
+      else if (drag.type === "vertex") {
+        // у объединённой группы геометрия одна: вершина двигается во всех её линиях сразу
+        const ln = project.lines.find((l) => l.id === drag.id);
+        const from = ln.points[sel.vidx];
+        ln.points[sel.vidx] = np;
+        if (ln.group) {
+          project.lines.forEach((l) => {
+            if (l === ln || l.group !== ln.group) return;
+            l.points.forEach((q, i) => { if (q.x === from.x && q.y === from.y) l.points[i] = { x: np.x, y: np.y }; });
+          });
+        }
+      }
       else if (drag.type === "shape") { const sh = project.shapes.find((x) => x.id === drag.id); sh.x = np.x; sh.y = np.y; }
       else if (drag.type === "label") { const st = project.stations.find((x) => x.id === drag.id); st.label.dx = np.x; st.label.dy = np.y; }
       else if (drag.type === "badge") { const st = project.stations.find((x) => x.id === drag.id); st.badge.dx = np.x; st.badge.dy = np.y; }
@@ -2064,8 +2149,12 @@ const NetworkScheme = (function () {
       else if (e.key === "Enter" && (!multiline || e.ctrlKey)) { e.preventDefault(); ok(); }
     });
     el.canvasBox.appendChild(askBox);
-    input.focus();
-    input.select();
+    // Фокус — после текущего события: инструмент «Текст» открывает окно прямо в
+    // mousedown, и стандартное действие мыши сразу уводило фокус с поля
+    const focusIt = () => { if (askBox && askBox.contains(input)) { input.focus(); input.select(); } };
+    focusIt();
+    setTimeout(focusIt, 0);
+    setTimeout(focusIt, 60);
   }
 
   function renameSelection() {
@@ -2436,6 +2525,20 @@ const NetworkScheme = (function () {
     const inp = h("input", { type: "number", min, max, step, value: value == null ? "" : value, placeholder });
     return bindEdit(inp, (v) => apply(v === "" ? null : Math.max(min, Math.min(max, Number(v) || min))));
   }
+  // Контрастные цвета обводки групп объединённых линий
+  const RING_COLORS = ["#f59e0b", "#22d3ee", "#a3e635", "#f472b6", "#a78bfa", "#fb7185", "#2dd4bf", "#facc15", "#60a5fa", "#fb923c"];
+  // Глаз (открыт / перечёркнут) — SVG через DOM-API
+  function eyeIcon(off) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    [["width", "16"], ["height", "16"], ["viewBox", "0 0 24 24"], ["fill", "none"], ["stroke", "currentColor"],
+      ["stroke-width", "2"], ["stroke-linecap", "round"], ["stroke-linejoin", "round"]].forEach(([a, v]) => svg.setAttribute(a, v));
+    const add = (tag, attrs) => { const n = document.createElementNS(NS, tag); Object.keys(attrs).forEach((a) => n.setAttribute(a, attrs[a])); svg.appendChild(n); };
+    add("path", { d: "M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" });
+    add("circle", { cx: "12", cy: "12", r: "3" });
+    if (off) add("path", { d: "M3 3l18 18" });
+    return svg;
+  }
   function slider(value, min, max, step, apply) {
     const out = h("span", { class: "scheme-offset-val", text: String(value) });
     const inp = h("input", { type: "range", min, max, step, value });
@@ -2447,6 +2550,7 @@ const NetworkScheme = (function () {
   function stationFields(st) {
     return [
       field("schemeFieldStationStyle", selectInput(st.style, C().STATION_STYLES.map((s) => [s, tt("schemeStStyle_" + s)]), (v) => { st.style = v; })),
+      field("schemeFieldTransferStyle", selectInput(st.transferStyle || "", [["", tt("schemeTrStyle_default")], ...C().TRANSFER_STYLES.map((x) => [x, tt("schemeTrStyle_" + x)])], (v) => { st.transferStyle = v; })),
       field("schemeFieldFill", optColor(st.fill, project.style.stationFill, (v) => { st.fill = v; })),
       field("schemeFieldStroke", optColor(st.stroke, project.style.stationStroke, (v) => { st.stroke = v; })),
       field("schemeFieldStrokeW", optNum(st.strokeW, 0, 20, 0.5, (v) => { st.strokeW = v; }, "auto")),
@@ -2523,18 +2627,23 @@ const NetworkScheme = (function () {
           });
         })));
       }
+      // у каждой объединённой группы своя обводка — чтобы группы различались
+      const groupIds = [...new Set(lines.filter((l) => l.group).map((l) => l.group))].sort();
+      const groupColor = (g) => RING_COLORS[groupIds.indexOf(g) % RING_COLORS.length];
       lines.forEach((l) => {
         const pick = h("input", { type: "checkbox", class: "scheme-list-pick", title: tt("schemeMergePick") });
         pick.checked = mergePick.has(l.id);
         pick.addEventListener("change", () => { if (pick.checked) mergePick.add(l.id); else mergePick.delete(l.id); });
         const eye = h("button", {
-          type: "button", class: "icon-btn scheme-eye" + (l.hidden ? " off" : ""), text: l.hidden ? "⌀" : "◉", title: tt("schemeToggleLine"),
+          type: "button", class: "icon-btn scheme-eye" + (l.hidden ? " off" : ""), title: tt("schemeToggleLine"),
           onclick: () => { pushHistory(); l.hidden = !l.hidden; relayoutLanes(); changed(); },
-        });
+        }, [eyeIcon(!!l.hidden)]);
+        const colorInp = bindEdit(h("input", { type: "color", value: l.color, class: "scheme-list-color" }), (v) => { l.color = v; shareGroupProps(l); });
+        if (l.group) colorInp.style.outline = "2px solid " + groupColor(l.group);
         wrap.append(h("div", { class: "scheme-list-row" + (l.group ? " is-merged" : "") + (l.hidden ? " is-hidden" : "") }, [
           eye,
           pick,
-          bindEdit(h("input", { type: "color", value: l.color, class: "scheme-list-color" }), (v) => { l.color = v; shareGroupProps(l); }),
+          colorInp,
           bindEdit(h("input", { type: "text", value: l.number, class: "scheme-list-num", title: tt("schemeFieldNumber") }), (v) => { l.number = v.slice(0, 24); }),
           bindEdit(h("input", { type: "text", value: l.name, class: "scheme-list-name", title: tt("schemeFieldName") }), (v) => { l.name = v; }),
           h("button", { type: "button", class: "icon-btn", text: "◎", title: tt("schemeSelectLine"), onclick: () => { clearSelection(); sel = { kind: "line", id: l.id }; renderOverlay(); renderProps(); } }),
@@ -2602,6 +2711,7 @@ const NetworkScheme = (function () {
           field("schemeFieldStationStyle", selectInput(proxy.style, C().STATION_STYLES.map((s) => [s, tt("schemeStStyle_" + s)]), applyAll((s, v) => { s.style = v; }))),
           field("schemeFieldFill", optColor(proxy.fill, project.style.stationFill, applyAll((s, v) => { s.fill = v; }))),
           field("schemeFieldStroke", optColor(proxy.stroke, project.style.stationStroke, applyAll((s, v) => { s.stroke = v; }))),
+          field("schemeFieldTransferStyle", selectInput(proxy.transferStyle || "", [["", tt("schemeTrStyle_default")], ...C().TRANSFER_STYLES.map((x) => [x, tt("schemeTrStyle_" + x)])], applyAll((s, v) => { s.transferStyle = v; }))),
           field("schemeFieldSize", slider(proxy.size, 0.3, 4, 0.1, applyAll((s, v) => { s.size = v; }))),
           field("schemeFieldLabelPos", selectInput(proxy.label.pos, C().LABEL_POS.map((s) => [s, tt("schemeLabelPos_" + s)]), applyAll((s, v) => { s.label.pos = v; }))),
         );
@@ -2686,6 +2796,7 @@ const NetworkScheme = (function () {
       const tr = project.transfers.find((x) => x.id === sel.id);
       if (!tr) { sel = null; return renderProps(); }
       box.append(title("schemePropTransfer"));
+      box.append(field("schemeFieldTransferStyle", selectInput(tr.style || "", [["", tt("schemeTrStyle_default")], ...C().TRANSFER_STYLES.map((x) => [x, tt("schemeTrStyle_" + x)])], (v) => { tr.style = v; })));
       tr.stationIds.forEach((id) => {
         const st = project.stations.find((s) => s.id === id);
         if (st) box.append(h("div", { class: "scheme-props-item", text: st.name || id }));
@@ -2699,14 +2810,15 @@ const NetworkScheme = (function () {
       title("schemePropScheme"),
       field("schemeFieldTitle", textInput(project.title, (v) => { project.title = v; })),
       field("schemeFieldMapScale", h("span", { class: "scheme-btn-row" }, [
-        h("button", { type: "button", class: "secondary-btn", text: "−", title: tt("schemeMapScaleDown"), onclick: () => scaleMap(0.8) }),
-        h("button", { type: "button", class: "secondary-btn", text: "+", title: tt("schemeMapScaleUp"), onclick: () => scaleMap(1.25) }),
+        h("button", { type: "button", class: "secondary-btn", text: "−", title: tt("schemeMapScaleDown"), onclick: () => scaleMap(0.5) }),
+        h("button", { type: "button", class: "secondary-btn", text: "+", title: tt("schemeMapScaleUp"), onclick: () => scaleMap(2) }),
       ])),
       title("schemePropLook"),
       field("schemeFieldLineWidth", slider(st.lineWidth, 1, 24, 1, (v) => { st.lineWidth = v; })),
       field("schemeFieldLaneGap", slider(st.laneGap, 0, 8, 0.5, (v) => { st.laneGap = v; })),
       field("schemeFieldCorner", slider(st.cornerRadius, 0, 60, 1, (v) => { st.cornerRadius = v; })),
       field("schemeFieldStationScale", slider(st.stationScale, 0.3, 3, 0.1, (v) => { st.stationScale = v; })),
+      field("schemeFieldTransferStyle", selectInput(st.transferStyle, C().TRANSFER_STYLES.map((x) => [x, tt("schemeTrStyle_" + x)]), (v) => { st.transferStyle = v; })),
       field("schemeFieldTransferScale", slider(st.transferScale, 0.2, 3, 0.1, (v) => { st.transferScale = v; })),
       field("schemeFieldStationFill", colorInput(st.stationFill, (v) => { st.stationFill = v; })),
       field("schemeFieldStationStroke", colorInput(st.stationStroke, (v) => { st.stationStroke = v; })),
@@ -2768,12 +2880,11 @@ const NetworkScheme = (function () {
   function setStatus(msg) { if (el.status) el.status.textContent = msg || ""; }
 
   function typeLabel(type) {
-    const m = /^(train|boat|cable_car|airplane)_(.+)$/.exec(type || "");
-    if (!m) return type;
-    const icon = { train: "", boat: "⛴ ", cable_car: "🚡 ", airplane: "✈ " }[m[1]];
-    const k = "schemeType_" + m[2];
-    const label = tt(k);
-    return icon + (label === k ? m[2] : label);
+    // единые названия типов из приложения (Ship, Cable car, Airplane…), без эмодзи:
+    // раньше boat_normal и cable_car_normal оба превращались в «Trains»
+    if (typeof window.routeTypeName === "function") return window.routeTypeName(type);
+    const m = /^(?:train|boat|cable_car|airplane)_(.+)$/.exec(type || "");
+    return m ? m[1] : type;
   }
 
   async function loadSchemeData(force) {
@@ -2859,20 +2970,79 @@ const NetworkScheme = (function () {
     }
   }
 
-  function publishUrl() {
-    const packed = LZString.compressToEncodedURIComponent(JSON.stringify(C().toPublished(project)));
-    return `${PUBLISH_BASE}#m=${packed}`;
+  // ------------------------------------------------------------
+  // «Поделиться»: автономный HTML-файл и просмотр в системном браузере
+  // ------------------------------------------------------------
+  function isEmpty() { return !project.stations.length && !project.lines.length; }
+  function fileBaseName() {
+    const name = (activeScheme() && activeScheme().name) || project.title || "network-map";
+    return name.replace(/[\\/:*?"<>|\x00-\x1f]+/g, "_").trim().slice(0, 80) || "network-map";
   }
+  // map.html + schemeCore.js + данные схемы в одном файле: открывается в любом
+  // браузере (и на телефоне) без интернета, приложения и хостинга
+  async function buildStandaloneHtml() {
+    const get = async (u) => {
+      const r = await fetch(u, { cache: "no-store" });
+      if (!r.ok) throw new Error(`${u}: ${r.status}`);
+      return r.text();
+    };
+    const [page, core] = await Promise.all([get("map.html"), get("schemeCore.js")]);
+    const LZ_TAG = '<script src="vendor/lz-string.min.js"></script>';
+    const CORE_TAG = '<script src="schemeCore.js"></script>';
+    if (!page.includes(LZ_TAG) || !page.includes(CORE_TAG)) throw new Error("map.html");
+    // JSON внутри <script>: «<» экранируем, чтобы данные не закрыли тег
+    const data = JSON.stringify(C().toPublished(project)).replace(/</g, "\\u003c");
+    const code = core.replace(/<\/script/gi, "<\\/script");
+    // функции-замены: в коде и данных могут встретиться «$&» и т.п.
+    return page
+      .replace(LZ_TAG, () => "")
+      .replace(CORE_TAG, () => `<script type="application/json" id="mapData">${data}</script>\n<script>\n${code}\n</script>`);
+  }
+  async function saveHtml() {
+    try {
+      const html = await buildStandaloneHtml();
+      download(new Blob([html], { type: "text/html" }), fileBaseName() + ".html");
+      el.shareStatus.textContent = tt("schemeHtmlSaved", { kb: Math.ceil(html.length / 1024) });
+    } catch (e) {
+      el.shareStatus.textContent = tt("schemeExportError") + ": " + e.message;
+    }
+  }
+
+  // Вкладка браузера с map.html#v=<id схемы> опрашивает /api/scheme-view/<id>;
+  // после «Открыть в браузере» каждая правка схемы уходит туда сама.
+  const viewOpened = new Set();
+  let viewPushTimer = 0;
+  async function pushView(id) {
+    const r = await fetch("/api/scheme-view", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, data: C().toPublished(project) }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+  }
+  function scheduleViewPush() {
+    if (!viewOpened.has(activeId)) return;
+    clearTimeout(viewPushTimer);
+    const id = activeId;
+    viewPushTimer = setTimeout(() => {
+      if (id === activeId) pushView(id).catch((e) => console.warn("scheme view push:", e.message));
+    }, VIEW_PUSH_DELAY);
+  }
+  async function openInBrowser() {
+    try {
+      await pushView(activeId);
+      viewOpened.add(activeId);
+      // в Electron window.open уходит в системный браузер (setWindowOpenHandler)
+      window.open(`${location.origin}/map.html#v=${encodeURIComponent(activeId)}`, "_blank");
+      el.shareStatus.textContent = tt("schemeBrowserOpened");
+    } catch (e) {
+      el.shareStatus.textContent = tt("schemeExportError") + ": " + e.message;
+    }
+  }
+
   function openPublish() {
-    if (!project.stations.length && !project.lines.length) { setStatus(tt("schemePublishEmpty")); return; }
-    const url = publishUrl();
-    el.publishUrl.value = url;
-    el.publishSize.textContent = tt("schemePublishSize", { kb: Math.ceil(url.length / 1024) });
-    refreshLiveUi();
-    el.liveStatus.textContent = "";
+    if (isEmpty()) { setStatus(tt("schemePublishEmpty")); return; }
+    el.shareStatus.textContent = "";
     el.publishOverlay.style.display = "flex";
-    el.publishUrl.focus();
-    el.publishUrl.select();
   }
   function closePublish() { el.publishOverlay.style.display = "none"; }
 
@@ -2901,6 +3071,7 @@ const NetworkScheme = (function () {
       return { ref: l, id: l.id, group: l.group, points: l.points, mtrStationIds: ids };
     });
     assignLanes(tmp, pos);
+    compactLanes(tmp);
     tmp.forEach((t) => { if (isMtr(t.ref.id, P_LINE) || t.ref.group) t.ref.lanes = t.lanes; });
   }
 
@@ -2953,11 +3124,11 @@ const NetworkScheme = (function () {
     const members = project.lines.filter((l) => mergePick.has(l.id) || (l.group && groups.has(l.group)));
     if (members.length < 2) { setStatus(tt("schemeMergeNeed")); return; }
     pushHistory();
-    const master = members[0];
-    const gid = master.group || "g" + Date.now().toString(36);
-    // новая группа получает собственный цвет; номера и названия остаются у
-    // каждого маршрута (на конечных у каждого свой номер)
-    const color = master.group ? master.color : pickGroupColor(members);
+    // цвет и параметры группы — от ПЕРВОЙ отмеченной пользователем линии
+    const first = [...mergePick].map((id) => project.lines.find((l) => l.id === id)).find(Boolean);
+    const master = first || members[0];
+    const gid = master.group || members.map((l) => l.group).find(Boolean) || "g" + Date.now().toString(36);
+    const color = master.color;
     members.forEach((l) => { l.group = gid; l.color = color; l.width = master.width; l.dash = master.dash; l.offset = master.offset; });
     splitAtMemberVertices(members);
     relayoutLanes();
@@ -2986,7 +3157,7 @@ const NetworkScheme = (function () {
     if (!project) project = C().emptyProject();
     if (!schemes.length) {
       activeId = uid();
-      schemes = [{ id: activeId, name: tt("schemeDefaultName", { n: 1 }), project, types: ui.types, publish: null }];
+      schemes = [{ id: activeId, name: tt("schemeDefaultName", { n: 1 }), project, types: ui.types }];
     }
     if (!activeScheme()) activeId = schemes[0].id;
   }
@@ -3023,16 +3194,40 @@ const NetworkScheme = (function () {
   function newScheme() {
     askText(tt("schemeAskNewScheme"), tt("schemeDefaultName", { n: schemes.length + 1 }), (name) => {
       syncActive();
-      const e = { id: uid(), name: name.trim() || tt("schemeDefaultName", { n: schemes.length + 1 }), project: C().emptyProject(), types: null, publish: null };
+      const e = { id: uid(), name: name.trim() || tt("schemeDefaultName", { n: schemes.length + 1 }), project: C().emptyProject(), types: null };
       schemes.push(e);
       switchScheme(e.id);
       scheduleSave();
     });
   }
+  // Схема станции из генератора табло: все маршруты через станцию, всех типов,
+  // как новая схема; пользователь дорабатывает её здесь и жмёт «В табло»
+  async function createStationScheme(stationId) {
+    const data = await loadSchemeData(true);
+    const routes = data.routes.filter((r) => (r.stationIds || []).includes(stationId));
+    if (!routes.length) return false;
+    const types = new Set(routes.map((r) => r.type));
+    const st = data.stations.find((s) => s.id === stationId);
+    syncActive();
+    const e = { id: uid(), name: (st && st.name) || tt("schemeDefaultName", { n: schemes.length + 1 }), project: C().emptyProject(), types: [...types] };
+    schemes.push(e);
+    switchScheme(e.id);
+    const res = buildFromMtr({ stations: data.stations, routes }, types, project, { alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap });
+    project = res.project;
+    e.project = project;
+    sel = null; group = null;
+    renderTypes();
+    changed();
+    scheduleSave();
+    const btn = document.getElementById("boardModeSchemeBtn");
+    if (btn) btn.click(); else setMode("scheme");
+    setTimeout(() => { fitView(); if (typeof updateNextPageTitle === "function") updateNextPageTitle(); }, 120);
+    return true;
+  }
   function duplicateScheme() {
     syncActive();
     const cur = activeScheme();
-    const copy = { id: uid(), name: cur.name + " (2)", project: C().normalize(JSON.parse(JSON.stringify(cur.project))), types: cur.types ? [...cur.types] : null, publish: null };
+    const copy = { id: uid(), name: cur.name + " (2)", project: C().normalize(JSON.parse(JSON.stringify(cur.project))), types: cur.types ? [...cur.types] : null };
     schemes.push(copy);
     switchScheme(copy.id);
     scheduleSave();
@@ -3087,49 +3282,6 @@ const NetworkScheme = (function () {
     }
   }
 
-  // ------------------------------------------------------------
-  // Живая публикация (jsonblob.com через сервер приложения)
-  // ------------------------------------------------------------
-  function liveLink() {
-    const e = activeScheme();
-    if (!e || !e.publish || !e.publish.id) return "";
-    return `${(ui.viewerBase || PUBLISH_BASE).replace(/#.*$/, "")}#b=${e.publish.id}`;
-  }
-  function refreshLiveUi() {
-    el.liveUrl.value = liveLink();
-    el.liveViewer.value = ui.viewerBase || PUBLISH_BASE;
-    const has = !!liveLink();
-    el.livePublish.textContent = tt(has ? "schemeLiveUpdate" : "schemeLivePublish");
-    el.liveCopy.disabled = !has;
-    el.liveForget.disabled = !has;
-  }
-  async function livePublish() {
-    const e = activeScheme();
-    el.liveStatus.textContent = tt("schemeLivePublishing");
-    el.livePublish.disabled = true;
-    try {
-      const res = await fetch("/api/scheme-publish", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: e.publish && e.publish.id, data: C().toPublished(project) }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (res.status === 404 && e.publish) {
-        // запись пропала на стороне хранилища — следующий клик создаст новую
-        e.publish = null;
-        scheduleSave();
-      }
-      if (!res.ok) throw new Error(body.error || res.status);
-      e.publish = { id: body.id, at: Date.now() };
-      scheduleSave();
-      el.liveStatus.textContent = tt("schemeLiveDone", { time: new Date().toLocaleTimeString() });
-    } catch (err) {
-      el.liveStatus.textContent = tt("schemeLiveFail") + ": " + err.message;
-    } finally {
-      el.livePublish.disabled = false;
-      refreshLiveUi();
-    }
-  }
-
   function setMode(mode) {
     ui.mode = mode === "scheme" ? "scheme" : "timetable";
     const scheme = ui.mode === "scheme";
@@ -3148,8 +3300,16 @@ const NetworkScheme = (function () {
   function onKey(e) {
     if (!visible()) return;
     const tag = (e.target && e.target.tagName) || "";
-    if (/INPUT|TEXTAREA|SELECT/.test(tag)) return;
-    const k = e.key.toLowerCase();
+    if (/INPUT|TEXTAREA|SELECT/.test(tag)) {
+      // Esc в поле правой панели: снять фокус и дальше — снять выделение
+      if (e.key === "Escape" && el.props && el.props.contains(e.target)) e.target.blur();
+      else return;
+    }
+    // Горячие клавиши по физической клавише (e.code): с русской раскладкой e.key = «я», «н»…
+    const code = e.code || "";
+    let k = e.key.toLowerCase();
+    if (/^Key[A-Z]$/.test(code)) k = code.slice(3).toLowerCase();
+    else if (code === "Delete") k = "delete";
     if (e.code === "Space") { spaceDown = true; e.preventDefault(); return; }
     if ((e.ctrlKey || e.metaKey) && k === "z" && !e.shiftKey) { e.preventDefault(); undo(); return; }
     if ((e.ctrlKey || e.metaKey) && (k === "y" || (k === "z" && e.shiftKey))) { e.preventDefault(); redo(); return; }
@@ -3167,7 +3327,7 @@ const NetworkScheme = (function () {
     if (k === "f2") { e.preventDefault(); renameSelection(); return; }
     if (k === "escape") {
       if (drawing) { drawing = null; renderOverlay(); return; }
-      clearSelection(); transferFirst = null; setTool("select"); renderProps(); return;
+      clearSelection(); transferFirst = null; setTool("select"); renderOverlay(); renderProps(); return;
     }
     if (k === "enter" && drawing) { finishLine(); return; }
     const tools = { v: "select", l: "line", s: "station", t: "transfer", r: "rect", o: "ellipse", d: "shapeline", a: "text" };
@@ -3193,16 +3353,9 @@ const NetworkScheme = (function () {
     el.liveToggle = $("schemeLiveToggle");
     el.zoomLabel = $("schemeZoomLabel");
     el.publishOverlay = $("schemePublishOverlay");
-    el.publishUrl = $("schemePublishUrl");
-    el.publishSize = $("schemePublishSize");
+    el.shareStatus = $("schemeShareStatus");
     el.schemeSelect = $("schemeSelect");
     el.schemeDelBtn = $("schemeDelBtn");
-    el.liveUrl = $("schemeLiveUrl");
-    el.liveViewer = $("schemeViewerBase");
-    el.livePublish = $("schemeLivePublish");
-    el.liveCopy = $("schemeLiveCopy");
-    el.liveForget = $("schemeLiveForget");
-    el.liveStatus = $("schemeLiveStatus");
     if (!el.scheme || !el.svg || !window.SchemeCore) return;
     initialized = true;
     if (!project) project = C().emptyProject();
@@ -3265,30 +3418,10 @@ const NetworkScheme = (function () {
     el.minGap.value = String(ui.minGap);
     el.minGap.addEventListener("change", () => { ui.minGap = Number(el.minGap.value) || 0; scheduleSave(); });
     $("schemeToBoardBtn").addEventListener("click", sendToBoard);
-    el.livePublish.addEventListener("click", livePublish);
-    el.liveViewer.addEventListener("change", () => {
-      const v = el.liveViewer.value.trim();
-      ui.viewerBase = /^https?:\/\//i.test(v) && v !== PUBLISH_BASE ? v : "";
-      refreshLiveUi();
-      scheduleSave();
-    });
-    el.liveCopy.addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(el.liveUrl.value); } catch (e) { el.liveUrl.select(); document.execCommand("copy"); }
-      el.liveStatus.textContent = tt("schemePublishCopied");
-    });
-    el.liveForget.addEventListener("click", () => { const e = activeScheme(); if (e) { e.publish = null; scheduleSave(); refreshLiveUi(); } });
     $("schemePublishClose").addEventListener("click", closePublish);
     el.publishOverlay.addEventListener("click", (e) => { if (e.target === el.publishOverlay) closePublish(); });
-    $("schemePublishCopy").addEventListener("click", async () => {
-      try { await navigator.clipboard.writeText(el.publishUrl.value); setStatus(tt("schemePublishCopied")); }
-      catch (e) { el.publishUrl.select(); document.execCommand("copy"); setStatus(tt("schemePublishCopied")); }
-      closePublish();
-    });
-    // в Electron window.open уходит в системный браузер (setWindowOpenHandler)
-    $("schemePublishOpen").addEventListener("click", () => window.open(el.publishUrl.value, "_blank"));
-    $("schemePublishLocal").addEventListener("click", () => {
-      window.open(el.publishUrl.value.replace(PUBLISH_BASE, location.origin + "/map.html"), "_blank");
-    });
+    $("schemeHtmlSave").addEventListener("click", saveHtml);
+    $("schemeBrowserOpen").addEventListener("click", openInBrowser);
 
     setTool("select");
     setMode(ui.mode);
@@ -3307,8 +3440,8 @@ const NetworkScheme = (function () {
     syncActive();
     return {
       project,
-      ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap, viewerBase: ui.viewerBase },
-      schemes: schemes.map((e) => ({ id: e.id, name: e.name, project: e.project, types: e.types, publish: e.publish })),
+      ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap },
+      schemes: schemes.map((e) => ({ id: e.id, name: e.name, project: e.project, types: e.types })),
       activeId,
     };
   }
@@ -3320,7 +3453,6 @@ const NetworkScheme = (function () {
       schemes = s.schemes.filter((e) => e && valid(e.project)).map((e) => ({
         id: String(e.id || uid()).slice(0, 40), name: String(e.name || "").slice(0, 80) || tt("schemeDefaultName", { n: 1 }),
         project: window.SchemeCore.normalize(e.project), types: Array.isArray(e.types) ? e.types : null,
-        publish: e.publish && /^[A-Za-z0-9-]{8,64}$/.test(String(e.publish.id)) ? { id: String(e.publish.id), at: Number(e.publish.at) || 0 } : null,
       }));
       activeId = schemes.some((e) => e.id === s.activeId) ? s.activeId : schemes[0].id;
       project = activeScheme().project;
@@ -3336,7 +3468,6 @@ const NetworkScheme = (function () {
       if ([0, 10, 15, 20].includes(s.ui.alignTol)) ui.alignTol = s.ui.alignTol;
       if ([0, 3, 5, 8].includes(s.ui.compress)) ui.compress = s.ui.compress;
       if (MIN_GAPS.includes(s.ui.minGap)) ui.minGap = s.ui.minGap;
-      if (typeof s.ui.viewerBase === "string" && /^https?:\/\//i.test(s.ui.viewerBase)) ui.viewerBase = s.ui.viewerBase;
     }
     ensureSchemes();
     // типы маршрутов — свойство схемы: у активной они перекрывают общие
@@ -3353,7 +3484,7 @@ const NetworkScheme = (function () {
     }
   }
 
-  return { init, getPersistedState, applyPersistedState, onLanguageChange, buildFromMtr };
+  return { init, getPersistedState, applyPersistedState, onLanguageChange, buildFromMtr, createStationScheme };
 })();
 
 window.NetworkScheme = NetworkScheme;

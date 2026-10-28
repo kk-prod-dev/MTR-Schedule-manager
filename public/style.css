@@ -698,6 +698,16 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 }
 .fav-chip:hover { background: var(--panel2); border-color: var(--accent); }
 .fav-chip.fav-active { background: rgba(99,102,241,.15); border-color: var(--accent); color: var(--accent); }
+/* Крестик «убрать из избранного» внутри чипа — виден при наведении,
+   у станции, которой нет на текущем сервере, — всегда */
+.fav-chip .fav-x {
+  display: inline-block; margin: 0 -4px 0 6px; padding: 0 3px;
+  border-radius: 50%; opacity: 0; color: var(--muted); font-weight: 600;
+}
+.fav-chip:hover .fav-x, .fav-chip.fav-missing .fav-x { opacity: 1; }
+.fav-chip .fav-x:hover { color: var(--red, #ef4444); background: rgba(239,68,68,.15); }
+.fav-chip.fav-missing { opacity: .55; text-decoration: line-through; cursor: default; }
+.fav-chip.fav-missing .fav-x { text-decoration: none; }
 
 .nearest-row {
   display: flex;
@@ -1258,6 +1268,7 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 @keyframes sc-pulse { 50% { stroke-opacity: 0.12; } }
 .scheme-zoom { position: absolute; right: 10px; bottom: 10px; }
 .scheme-tool-hint {
+  display: none;
   position: absolute; left: 10px; bottom: 10px;
   font-size: 12px; color: #374151;
   background: rgba(255,255,255,0.85); padding: 4px 8px; border-radius: 6px;
@@ -1319,8 +1330,8 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .scheme-ask-label { font-size: 12px; color: var(--muted); }
 .scheme-ask input, .scheme-ask textarea { width: 100%; font: inherit; }
 .scheme-ask-btns { display: flex; gap: 6px; justify-content: flex-end; }
-.scheme-live-publish { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
-.scheme-live-publish h4, #schemePublishOverlay h4 { margin: 0; font-size: 13px; }
+#schemePublishOverlay h4 { margin: 14px 0 4px; font-size: 13px; }
+#schemePublishOverlay h4 + .hint { margin-top: 0; }
 
 /* Выпадающие панели конструктора (столбцы / фильтры) */
 .board-dd { position: relative; }
@@ -1369,3 +1380,69 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .board-filter-all:hover { text-decoration: underline; }
 .board-filter-empty { font-size: 12px; color: var(--muted); max-width: 220px; }
 .board-sections { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+
+/* ===== Метки маршрутов (routeMarkers.js, Настройки → «Метки маршрутов») =====
+   Фигура залита цветом маршрута (--rmk), внутри номер или значок. Ширина растёт
+   под длинный номер; у «пустой» метки размер как у прежней цветной точки. */
+.rmk {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0; box-sizing: border-box; vertical-align: middle;
+  background: var(--rmk); line-height: 1; white-space: nowrap;
+  font-weight: 700; font-style: normal; text-shadow: none;
+}
+.rmk b { font-weight: 700; }
+.rmk svg { width: 70%; height: 70%; flex-shrink: 0; }
+.rmk-sm { height: 10px; min-width: 10px; }
+.rmk-md { height: 18px; min-width: 18px; font-size: 10.5px; }
+.rmk-lg { height: 24px; min-width: 24px; font-size: 13px; }
+.rmk-md.rmk-empty { height: 11px; min-width: 11px; }
+.rmk-lg.rmk-empty { height: 14px; min-width: 14px; }
+.rmk-num { padding: 0 0.4em; }
+.rmk-circle { border-radius: 999px; }
+.rmk-capsule { border-radius: 999px; }
+.rmk-capsule.rmk-num { padding: 0 0.65em; }
+.rmk-capsule.rmk-icon, .rmk-plaque.rmk-icon { padding: 0 0.45em; }
+.rmk-capsule.rmk-icon svg, .rmk-plaque.rmk-icon svg { width: 1.25em; }
+.rmk-plaque { border-radius: 3px; }
+.rmk-plaque.rmk-num { padding: 0 0.5em; }
+.rmk-square { border-radius: 2px; }
+.rmk-parallelogram { clip-path: polygon(28% 0, 100% 0, 72% 100%, 0 100%); min-width: 1.6em; }
+.rmk-parallelogram.rmk-sm { min-width: 15px; }
+.rmk-parallelogram.rmk-md.rmk-empty { min-width: 17px; }
+.rmk-parallelogram.rmk-num, .rmk-parallelogram.rmk-icon { clip-path: polygon(0.45em 0, 100% 0, calc(100% - 0.45em) 100%, 0 100%); padding: 0 0.85em; }
+.rmk-parallelogram.rmk-icon svg { width: 1.2em; }
+.rmk-diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); min-width: 1.35em; }
+.rmk-diamond.rmk-sm { min-width: 12px; height: 12px; }
+.rmk-diamond.rmk-md { min-width: 22px; height: 22px; }
+.rmk-diamond.rmk-md.rmk-empty { min-width: 13px; height: 13px; }
+.rmk-diamond.rmk-lg { min-width: 30px; height: 30px; }
+.rmk-diamond.rmk-lg.rmk-empty { min-width: 16px; height: 16px; }
+.rmk-diamond.rmk-num { padding: 0 1em; font-size: 0.85em; }
+.rmk-diamond svg { width: 58%; height: 58%; }
+.rmk-hexagon { clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); min-width: 1.2em; }
+.rmk-hexagon.rmk-sm { min-width: 12px; }
+.rmk-hexagon.rmk-md { min-width: 21px; }
+.rmk-hexagon.rmk-md.rmk-empty { min-width: 13px; }
+.rmk-hexagon.rmk-lg { min-width: 28px; }
+.rmk-hexagon.rmk-lg.rmk-empty { min-width: 16px; }
+.rmk-hexagon.rmk-num { padding: 0 0.75em; }
+.rmk-hexagon svg { width: 62%; height: 62%; }
+.rmk-triangle { clip-path: polygon(50% 0, 100% 100%, 0 100%); align-items: flex-end; min-width: 1.3em; }
+.rmk-triangle.rmk-sm { min-width: 12px; height: 11px; }
+.rmk-triangle.rmk-md { min-width: 22px; height: 20px; padding-bottom: 2px; }
+.rmk-triangle.rmk-md.rmk-empty { min-width: 13px; height: 12px; padding-bottom: 0; }
+.rmk-triangle.rmk-lg { min-width: 30px; height: 27px; padding-bottom: 3px; }
+.rmk-triangle.rmk-lg.rmk-empty { min-width: 17px; height: 15px; padding-bottom: 0; }
+.rmk-triangle.rmk-num { padding: 0 1.5em 2px; font-size: 0.82em; }
+.rmk-triangle svg { width: 50%; height: 50%; }
+/* отступ от метки до текста там, где родитель не задаёт gap */
+.nb-row .rmk, .problem-card-name .rmk, .checkbox-list label .rmk { margin-right: 6px; }
+.modal h2 .rmk { margin-right: 10px; }
+/* Настройки: строки «тип — форма — внутри — превью» */
+#routeMarkersBlock { max-width: 680px; }
+.rm-row { display: grid; grid-template-columns: minmax(130px, 1fr) 150px 150px 64px; gap: 8px; align-items: center; padding: 4px 0; }
+.rm-row .rm-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rm-row .rm-code { display: block; font-size: 11px; color: var(--muted); }
+.rm-row select { width: 100%; padding: 6px 8px; font-size: 12.5px; }
+.rm-row .rm-preview { display: flex; justify-content: center; }
+@media (max-width: 700px) { .rm-row { grid-template-columns: minmax(0, 1fr) 1fr 1fr 56px; } }

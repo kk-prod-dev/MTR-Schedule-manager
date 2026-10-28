@@ -41,7 +41,25 @@
     0% { left: -40%; }
     100% { left: 100%; }
   }
+  /* Новый интерфейс (?layout=next): заставка из макета Claude Design */
+  @font-face { font-family: "DM Sans"; font-weight: 500; src: url(../public/vendor/fonts/dm-sans-latin-500-normal.woff2) format("woff2"); unicode-range: U+0000-00FF,U+2000-206F; }
+  @font-face { font-family: "DM Sans"; font-weight: 500; src: url(../public/vendor/fonts/manrope-cyrillic-500-normal.woff2) format("woff2"); unicode-range: U+0400-045F; }
+  @font-face { font-family: "DM Mono"; font-weight: 400; src: url(../public/vendor/fonts/dm-mono-latin-400-normal.woff2) format("woff2"); }
+  .next-splash { display: none; }
+  .next body { background: #0B0B0E; color: #FBE5DC; font-family: "DM Sans", system-ui, sans-serif; }
+  .next .wrap { display: none; }
+  .next .next-splash { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; position: relative; }
+  .next .next-splash svg { width: 88px; height: 88px; }
+  .next .ns-title { font-size: 14px; font-weight: 500; margin-top: 18px; }
+  .next .ns-sub { font-size: 12px; color: #A0928E; margin-top: 6px; }
+  .next .ns-ver { position: absolute; left: 28px; bottom: 42px; font: 11px "DM Mono", monospace; color: #A0928E; }
+  .next .ns-bar { position: absolute; left: 28px; right: 28px; bottom: 30px; height: 4px; border-radius: 2px; background: #1E1D24; overflow: hidden; }
+  .next .ns-bar::after { content: ""; position: absolute; top: 0; bottom: 0; width: 38%; border-radius: 2px; background: #FBE5DC; animation: slide 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .next .ns-bar::after { animation: none; left: 0; } }
 </style>
+<script>
+  if (new URLSearchParams(location.search).get("layout") === "next") document.documentElement.classList.add("next");
+</script>
 </head>
 <body>
   <div class="wrap">
@@ -60,5 +78,16 @@
     </div>
     <div class="bar"></div>
   </div>
+  <div class="next-splash">
+    <svg viewBox="120 123 266 266" role="img" aria-label="Schedule Manager"><path fill="#FBE5DC" d="M327.558 131C336.068 131 343.947 135.316 348.399 142.364L348.819 143.054L378 192.903L341.026 213.605L317.061 172.667H259.167L359.961 345.154C369.295 361.126 357.502 381 338.691 381H239.373C230.589 381 222.477 376.401 218.113 368.946L181.225 305.934L218.2 285.233L249.871 339.333H307.488L210.095 172.667H190.547L164.974 216.352L128 195.648L158.789 143.054L159.209 142.364C163.661 135.316 171.54 131 180.049 131H327.558Z"/></svg>
+    <div class="ns-title">Поднимаем пантограф…</div>
+    <div class="ns-sub">Запускаем сервер расписания</div>
+    <div class="ns-ver" id="nsVer"></div>
+    <div class="ns-bar" role="progressbar" aria-label="Загрузка"></div>
+  </div>
+  <script>
+    var v = new URLSearchParams(location.search).get("v");
+    if (v && /^[0-9A-Za-z.\-]{1,32}$/.test(v)) document.getElementById("nsVer").textContent = "v" + v;
+  </script>
 </body>
 </html>

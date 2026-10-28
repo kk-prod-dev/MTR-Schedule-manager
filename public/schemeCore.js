@@ -33,10 +33,11 @@ const SchemeCore = (function () {
   // прежний ±8 сваливал крайние линии на одну полосу
   const MAX_LANE = 40;
   const FONT = '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-  const DASHES = ["solid", "dashed", "dotted", "double"];
+  const DASHES = ["solid", "dashed", "dotted", "double", "rail", "dashdot"];
   const SHAPE_DASHES = ["solid", "dashed", "dotted"];
   const SHAPE_TYPES = ["rect", "ellipse", "line", "text"];
-  const STATION_STYLES = ["auto", "tick", "circle", "pill", "square", "diamond"];
+  const TRANSFER_STYLES = ["bar", "capsule", "dumbbell", "curve", "dashed", "none"];
+  const STATION_STYLES = ["auto", "tick", "circle", "pill", "square", "diamond", "stump"];
   const LABEL_POS = ["auto", "n", "ne", "e", "se", "s", "sw", "w", "nw"];
   const LABEL_ANGLES = [0, -45, 45, -90, 90];
   const DIRS = {
@@ -110,6 +111,7 @@ const SchemeCore = (function () {
         stationStroke: color(style.stationStroke, "#111827"),
         labelAuto: style.labelAuto !== false,
         transferScale: clamp(style.transferScale, 0.2, 4, 1),
+        transferStyle: oneOf(style.transferStyle, TRANSFER_STYLES, "bar"),
       },
       shapes: (Array.isArray(src.shapes) ? src.shapes : []).slice(0, 3000).map(normalizeShape),
       lines: (Array.isArray(src.lines) ? src.lines : []).slice(0, 2000).map((l) => {
@@ -159,13 +161,15 @@ const SchemeCore = (function () {
           size: clamp(s.size, 0.3, 5, 1),
           labelSize: s.labelSize == null || s.labelSize === "" ? null : clamp(s.labelSize, 6, 48, 12),
           labelColor: colorOpt(s.labelColor),
+          // вид пересадки именно у этой станции ("" = как задано для всей схемы)
+          transferStyle: TRANSFER_STYLES.includes(s.transferStyle) ? s.transferStyle : "",
         };
         if (s.mtrStationId) st.mtrStationId = str(s.mtrStationId, 80);
         if (s.mtrName != null) st.mtrName = str(s.mtrName);
         return st;
       }),
       transfers: (Array.isArray(src.transfers) ? src.transfers : []).slice(0, 5000)
-        .map((t) => ({ id: str(t.id, 80) || "tr-" + Math.random().toString(36).slice(2, 9), stationIds: idList(t.stationIds) }))
+        .map((t) => ({ id: str(t.id, 80) || "tr-" + Math.random().toString(36).slice(2, 9), stationIds: idList(t.stationIds), style: TRANSFER_STYLES.includes(t.style) ? t.style : "" }))
         .filter((t) => t.stationIds.length >= 2),
       legend: {
         show: legend.show !== false,
@@ -195,13 +199,13 @@ const SchemeCore = (function () {
       v: VERSION,
       t: p.title,
       s: [p.style.lineWidth, p.style.labelSize, p.style.bg, p.style.labelColor, p.style.cornerRadius, p.style.laneGap,
-        p.style.stationScale, p.style.stationFill, p.style.stationStroke, p.style.labelAuto ? 1 : 0, p.style.transferScale],
+        p.style.stationScale, p.style.stationFill, p.style.stationStroke, p.style.labelAuto ? 1 : 0, p.style.transferScale, p.style.transferStyle],
       l: p.lines.map((l) => [l.id, l.name, l.number, l.color, l.width, l.dash, l.offset, l.points.flatMap((q) => [r(q.x), r(q.y)]), l.lanes || null, l.group || ""]),
       st: p.stations.map((s) => [s.id, s.name, s.sub, r(s.x), r(s.y), s.style, s.label.pos, s.label.angle, s.lineIds,
         s.passLineIds, s.fill, s.stroke, s.strokeW, s.size, s.labelSize, s.labelColor,
-        r(s.label.dx), r(s.label.dy), r(s.badge.dx), r(s.badge.dy), s.badge.hide ? 1 : 0]),
+        r(s.label.dx), r(s.label.dy), r(s.badge.dx), r(s.badge.dy), s.badge.hide ? 1 : 0, s.transferStyle || ""]),
       sh: p.shapes.map((x) => [x.type, x.x, x.y, x.w, x.h, x.fill, x.stroke, x.strokeW, x.opacity, x.dash, x.rx, x.rot, x.layer, x.text, x.fontSize, x.bold ? 1 : 0, x.align]),
-      tr: p.transfers.map((t) => t.stationIds),
+      tr: p.transfers.map((t) => (t.style ? [t.stationIds, t.style] : t.stationIds)),
       lg: [p.legend.show ? 1 : 0, r(p.legend.x), r(p.legend.y), p.legend.title],
     };
   }
@@ -215,7 +219,7 @@ const SchemeCore = (function () {
       title: c.t,
       style: {
         lineWidth: s[0], labelSize: s[1], bg: s[2], labelColor: s[3], cornerRadius: s[4], laneGap: s[5],
-        stationScale: s[6], stationFill: s[7], stationStroke: s[8], labelAuto: s[9] !== 0, transferScale: s[10],
+        stationScale: s[6], stationFill: s[7], stationStroke: s[8], labelAuto: s[9] !== 0, transferScale: s[10], transferStyle: s[11],
       },
       shapes: arr(c.sh).map((x, i) => {
         x = arr(x);
@@ -236,10 +240,10 @@ const SchemeCore = (function () {
         return {
           id: x[0], name: x[1], sub: x[2], x: x[3], y: x[4], style: x[5], label: { pos: x[6], angle: x[7], dx: x[16], dy: x[17] }, lineIds: x[8],
           passLineIds: x[9], fill: x[10], stroke: x[11], strokeW: x[12], size: x[13], labelSize: x[14], labelColor: x[15],
-          badge: { dx: x[18], dy: x[19], hide: x[20] === 1 },
+          badge: { dx: x[18], dy: x[19], hide: x[20] === 1 }, transferStyle: x[21],
         };
       }),
-      transfers: arr(c.tr).map((ids, i) => ({ id: "tr-" + i, stationIds: ids })),
+      transfers: arr(c.tr).map((x, i) => (Array.isArray(x[0]) ? { id: "tr-" + i, stationIds: x[0], style: x[1] } : { id: "tr-" + i, stationIds: x })),
       legend: { show: lg[0] !== 0, x: lg[1], y: lg[2], title: lg[3] },
     });
   }
@@ -431,7 +435,13 @@ const SchemeCore = (function () {
 
   const lineWidthOf = (p, l) => l.width || p.style.lineWidth;
   // смещение отрезка i в пикселях: полоса генератора + ручной сдвиг линии
-  const segOffset = (p, l, i) => (((l.lanes && l.lanes[i]) || 0) + (l.offset || 0)) * (lineWidthOf(p, l) + p.style.laneGap);
+  // Шаг полос — ОДИН на всю схему (по самой толстой линии): с шагом по ширине
+  // каждой линии разной толщины полосы соседей налезали друг на друга
+  // при зазоре < 1 соседние линии перекрываются на 0.4 px: края двух вплотную
+  // стоящих обводок давали просвет-«шов» (особенно на поворотах)
+  const computePitch = (p) => Math.max(p.style.lineWidth, ...p.lines.map((l) => l.width || 0)) + p.style.laneGap - (p.style.laneGap < 1 ? 0.4 : 0);
+  const pitchOf = (p) => (p._pitch != null ? p._pitch : computePitch(p));
+  const segOffset = (p, l, i) => (((l.lanes && l.lanes[i]) || 0) + (l.offset || 0)) * pitchOf(p);
   const lineOffsets = (p, l) => l.points.slice(1).map((_, i) => segOffset(p, l, i));
 
   // Видимая позиция каждой вершины линии с учётом её полосы (там, где линия
@@ -481,7 +491,14 @@ const SchemeCore = (function () {
       el("path", Object.assign({}, base, { stroke: p.style.bg, "stroke-width": Math.max(1, w * 0.35) }), g);
       return;
     }
-    const dash = line.dash === "dashed" ? `${w * 1.8} ${w * 1.2}` : line.dash === "dotted" ? `0.1 ${w * 1.6}` : null;
+    if (line.dash === "rail") {
+      // железнодорожная: сплошные кромки по краям, пунктир посередине
+      el("path", Object.assign({}, base, { stroke: line.color, "stroke-width": w * 1.4, "stroke-linecap": "butt", "stroke-linejoin": "round" }, extraAttrs), g);
+      el("path", Object.assign({}, base, { stroke: p.style.bg, "stroke-width": w * 0.85, "stroke-linecap": "butt", "stroke-linejoin": "round" }), g);
+      el("path", Object.assign({}, base, { stroke: line.color, "stroke-width": w * 0.85, "stroke-linecap": "butt", "stroke-linejoin": "round", "stroke-dasharray": `${w * 1.1} ${w * 0.9}` }), g);
+      return;
+    }
+    const dash = line.dash === "dashdot" ? `${w * 2.2} ${w * 0.9} ${w * 0.5} ${w * 0.9}` : line.dash === "dashed" ? `${w * 1.8} ${w * 1.2}` : line.dash === "dotted" ? `0.1 ${w * 1.6}` : null;
     el("path", Object.assign({}, base, { stroke: line.color, "stroke-width": w, "stroke-dasharray": dash }, extraAttrs), g);
   }
 
@@ -505,8 +522,47 @@ const SchemeCore = (function () {
    * отрезков, с нормалью отрезка n), по ним строится пересадочный значок —
    * капсула на каждое направление; lo/hi — охват полос вдоль nrm.
    */
+  /**
+   * Станцию не рисуют на повороте: если в вершине st ВСЕ её линии поворачивают
+   * одинаково (одни и те же два плеча), значок сдвигается по длинному плечу на
+   * конец скругления (+ запас на ширину линий) — там линия уже прямая.
+   * На развилках и в конечных точках сдвига нет (там плечи разные).
+   */
+  function offBend(p, st, linesById, drawn) {
+    const v = { x: st.x, y: st.y };
+    if (drawn.transferStations.has(st.id)) return v;
+    let arms = null, maxOff = 0, turn = 0;
+    for (const id of st.lineIds) {
+      const line = linesById.get(id);
+      if (!line || line.points.length < 2) continue;
+      const pts = line.points, k = vertexAt(pts, v);
+      if (k <= 0 || k >= pts.length - 1) return v;
+      const ua = unit(sub(pts[k - 1], v)), ub = unit(sub(pts[k + 1], v));
+      if (Math.abs(cross(ua, ub)) < 1e-3) return v;
+      const la = len(sub(pts[k - 1], v)), lb = len(sub(pts[k + 1], v));
+      const cur = [{ u: ua, l: la }, { u: ub, l: lb }];
+      // внешние полосы пучка огибают угол по дуге большего радиуса: их скругление
+      // заканчивается дальше — значок должен стоять за ним
+      maxOff = Math.max(maxOff, Math.abs(segOffset(p, line, k - 1)), Math.abs(segOffset(p, line, k)));
+      turn = Math.acos(Math.max(-1, Math.min(1, -(ua.x * ub.x + ua.y * ub.y))));
+      if (!arms) arms = cur;
+      else {
+        const same = (x, y) => Math.abs(x.u.x - y.u.x) < 1e-3 && Math.abs(x.u.y - y.u.y) < 1e-3;
+        if (!((same(cur[0], arms[0]) && same(cur[1], arms[1])) || (same(cur[0], arms[1]) && same(cur[1], arms[0])))) return v;
+        arms = [{ u: arms[0].u, l: Math.min(arms[0].l, cur[same(cur[0], arms[0]) ? 0 : 1].l) },
+          { u: arms[1].u, l: Math.min(arms[1].l, cur[same(cur[0], arms[0]) ? 1 : 0].l) }];
+      }
+    }
+    if (!arms) return v;
+    const R = Math.min(p.style.cornerRadius, arms[0].l / 2, arms[1].l / 2);
+    const arm = arms[0].l >= arms[1].l ? arms[0] : arms[1];
+    const tn = Math.tan(turn / 2);
+    const d = Math.min(R + (maxOff + p.style.lineWidth / 2) * Math.min(tn, 4) + p.style.lineWidth * 1.2, arm.l * 0.8);
+    return { x: v.x + arm.u.x * d, y: v.y + arm.u.y * d };
+  }
+
   function stationGeometry(p, st, linesById, drawn) {
-    const here = { x: st.x, y: st.y };
+    const here = offBend(p, st, linesById, drawn);
     const items = [];
     for (const id of st.lineIds) {
       const line = linesById.get(id);
@@ -568,13 +624,75 @@ const SchemeCore = (function () {
       const a = pts[0], b = pts[pts.length - 1];
       return (a.x === st.x && a.y === st.y) || (b.x === st.x && b.y === st.y);
     });
-    return { c, items, dir, nrm, lo, hi, maxW, ends, inTransfer: drawn.transferStations.has(st.id) };
+    return { c, items, dir, nrm, lo, hi, maxW, ends, offsetPts: drawn.offsetPts, inTransfer: drawn.transferStations.has(st.id), bare: !!(drawn.bareStations && drawn.bareStations.has(st.id)) };
   }
 
-  // Авто: любая станция — скруглённый прямоугольник поперёк пучка
-  // (размер зависит только от числа линий с каждой стороны, см. pillMetrics)
-  function resolveStyle(st) {
-    return st.style !== "auto" ? st.style : "pill";
+  // Авто: пересадка, конечная и развилка — скруглённый прямоугольник поперёк
+  // пучка (размер зависит только от числа линий с каждой стороны, см. pillMetrics).
+  // Обычная станция, где все линии идут вместе (одни и те же соседи по обе
+  // стороны), — «пеньки»: у каждой линии свой, они накладываются друг на друга
+  function resolveStyle(st, geo, seq, minRun, mode) {
+    const r = resolveBase(st, geo, seq, minRun);
+    // пересадочный узел из нескольких линий в ОДНОЙ станции: вид задаёт style.transferStyle
+    if (r === "pill" && st.style === "auto" && geo && geo.items.length >= 2 && !geo.inTransfer) {
+      // у каждого вида пересадки есть свой вид и на одиночном узле
+      if (mode === "capsule") return "pill2";
+      if (mode === "dumbbell") return "ring";
+      if (mode === "curve") return "circ";
+      if (mode === "dashed") return "pilld";
+      if (mode === "none") return "stump";
+    }
+    return r;
+  }
+  function resolveBase(st, geo, seq, minRun) {
+    if (st.style !== "auto") return st.style;
+    if (geo && geo.bare) return "bare";
+    if (!geo || geo.inTransfer || geo.ends.length || !geo.items.length) return "pill";
+    let key = null;
+    for (const it of geo.items) {
+      // зигзаг / S-образный перегиб рядом: пенёк нужен на ровном участке, а не
+      // между двумя изгибами — до ближайшего поворота в обе стороны должно быть
+      // место на скругление
+      if (!straightAround(it.line.points, geo.c, minRun, it.line.lanes)) return "pill";
+      const ids = seq && seq.get(it.line.id);
+      const k = ids ? ids.indexOf(st.id) : -1;
+      if (k <= 0 || k >= ids.length - 1) return "pill";
+      const nb = [ids[k - 1], ids[k + 1]].sort().join("|");
+      if (key === null) key = nb; else if (key !== nb) return "pill";
+    }
+    return "stump";
+  }
+
+  // Длина ровного участка от точки c до ближайшего излома в обе стороны ≥ minRun
+  function straightAround(pts, c, minRun, lanes) {
+    const near = nearestOnPolyline(pts, c);
+    if (!near) return false;
+    // излом линии ИЛИ смена полосы (ступенька-«jog») тоже обрывают ровный участок
+    const bend = (i) => Math.abs(cross(unit(sub(pts[i], pts[i - 1])), unit(sub(pts[i + 1], pts[i])))) > 1e-3
+      || (lanes && (lanes[i - 1] || 0) !== (lanes[i] || 0));
+    const n = pts.length;
+    let fwd = len(sub(pts[near.seg + 1], c)), i = near.seg + 1;
+    while (i < n - 1 && !bend(i)) { fwd += len(sub(pts[i + 1], pts[i])); i++; }
+    let bwd = len(sub(c, pts[near.seg])); i = near.seg;
+    while (i > 0 && !bend(i)) { bwd += len(sub(pts[i], pts[i - 1])); i--; }
+    return Math.min(fwd, bwd) >= minRun;
+  }
+
+  // Порядок станций вдоль каждой линии (по положению на полилинии)
+  function stationSequences(p, linesById) {
+    const seq = new Map();
+    for (const line of linesById.values()) {
+      if (line.points.length < 2) continue;
+      const list = [];
+      for (const st of p.stations) {
+        if (!st.lineIds.includes(line.id)) continue;
+        const near = nearestOnPolyline(line.points, st);
+        if (near && near.dist <= p.grid * 0.75) list.push({ id: st.id, pos: near.seg + near.t });
+      }
+      list.sort((a, b) => a.pos - b.pos);
+      seq.set(line.id, list.map((q) => q.id));
+    }
+    return seq;
   }
 
   function labelDir(st, geo) {
@@ -645,6 +763,47 @@ const SchemeCore = (function () {
     return { mid, half, thick, rx, rot: Math.atan2(m.y, m.x) * 180 / Math.PI, reach: len(sub(mid, c)) + Math.max(half, thick / 2) };
   }
 
+  // «Гантель» для узла из нескольких линий в одной станции: по кружку НА КАЖДОЙ
+  // линии (цветом линии), чуть сдвинутому вдоль неё, чтобы кружки не слипались,
+  // и мостик, соединяющий их в «восьмёрку»
+  function ringMetrics(p, st, geo) {
+    const k = stScale(p, st);
+    // цветной кружок накрывает полосу своей линии: диаметр = шаг полос
+    // (толщина + расстояние между линиями), поэтому он меняется вместе с настройками
+    const rc = Math.max(1.5, pitchOf(p) * 0.5) * k;
+    const ring = Math.max(1.8, geo.maxW * 0.4 * k);
+    const r = rc + ring;
+    const pm = pillMetrics(p, st, geo);
+    const ra = pm.rot * Math.PI / 180, axis = { x: Math.cos(ra), y: Math.sin(ra) };
+    // кружки — по ПРЯМОЙ вдоль оси значка, строго над своими линиями
+    const lane = geo.items.map((it) => {
+      const q = it.pts && it.pts[0] ? it.pts[0] : geo.c;
+      return { color: it.line.color, t: q.x * axis.x + q.y * axis.y, q };
+    }).sort((u, v) => u.t - v.t);
+    const n0 = lane.length || 1;
+    const bx = lane.reduce((a, q) => a + q.q.x, 0) / n0, by = lane.reduce((a, q) => a + q.q.y, 0) / n0;
+    const tm = lane.reduce((a, q) => a + q.t, 0) / n0;
+    // если полосы почти совпадают (линии пересекаются в одной точке), разводим кружки
+    const minGap = lane.reduce((m, q, i) => (i ? Math.min(m, q.t - lane[i - 1].t) : m), Infinity);
+    const spread = n0 > 1 && minGap < rc * 1.2;
+    const dots = lane.map((q, i) => {
+      const off = spread ? (i - (n0 - 1) / 2) * rc * 1.8 : q.t - tm;
+      return { x: bx + axis.x * off, y: by + axis.y * off, color: q.color };
+    });
+    const cx = bx, cy = by;
+    let hw = r, hh = r;
+    for (const q of dots) hw = Math.max(hw, Math.abs((q.x - cx) * axis.x + (q.y - cy) * axis.y) + r);
+    return { dots, r, ring, bw: r * 0.8, rot: pm.rot, cx, cy, hw, hh };
+  }
+
+  // Круг, накрывающий весь пучок линий станции
+  function circMetrics(p, st, geo) {
+    const k = stScale(p, st), n = geo.nrm;
+    const t = (geo.lo + geo.hi) / 2;
+    const r = Math.max((geo.hi - geo.lo) / 2 + geo.maxW * 0.9 * k, geo.maxW * 1.4 * k);
+    return { cx: geo.c.x + n.x * t, cy: geo.c.y + n.y * t, r };
+  }
+
   /**
    * Габарит значка без рисования: повёрнутый прямоугольник (для подписей —
    * препятствие) и reach(u) — насколько значок выступает от c в сторону u.
@@ -654,10 +813,20 @@ const SchemeCore = (function () {
   function markerBox(p, st, geo, style) {
     const c = geo.c, n = geo.nrm, k = stScale(p, st);
     let box;
-    if (style === "pill") {
+    if (style === "circ") {
+      const cm = circMetrics(p, st, geo);
+      box = { cx: cm.cx, cy: cm.cy, ca: 1, sa: 0, hw: cm.r, hh: cm.r, rx: cm.r };
+    } else if (style === "ring") {
+      const rg = ringMetrics(p, st, geo);
+      const ra = rg.rot * Math.PI / 180;
+      box = { cx: rg.cx, cy: rg.cy, ca: Math.cos(ra), sa: Math.sin(ra), hw: rg.hw, hh: rg.hh, rx: rg.r };
+    } else if (style === "pill" || style === "pill2" || style === "pilld") {
       const pm = pillMetrics(p, st, geo);
       const a = pm.rot * Math.PI / 180;
       box = { cx: pm.mid.x, cy: pm.mid.y, ca: Math.cos(a), sa: Math.sin(a), hw: pm.half, hh: pm.thick / 2, rx: pm.rx };
+    } else if (style === "bare") {
+      const r = geo.maxW * 1.4 * k;
+      box = { cx: c.x, cy: c.y, ca: 1, sa: 0, hw: r, hh: r, rx: r };
     } else if (style === "circle" || style === "square" || style === "diamond") {
       const pos = geo.items[0] ? geo.items[0].pos : 0;
       const r = geo.maxW * 0.8 * k * (style === "circle" ? 1 : style === "square" ? 1.05 : 1.3);
@@ -684,11 +853,33 @@ const SchemeCore = (function () {
     const sw = st.strokeW != null ? st.strokeW : null;
     let reach = Math.max(Math.abs(geo.lo), Math.abs(geo.hi));
 
-    if (style === "pill") {
+    if (style === "bare") {
+      // значок рисует сама пересадка (капсула / «гантель»)
+      reach = geo.maxW * 1.4 * k;
+    } else if (style === "circ") {
+      const cm = circMetrics(p, st, geo);
+      el("circle", { cx: cm.cx, cy: cm.cy, r: cm.r, fill, stroke, "stroke-width": sw != null ? sw : Math.max(2, geo.maxW * 0.4 * k) }, g);
+      reach = Math.hypot(cm.cx - c.x, cm.cy - c.y) + cm.r;
+    } else if (style === "ring") {
+      const rg = ringMetrics(p, st, geo);
+      const ring = sw != null ? sw : rg.ring;
+      const path = rg.dots.map((q, i) => `${i ? "L" : "M"}${q.x} ${q.y}`).join(" ");
+      // тёмный контур: мостик и круги, поверх — заливка мостика и круги цветом линий
+      if (rg.dots.length > 1) {
+        el("path", { d: path, fill: "none", stroke, "stroke-width": rg.bw + ring * 2, "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+      }
+      for (const q of rg.dots) el("circle", { cx: q.x, cy: q.y, r: rg.r, fill: stroke }, g);
+      if (rg.dots.length > 1) {
+        el("path", { d: path, fill: "none", stroke: fill, "stroke-width": rg.bw, "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+      }
+      for (const q of rg.dots) el("circle", { cx: q.x, cy: q.y, r: Math.max(1, rg.r - ring), fill: q.color }, g);
+      reach = Math.hypot(rg.cx - c.x, rg.cy - c.y) + Math.max(rg.hw, rg.hh);
+    } else if (style === "pill" || style === "pill2" || style === "pilld") {
       const pm = pillMetrics(p, st, geo);
       el("rect", {
         x: -pm.half, y: -pm.thick / 2, width: pm.half * 2, height: pm.thick, rx: pm.rx,
-        fill, stroke, "stroke-width": sw != null ? sw : Math.max(1.1, geo.maxW * 0.2 * k),
+        fill, stroke, "stroke-width": sw != null ? sw : Math.max(style === "pill2" ? 2.4 : 1.1, geo.maxW * (style === "pill2" ? 0.45 : 0.2) * k),
+        "stroke-dasharray": style === "pilld" ? `${geo.maxW * 0.7 * k} ${geo.maxW * 0.5 * k}` : null,
         transform: `translate(${pm.mid.x} ${pm.mid.y}) rotate(${pm.rot})`,
       }, g);
       reach = pm.reach;
@@ -706,6 +897,33 @@ const SchemeCore = (function () {
         }, common), g);
       }
       reach = Math.abs(pos) + r * (style === "circle" ? 1 : style === "square" ? 1.05 : 1.3);
+    } else if (style === "stump") {
+      // пенёк у каждой линии: от её полосы наружу, в сторону подписи; все пеньки
+      // кончаются на одном краю и накладываются, крайняя линия — сверху
+      const side = ld[0] * n.x + ld[1] * n.y >= 0 ? 1 : -1;
+      const edge = side > 0 ? geo.hi : -geo.lo;
+      const tick = geo.maxW * 0.85 * k;
+      const items = geo.items.slice().sort((a, b) => side * (a.pos - b.pos));
+      for (const it of items) {
+        // высота пенька = ширина самой линии, и он целиком накрывает линию
+        const th = lineWidthOf(p, it.line);
+        // пенёк стоит там, где линия реально нарисована (на её смещённой полилинии),
+        // а не на «идеальной» полосе: у границ изломов и ступенек они расходятся
+        const guess = { x: c.x + n.x * it.pos, y: c.y + n.y * it.pos };
+        const op = geo.offsetPts && geo.offsetPts.get(it.line.id);
+        const near = op && op.length > 1 ? nearestOnPolyline(op, guess) : null;
+        const q = near && near.dist <= th * 2 ? near.point : guess;
+        const d0 = side * ((q.x - c.x) * n.x + (q.y - c.y) * n.y);
+        // от оси линии наружу: край пенька не совпадает с дальним краем линии
+        // (там два сглаженных края давали светлый шов), и никуда не выпирает
+        const from = 0;
+        el("rect", {
+          x: from, y: -th / 2, width: edge + tick - d0 - from, height: th,
+          fill: st.fill || it.line.color,
+          transform: `translate(${q.x} ${q.y}) rotate(${side > 0 ? ang : ang + 180})`,
+        }, g);
+      }
+      reach = edge + tick;
     } else {
       // засечка наружу, в сторону подписи
       const side = ld[0] * n.x + ld[1] * n.y >= 0 ? 1 : -1;
@@ -1054,9 +1272,16 @@ const SchemeCore = (function () {
     t.textContent = label;
   }
 
-  function drawTransfer(g, p, tr, stById) {
+  // Пересадка: способ обозначения (style.transferStyle или свой у каждой):
+  // bar — белая перемычка; capsule — толстая капсула с обводкой (как в Пекине);
+  // dumbbell — два кружка цветом линии, соединённые мостиком («восьмёрка»);
+  // curve — тонкий изогнутый переход; dashed — пунктирный переход; none — без соединения
+  const transferStyleOf = (p, tr) => tr.style || p.style.transferStyle;
+  function drawTransfer(g, p, tr, stById, linesById) {
     const sts = tr.stationIds.map((id) => stById.get(id)).filter(Boolean);
     if (sts.length < 2) return;
+    const mode = transferStyleOf(p, tr);
+    if (mode === "none") return;
     // соединяем цепочкой ближайших соседей
     const chain = [sts[0]];
     const rest = sts.slice(1);
@@ -1066,11 +1291,36 @@ const SchemeCore = (function () {
       rest.forEach((s, i) => { const d = Math.hypot(s.x - lastSt.x, s.y - lastSt.y); if (d < bd) { bd = d; bi = i; } });
       chain.push(rest.splice(bi, 1)[0]);
     }
-    const d = chain.map((s, i) => `${i ? "L" : "M"}${s.x} ${s.y}`).join(" ");
-    const w = p.style.lineWidth * 1.1 * p.style.transferScale;
+    const k = p.style.transferScale, lw = p.style.lineWidth;
+    const stroke = p.style.stationStroke, fill = p.style.stationFill;
     const tg = el("g", { "data-kind": "transfer", "data-id": tr.id, class: "sc-transfer" }, g);
-    el("path", { d, fill: "none", stroke: p.style.stationStroke, "stroke-width": w + 2.5, "stroke-linecap": "round" }, tg);
-    el("path", { d, fill: "none", stroke: p.style.stationFill, "stroke-width": w, "stroke-linecap": "round" }, tg);
+    const straight = chain.map((s, i) => `${i ? "L" : "M"}${s.x} ${s.y}`).join(" ");
+    if (mode === "capsule") {
+      const w = lw * 2.4 * k, ring = Math.max(2, lw * 0.5);
+      el("path", { d: straight, fill: "none", stroke, "stroke-width": w, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
+      el("path", { d: straight, fill: "none", stroke: fill, "stroke-width": Math.max(1, w - ring * 2), "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
+    } else if (mode === "dumbbell") {
+      const r = lw * 1.25 * k, ring = Math.max(1.8, lw * 0.4);
+      el("path", { d: straight, fill: "none", stroke, "stroke-width": lw * 0.9 * k + ring, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
+      for (const s of chain) {
+        const line = linesById && s.lineIds.map((id) => linesById.get(id)).find(Boolean);
+        el("circle", { cx: s.x, cy: s.y, r, fill: line ? line.color : fill, stroke, "stroke-width": ring }, tg);
+      }
+    } else if (mode === "curve" || mode === "dashed") {
+      let d = straight;
+      if (mode === "curve" && chain.length === 2) {
+        const a = chain[0], b = chain[1];
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
+        d = `M${a.x} ${a.y} Q${mx - dy * 0.22} ${my + dx * 0.22} ${b.x} ${b.y}`;
+      }
+      const w = Math.max(2, lw * 0.5 * k);
+      el("path", { d, fill: "none", stroke: fill, "stroke-width": w + 3, "stroke-linecap": "round", opacity: 0.9 }, tg);
+      el("path", { d, fill: "none", stroke, "stroke-width": w, "stroke-linecap": mode === "dashed" ? "butt" : "round", "stroke-dasharray": mode === "dashed" ? `${w * 1.6} ${w * 1.2}` : null }, tg);
+    } else {
+      const w = lw * 1.1 * k;
+      el("path", { d: straight, fill: "none", stroke, "stroke-width": w + 2.5, "stroke-linecap": "round" }, tg);
+      el("path", { d: straight, fill: "none", stroke: fill, "stroke-width": w, "stroke-linecap": "round" }, tg);
+    }
   }
 
   function drawLegend(g, p) {
@@ -1215,11 +1465,13 @@ const SchemeCore = (function () {
   function render(root, p, opts) {
     opts = opts || {};
     p = visibleProject(p);
+    Object.defineProperty(p, "_pitch", { value: computePitch(p), writable: true, configurable: true, enumerable: false });
     while (root.firstChild) root.removeChild(root.firstChild);
     root.setAttribute("font-family", FONT);
     const linesById = new Map(p.lines.map((l) => [l.id, l]));
     const stById = new Map(p.stations.map((s) => [s.id, s]));
     const transferStations = new Set(p.transfers.flatMap((t) => t.stationIds));
+    const bareStations = new Set(p.transfers.filter((t) => ["capsule", "dumbbell"].includes(transferStyleOf(p, t))).flatMap((t) => t.stationIds));
 
     const gShapesBack = el("g", { class: "sc-shapes-back" }, root);
     const gLive = el("g", { class: "sc-live" }, root);
@@ -1240,13 +1492,18 @@ const SchemeCore = (function () {
       if (line.points.length >= 2) offsetPts.set(line.id, offsetPolylineVar(line.points, lineOffsets(p, line), p.style.cornerRadius));
     }
     shareCornerRadii([...offsetPts.values()], p.style.cornerRadius, Math.max(p.style.lineWidth, p.style.cornerRadius * 0.35));
+    const drawnPaths = new Set();
     for (const line of p.lines) {
       const pts = offsetPts.get(line.id);
       if (!pts) continue;
       const g = el("g", { "data-kind": "line", "data-id": line.id, class: "sc-line" }, gLines);
+      const d = roundedPath(pts, p.style.cornerRadius);
       // широкая прозрачная зона попадания
-      el("path", { d: roundedPath(pts, p.style.cornerRadius), fill: "none", stroke: "transparent", "stroke-width": lineWidthOf(p, line) + 10, "stroke-linecap": "round" }, g);
-      drawLinePath(g, p, line, pts);
+      el("path", { d, fill: "none", stroke: "transparent", "stroke-width": lineWidthOf(p, line) + 10, "stroke-linecap": "round" }, g);
+      // объединённые линии с одной трассой рисуются один раз, без слоёв друг на друге
+      const dup = line.group ? line.group + "|" + line.color + "|" + line.width + "|" + line.dash + "|" + d : "";
+      if (!dup || !drawnPaths.has(dup)) drawLinePath(g, p, line, pts);
+      if (dup) drawnPaths.add(dup);
       if (live && live.delayedRoutes && (line.mtrRouteIds || []).some((r) => live.delayedRoutes.has(r))) {
         const ms = Math.max(...line.mtrRouteIds.map((r) => live.delayedRoutes.get(r) || 0));
         const lg = el("g", { "data-kind": "line", "data-id": line.id }, gLive);
@@ -1259,15 +1516,16 @@ const SchemeCore = (function () {
       }
     }
 
-    for (const tr of p.transfers) drawTransfer(gTransfers, p, tr, stById);
+    for (const tr of p.transfers) drawTransfer(gTransfers, p, tr, stById, linesById);
 
-    const drawn = { transferStations, offsetPts };
+    const drawn = { transferStations, offsetPts, bareStations };
     const geos = new Map();
     const entries = [];
+    const seqs = stationSequences(p, linesById);
     for (const st of p.stations) {
       const geo = stationGeometry(p, st, linesById, drawn);
       geos.set(st.id, geo);
-      const style = resolveStyle(st);
+      const style = resolveStyle(st, geo, seqs, p.style.cornerRadius * 1.3, st.transferStyle || p.style.transferStyle);
       entries.push({ st, geo, style, mk: markerBox(p, st, geo, style) });
     }
     const badges = new Map();
@@ -1284,7 +1542,7 @@ const SchemeCore = (function () {
       // но строго в его контуре (чуть внутри обводки): раньше кусок брался
       // с запасом и торчал за край, а на большом значке пересадки виднелись
       // изгибы полос — «линии поверх станций»
-      const pass = (st.passLineIds || []).filter((lid) => offsetPts.has(lid) && linesById.has(lid));
+      const pass = style === "stump" || style === "tick" ? [] : (st.passLineIds || []).filter((lid) => offsetPts.has(lid) && linesById.has(lid));
       if (pass.length) {
         const b = mk.box, inset = Math.max(1.1, geo.maxW * 0.2);
         const cg = el("clipPath", { id: clipBase + si }, gThrough);
@@ -1302,7 +1560,7 @@ const SchemeCore = (function () {
       for (const b of badges.get(st.id) || []) drawBadge(gBadges, b.x, b.y, b.line, b.size, st.id);
       if (live && live.conflictStations && st.mtrStationId && live.conflictStations.has(st.mtrStationId)) {
         const cg = el("g", { "data-kind": "station", "data-id": st.id, class: "sc-live-conflict" }, gLive);
-        el("circle", { cx: st.x, cy: st.y, r: geo.maxW * 2.4, fill: "#ef4444", "fill-opacity": 0.22, stroke: "#ef4444", "stroke-width": 2 }, cg);
+        el("circle", { cx: geo.c.x, cy: geo.c.y, r: geo.maxW * 2.4, fill: "#ef4444", "fill-opacity": 0.22, stroke: "#ef4444", "stroke-width": 2 }, cg);
         el("title", null, cg).textContent = `⚠ ${live.conflictStations.get(st.mtrStationId)}`;
       }
     });
@@ -1372,7 +1630,7 @@ const SchemeCore = (function () {
   }
 
   return {
-    VERSION, NS, STATION_STYLES, LABEL_POS, LABEL_ANGLES, DASHES, SHAPE_DASHES, SHAPE_TYPES, DIRS,
+    VERSION, NS, STATION_STYLES, TRANSFER_STYLES, LABEL_POS, LABEL_ANGLES, DASHES, SHAPE_DASHES, SHAPE_TYPES, DIRS,
     normalize, emptyProject, toPublished, fromPublished,
     render, bounds, toSvgElement, toSvgString, toPngBlob,
     nearestOnPolyline, offsetPolylineVar, visibleProject, vertexDisplayPoints, el, normalizeShape, shapeBox,

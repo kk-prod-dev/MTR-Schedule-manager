@@ -1,8 +1,9 @@
 /* ============================================================
-   Экспериментальный интерфейс (Настройки → Интерфейс).
+   Экспериментальный интерфейс (Настройки → Интерфейс) — макеты
+   Claude Design, спецификация docs/ui-next-spec.md.
    Всё ниже действует только под html.ui-next — классический вид
-   не меняется. Разметка и логика общие: здесь только оформление
-   (палитра, шрифты, боковое меню вместо вкладок, окно без полей).
+   не меняется. Разметка .next-only и логика — блок «Новый интерфейс»
+   в app.js.
    ============================================================ */
 
 /* DM Sans / DM Mono не содержат кириллицы — русские буквы берутся
@@ -27,8 +28,11 @@
 /* Элементы, которые есть только в новом виде */
 .next-only { display: none !important; }
 
+/* ============================================================
+   Токены (docs/ui-next-spec.md §1). Переменные style.css
+   переопределены — большинство компонентов перекрашивается само.
+   ============================================================ */
 html.ui-next {
-  /* Те же переменные, что в style.css, — большинство компонентов перекрашивается само */
   --bg: #0B0B0E;
   --panel: #141418;
   --panel2: #1E1D24;
@@ -39,54 +43,76 @@ html.ui-next {
   --green: #D6FFF6;
   --amber: #FFC86B;
   --red: #FF6B81;
-  /* Новые */
+  --nx-raised-hover: #2A2932;
   --nx-hover: #26252E;
   --nx-active: #292741;
-  --nx-ink: #241651;      /* текст на светлом и оранжевом */
+  --nx-ink: #241651;
   --nx-mint: #D6FFF6;
   --nx-soft: #C9BAB4;
+  --nx-text2: #E5D3CE;
+  --nx-soft2: #C4B6B1;
+  --nx-bad-text: #FF97A6;
+  --nx-warn-text: #FFD08A;
+  --nx-moved: #7DD3FC;
+  --nx-edited: #FFE66B;
+  --nx-frame: 1px solid rgba(214, 255, 246, 0.07);
+  --nx-line: rgba(251, 229, 220, 0.09);
+  --nx-line-soft: rgba(251, 229, 220, 0.06);
   --nx-radius: 14px;
   --nx-font: "DM Sans", "Manrope", "Segoe UI", system-ui, sans-serif;
   --nx-mono: "DM Mono", "Cascadia Mono", Consolas, monospace;
+  --nx-cut: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+  --nx-top: 96px;
   color-scheme: dark;
 }
 
-/* ---------- Каркас: меню слева, шапка и рабочая область на всё окно ---------- */
+/* ============================================================
+   Каркас окна (§3): сайдбар 236 | рабочая область, зазор 8,
+   отступы 0 8 8 (сверху — полоса окна Electron)
+   ============================================================ */
 html.ui-next body {
   font-family: var(--nx-font);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
   display: grid;
   grid-template-columns: 236px minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   gap: 8px;
-  padding: 8px;
+  padding: 0 8px 8px;
   height: 100vh;
   box-sizing: border-box;
   overflow: hidden;
 }
+html.ui-next:not(.has-titlebar) body { padding-top: 8px; }
 html.ui-next input,
 html.ui-next select,
 html.ui-next button,
 html.ui-next textarea { font-family: var(--nx-font); }
 html.ui-next :focus-visible { outline: 2px solid var(--nx-mint); outline-offset: 2px; }
+html.ui-next .mono { font-family: var(--nx-mono); }
 
 html.ui-next ::-webkit-scrollbar { width: 10px; height: 10px; }
 html.ui-next ::-webkit-scrollbar-track { background: transparent; }
 html.ui-next ::-webkit-scrollbar-thumb { background: #2A2932; border-radius: 6px; border: 2px solid var(--panel); }
 html.ui-next ::-webkit-scrollbar-thumb:hover { background: #3A3843; }
 
-/* Боковое меню (бывшая строка вкладок) */
+/* ---------- Сайдбар ---------- */
 html.ui-next nav.tabs {
   grid-column: 1;
   grid-row: 1 / 3;
+  display: flex;
   flex-direction: column;
   flex-wrap: nowrap;
   gap: 2px;
+  margin: 0;
   padding: 14px 10px 10px;
-  border: 1px solid rgba(214, 255, 246, 0.07);
+  border: var(--nx-frame);
   border-radius: var(--nx-radius);
   background: var(--panel);
   overflow-y: auto;
   min-height: 0;
+  box-sizing: border-box;
 }
 html.ui-next .next-brand {
   display: flex !important;
@@ -104,7 +130,9 @@ html.ui-next .tab-btn {
   display: flex;
   align-items: center;
   gap: 11px;
+  flex-shrink: 0;
   height: 38px;
+  margin: 0;
   padding: 0 10px;
   border: 0;
   border-radius: 9px;
@@ -118,18 +146,21 @@ html.ui-next .tab-btn {
   text-overflow: ellipsis;
   opacity: 1;
 }
-html.ui-next .tab-btn:hover { background: var(--nx-hover); color: var(--text); opacity: 1; }
+html.ui-next .tab-btn.next-only { display: flex !important; }
+html.ui-next .tab-btn:hover { background: #1E1D24; color: var(--text); opacity: 1; }
 html.ui-next .tab-btn.active { background: var(--nx-active); color: var(--text); }
-html.ui-next .tab-btn.active::after {
+html.ui-next .tab-btn.active::after,
+html.ui-next nav.tabs:has(.tab-btn.active:is([data-tab="schedule"], [data-tab="graph"])) .next-nav-group::after {
   content: "";
   position: absolute;
-  left: 0; top: 9px; bottom: 9px;
+  left: -1px; top: 9px; bottom: 9px;
   width: 3px;
   border-radius: 2px;
   background: var(--accent);
 }
-/* Иконки пунктов — маской, чтобы не трогать текст кнопок (его пишет applyI18n) */
-html.ui-next .tab-btn::before {
+/* Иконки 19px, обводка 1.6 — пути из макетов; маской, текст кнопок пишет applyI18n */
+html.ui-next .tab-btn::before,
+html.ui-next .next-nav-group::before {
   content: "";
   flex-shrink: 0;
   width: 19px; height: 19px;
@@ -137,31 +168,171 @@ html.ui-next .tab-btn::before {
   -webkit-mask: var(--nx-ic) center / contain no-repeat;
           mask: var(--nx-ic) center / contain no-repeat;
 }
-/* Порядок как в макетах: станции и маршруты → расписания → проблемы → редактор, справка и настройки внизу */
-html.ui-next .tab-btn[data-tab="routes"]   { order: 1; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 21V8l6-4v17 M10 21h10V11l-6-3 M14 13h2.5 M14 17h2.5 M6.5 10.5v.01 M6.5 14.5v.01 M3 21h18'/></svg>"); }
-html.ui-next .tab-btn[data-tab="schedule"] { order: 2; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M9 3h6 M12 21a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15z M12 10v3.5l2.5 1.5'/></svg>"); }
-html.ui-next .tab-btn[data-tab="graph"]    { order: 3; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3v18h18 M7 15l4-6 3 4 6-8'/></svg>"); }
-html.ui-next .tab-btn[data-tab="problems"] { order: 4; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7.5v5.5 M12 16.5v.01'/></svg>"); }
-html.ui-next .tab-btn[data-tab="board"]    { order: 5; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z M9 4v13.5 M15 6.5V20'/></svg>"); }
+html.ui-next .tab-label { overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .nx-cnt {
+  display: inline-block !important;
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 9px;
+  background: rgba(255, 107, 129, 0.18);
+  color: var(--nx-bad-text);
+  font: 400 11px/1.4 var(--nx-mono);
+}
+html.ui-next .nx-cnt:empty { display: none !important; }
+
+/* Порядок пунктов как в макетах */
+html.ui-next .tab-btn[data-tab="routes"] { order: 1; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 21V8l6-4v17 M10 21h10V11l-6-3 M14 13h2.5 M14 17h2.5 M6.5 10.5v.01 M6.5 14.5v.01 M3 21h18'/></svg>"); }
+html.ui-next .next-nav-group { order: 2; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M9 3h6 M12 21a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15z M12 10v3.5l2.5 1.5'/></svg>"); }
+html.ui-next .tab-btn[data-tab="schedule"] { order: 3; }
+html.ui-next .tab-btn[data-tab="graph"] { order: 4; }
+html.ui-next .tab-btn[data-tab="problems"] { order: 5; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M12 7.5v5.5 M12 16.5v.01'/></svg>"); }
+html.ui-next #nextNavScheme { order: 6; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z M9 4v13.5 M15 6.5V20'/></svg>"); }
+html.ui-next .tab-btn[data-tab="board"]:not([data-board-mode]) { order: 7; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 3v18 M5 6h12l2.5 2.5L17 11H5z M8.5 21h7'/></svg>"); }
+html.ui-next .next-favs { order: 8; }
 html.ui-next .tab-btn[data-tab="instructions"] { order: 10; margin-top: auto; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7 M12 17v.01'/></svg>"); }
 html.ui-next .tab-btn[data-tab="settings"] { order: 11; --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 0 0 5 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2z'/></svg>"); }
 
-/* Шапка: заголовок текущего раздела + статус MTR */
+/* Группа «Расписания»: пункт + подпункты 30px с отступом 42 */
+html.ui-next .next-nav-group {
+  display: flex !important;
+  align-items: center;
+  gap: 11px;
+  flex-shrink: 0;
+  height: 38px;
+  padding: 0 10px;
+  border-radius: 9px;
+  color: var(--nx-soft);
+  font-size: 13.5px;
+  font-weight: 500;
+  position: relative;
+}
+html.ui-next nav.tabs:has(.tab-btn.active:is([data-tab="schedule"], [data-tab="graph"])) .next-nav-group { background: var(--nx-active); color: var(--text); }
+html.ui-next .tab-btn:is([data-tab="schedule"], [data-tab="graph"]) {
+  height: 30px;
+  padding: 0 10px 0 42px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--muted);
+}
+html.ui-next .tab-btn:is([data-tab="schedule"], [data-tab="graph"])::before { display: none; }
+html.ui-next .tab-btn:is([data-tab="schedule"], [data-tab="graph"]):hover { background: transparent; color: var(--text); }
+html.ui-next .tab-btn:is([data-tab="schedule"], [data-tab="graph"]).active { background: transparent; color: var(--nx-mint); }
+html.ui-next .tab-btn:is([data-tab="schedule"], [data-tab="graph"]).active::after { display: none; }
+
+/* Избранное: капс-подпись, строки 32 — звезда, название, стопка бейджей */
+html.ui-next #favoritesBar { display: none !important; }
+html.ui-next .next-favs { display: flex !important; flex-direction: column; gap: 0; }
+html.ui-next .next-favs.is-empty { display: none !important; }
+html.ui-next .next-favs-cap {
+  margin: 16px 0 6px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html.ui-next .next-fav { position: relative; display: flex; align-items: center; height: 32px; border-radius: 8px; }
+html.ui-next .next-fav:hover { background: #1E1D24; }
+html.ui-next .next-fav .next-fav-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--nx-text2);
+  font-size: 12.5px;
+  font-weight: 400;
+  text-align: left;
+}
+html.ui-next .next-fav .next-fav-open:hover { background: transparent; }
+html.ui-next .nx-fav-name { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .next-fav .next-fav-open::before {
+  content: "";
+  flex-shrink: 0;
+  width: 13px; height: 13px;
+  background: var(--accent);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'/></svg>") center / contain no-repeat;
+}
+/* × поверх стопки — только при наведении, у пропавшей станции всегда */
+html.ui-next .next-fav .next-fav-x {
+  position: absolute;
+  right: 3px; top: 3px;
+  width: 26px; height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: #1E1D24;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+}
+html.ui-next .next-fav:hover .next-fav-x,
+html.ui-next .next-fav .next-fav-x:focus-visible,
+html.ui-next .next-fav.missing .next-fav-x { opacity: 1; }
+html.ui-next .next-fav .next-fav-x:hover { color: var(--red); background: rgba(255, 107, 129, 0.14); }
+html.ui-next .next-fav.missing .nx-fav-name { text-decoration: line-through; color: var(--muted); }
+html.ui-next .next-fav.missing .next-fav-open { cursor: default; }
+html.ui-next .next-fav.active .nx-fav-name { color: var(--nx-mint); }
+
+/* Бейдж линии — мотив «срез 60°» */
+html.ui-next .nx-rb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 28px;
+  padding: 0 9px;
+  box-sizing: border-box;
+  clip-path: var(--nx-cut);
+  font: 500 11px/1 var(--nx-mono);
+  white-space: nowrap;
+}
+html.ui-next .nx-rb.more { background: var(--text); color: var(--nx-ink); }
+html.ui-next .nx-rb.lg { height: 32px; min-width: 44px; font-size: 15px; clip-path: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
+html.ui-next .nx-stack { display: inline-flex; margin-left: auto; flex-shrink: 0; }
+html.ui-next .nx-stack .nx-rb { margin-left: -5px; height: 16px; min-width: 20px; padding: 0 6px; font-size: 9.5px; }
+
+/* ---------- Шапка страницы ---------- */
 html.ui-next .topbar {
   grid-column: 2;
   grid-row: 1;
+  position: relative;
+  z-index: 50;
+  display: flex;
+  align-items: center;
   justify-content: flex-start;
   gap: 16px;
-  padding: 14px 20px;
-  border: 1px solid rgba(214, 255, 246, 0.07);
+  margin: 0;
+  padding: 12px 16px 12px 20px;
+  border: var(--nx-frame);
   border-radius: var(--nx-radius);
   background: var(--panel);
+  min-height: 0;
 }
 html.ui-next .topbar h1 { display: none; }
+html.ui-next .next-head { display: block !important; min-width: 180px; flex: 0 1 auto; }
+html.ui-next .next-crumbs { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+html.ui-next .next-crumbs button {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+html.ui-next .next-crumbs button:hover { background: none; color: var(--text); }
+html.ui-next .next-crumbs .cur { color: var(--text); }
+html.ui-next .next-title-row { display: flex; align-items: center; gap: 10px; margin-top: 3px; min-width: 0; }
 html.ui-next .next-page-title {
-  display: block !important;
-  flex: 1;
-  min-width: 0;
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.015em;
@@ -170,46 +341,191 @@ html.ui-next .next-page-title {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+html.ui-next .next-page-lead {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+html.ui-next .next-page-lead:empty { display: none; }
+/* подзаголовок живёт в «?» у инструментов шапки, под заголовком его нет */
+html.ui-next .next-page-lead { display: none; }
+html.ui-next .nx-help { position: relative; order: 2; flex-shrink: 0; display: inline-flex; }
+html.ui-next .nx-help[hidden] { display: none; }
+html.ui-next .nx-help-btn {
+  width: 24px; height: 24px; padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(251, 229, 220, 0.25);
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px; font-weight: 600; line-height: 1;
+  cursor: help;
+}
+html.ui-next .nx-help-btn:hover, html.ui-next .nx-help:focus-within .nx-help-btn { color: var(--text); background: #1E1D24; }
+html.ui-next .nx-help-pop {
+  display: none;
+  position: absolute; top: calc(100% + 8px); right: 0;
+  width: 320px; max-width: 70vw;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #1E1D24;
+  border: 1px solid rgba(251, 229, 220, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  color: var(--text); font-size: 12.5px; line-height: 1.45;
+  z-index: 700;
+}
+/* «?» в углу карточки настроек: абзац-пояснение — всплывашка */
+html:not(.ui-next) .nx-help-abs { display: none; }
+html.ui-next .settings-block { position: relative; }
+html.ui-next .nx-help-abs { position: absolute; top: 16px; right: 16px; z-index: 3; }
+html.ui-next .settings-block > .nx-help-src { display: none; }
+html.ui-next .settings-block > .nx-help-abs:hover + .nx-help-src,
+html.ui-next .settings-block > .nx-help-abs:focus + .nx-help-src {
+  display: block;
+  position: absolute; top: 46px; right: 16px; z-index: 700;
+  width: 320px; max-width: calc(100% - 32px);
+  margin: 0; padding: 10px 12px;
+  border-radius: 10px;
+  background: #1E1D24;
+  border: 1px solid rgba(251, 229, 220, 0.12);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  color: var(--text); font-size: 12.5px; line-height: 1.45;
+}
+html.ui-next .nx-help:hover .nx-help-pop, html.ui-next .nx-help:focus-within .nx-help-pop { display: block; }
+/* Звезда избранного у заголовка станции */
+html.ui-next #nextTitleExtra:empty { display: none; }
+html.ui-next #nextTitleExtra #toggleFavoriteStationBtn {
+  width: 28px; height: 28px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 19px !important;
+  line-height: 1;
+}
+html.ui-next #nextTitleExtra #toggleFavoriteStationBtn:hover { background: #1E1D24; }
+/* Статус MTR — в полосе окна; в браузере (без полосы) остаётся в шапке справа */
+html.ui-next.has-titlebar .status-badge { display: none; }
+/* в браузере полосы окна нет — статус переезжает в низ меню (syncNextLayout) */
+html.ui-next nav.tabs .status-badge { order: 9; margin: auto 0 6px; padding: 0 10px; max-width: none; }
+html.ui-next nav.tabs:has(.status-badge) .tab-btn[data-tab="instructions"] { margin-top: 0; }
 html.ui-next .status-badge {
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 30px;
-  padding: 0 12px;
+  height: auto;
+  padding: 0;
   border: 0;
-  border-radius: 15px;
-  background: var(--panel2);
-  color: var(--muted);
+  background: none;
+  color: var(--nx-mint);
   font-size: 12px;
+  white-space: nowrap;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 1;
 }
-html.ui-next .status-badge::before {
-  content: "";
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-html.ui-next .status-badge.ok { color: var(--nx-mint); box-shadow: none; }
-html.ui-next .status-badge.ok::before { box-shadow: 0 0 0 3px rgba(214, 255, 246, 0.16); }
+html.ui-next .status-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px rgba(214, 255, 246, 0.16); }
 html.ui-next .status-badge.warn { color: var(--amber); }
 html.ui-next .status-badge.error { color: var(--red); }
 
-/* Рабочая область — вся оставшаяся ширина и высота, без max-width */
-html.ui-next main {
-  grid-column: 2;
-  grid-row: 2;
-  max-width: none;
-  margin: 0;
-  padding: 0;
-  min-height: 0;
+/* Сегмент «Табло станции / График движения» — только на этих двух экранах */
+html.ui-next body:is([data-nx-tab="schedule"], [data-nx-tab="graph"]) .next-view-seg { display: inline-flex !important; margin-left: 8px; flex-shrink: 0; }
+/* Инструменты раздела справа */
+html.ui-next .next-head-tools { display: flex !important; align-items: center; gap: 12px; margin-left: auto; min-width: 0; flex: 0 1 auto; }
+html.ui-next .next-head-tools:not(:has(> :not([hidden]))) { display: none !important; }
+html.ui-next .topbar { flex-wrap: wrap; row-gap: 8px; }
+html.ui-next .next-head-tools > .controls,
+html.ui-next .next-head-tools > .controls.next-only {
+  display: flex !important;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   min-width: 0;
-  overflow: auto;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
 }
 
-/* ---------- Базовые элементы ---------- */
+/* ---------- Общие компоненты (§2) ---------- */
+html.ui-next .nx-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: #1E1D24; flex-shrink: 0; }
+html.ui-next .nx-seg > button,
+html.ui-next .nx-seg > span {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--nx-soft);
+  font-size: 12.5px;
+  font-weight: 400;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+html.ui-next .nx-seg > button:hover { background: var(--nx-raised-hover); color: var(--text); }
+html.ui-next .nx-seg > button.on { background: var(--text); color: var(--nx-ink); font-weight: 600; }
+html.ui-next .nx-fill { flex: 1; }
+html.ui-next .nx-ph {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  flex-shrink: 0;
+  padding: 0 10px 0 16px;
+  border-bottom: 1px solid var(--nx-line);
+  font-size: 13.5px;
+  font-weight: 600;
+  box-sizing: border-box;
+}
+html.ui-next .nx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 13px;
+  background: #1E1D24;
+  color: var(--nx-text2);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+html.ui-next .nx-chip:empty { display: none; }
+html.ui-next .nx-chip.bad { background: rgba(255, 107, 129, 0.14); color: var(--nx-bad-text); }
+html.ui-next .nx-chip.warn { background: rgba(255, 200, 107, 0.13); color: var(--nx-warn-text); }
+html.ui-next .nx-chip.live { color: var(--nx-mint); }
+html.ui-next .nx-ph .nx-chip { height: 22px; font-size: 11px; }
+html.ui-next .nx-board-bar .nx-chip { height: 26px; font-size: 12px; }
+html.ui-next .nx-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+html.ui-next .nx-dot.bad { background: var(--red); }
+html.ui-next .nx-dot.warn { background: var(--amber); }
+html.ui-next .nx-dot.diamond { border-radius: 0; transform: rotate(45deg); }
+html.ui-next .nx-empty { margin: 4px 0; padding: 8px 4px; font-size: 12.5px; color: var(--muted); }
+html.ui-next .nx-ib {
+  width: 32px; height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--nx-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+html.ui-next .nx-ib::before { content: ""; width: 16px; height: 16px; background: currentColor; -webkit-mask: var(--nx-ic) center / contain no-repeat; mask: var(--nx-ic) center / contain no-repeat; }
+html.ui-next .nx-ib:hover { background: #1E1D24; color: var(--text); }
+html.ui-next .nx-collapse { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><path d='M15 6l-6 6 6 6'/></svg>"); }
+html.ui-next .nx-collapsed .nx-collapse { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><path d='M4 6h16M7 12h10M10 18h4'/></svg>"); }
+html.ui-next .nx-close { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><path d='M6 6l12 12M18 6L6 18'/></svg>"); }
+
+/* Поля и кнопки */
 html.ui-next input,
 html.ui-next select,
 html.ui-next textarea {
-  background: var(--panel2);
+  background: #1E1D24;
   border: 1px solid transparent;
   border-radius: 9px;
   color: var(--text);
@@ -221,133 +537,1070 @@ html.ui-next select:focus,
 html.ui-next textarea:focus { outline: none; border-color: rgba(214, 255, 246, 0.5); }
 html.ui-next input[type="checkbox"],
 html.ui-next input[type="radio"] { accent-color: var(--accent); }
-html.ui-next input[type="range"] { background: var(--panel2); border: 0; }
-
-html.ui-next button {
+html.ui-next input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  height: 4px; margin: 8px 0; padding: 0;
+  border: 0; border-radius: 2px;
+  background: rgba(251, 229, 220, 0.2);
+  accent-color: var(--accent);
+}
+html.ui-next input[type="range"]:hover { background: rgba(251, 229, 220, 0.3); }
+html.ui-next input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
   background: var(--accent);
-  border: 1px solid var(--accent);
-  border-radius: 9px;
-  color: var(--nx-ink);
-  font-weight: 600;
+  border: 2px solid var(--panel);
+  box-sizing: content-box;
+  cursor: pointer;
 }
-html.ui-next button:hover { opacity: 1; background: #FF9564; border-color: #FF9564; }
-html.ui-next .secondary-btn,
-html.ui-next .icon-btn {
-  background: var(--panel2);
-  border-color: transparent;
-  color: var(--text);
-  font-weight: 500;
-}
-html.ui-next .secondary-btn:hover,
-html.ui-next .icon-btn:hover { background: #2A2932; border-color: transparent; }
-html.ui-next .link-btn { background: none; border: 0; color: var(--nx-mint); font-weight: 500; }
-html.ui-next .link-btn:hover { background: none; }
+html.ui-next input[type="checkbox"]:hover { border: 0; }
 
+/* Базовая кнопка — тёмная со светлым текстом. :where() держит специфичность
+   на уровне классического `button`: компоненты со своим фоном (.fav-chip,
+   .problem-fix-btn…) его сохраняют и наследуют светлый текст — тёмный текст
+   получают ТОЛЬКО оранжевые основные действия из списка ниже. */
+:where(html.ui-next) button {
+  height: 32px;
+  padding: 0 13px;
+  background: #1E1D24;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+:where(html.ui-next) button:hover { opacity: 1; background: var(--nx-raised-hover); }
+html.ui-next :is(#newDraftBtnSchedule, #newDraftBtnGraph, #newDraftBtn, #buildGraphBtn, #boardInsertScheduleBtn,
+  #saveDraftBtn, #boardShareModalActionBtn, #schemeLivePublish, #schemePublishCopy, #schemeHtmlSave) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--nx-ink);
+  font-weight: 700;
+}
+html.ui-next :is(#newDraftBtnSchedule, #newDraftBtnGraph, #newDraftBtn, #buildGraphBtn, #boardInsertScheduleBtn,
+  #saveDraftBtn, #boardShareModalActionBtn, #schemeLivePublish, #schemePublishCopy, #schemeHtmlSave):hover {
+  background: #FF9564;
+  border-color: #FF9564;
+}
+html.ui-next .secondary-btn,
+html.ui-next .icon-btn { background: #1E1D24; border-color: transparent; color: var(--text); }
+html.ui-next .secondary-btn:hover,
+html.ui-next .icon-btn:hover { background: var(--nx-raised-hover); border-color: transparent; }
+html.ui-next .link-btn { height: auto; padding: 0; background: none; border: 0; color: var(--nx-mint); font-size: 11px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+html.ui-next .link-btn:hover { background: none; color: #fff; }
+html.ui-next .nx-ghost { background: transparent; color: var(--nx-soft); height: 28px; font-size: 12px; }
+html.ui-next .nx-ghost:hover { background: #1E1D24; color: var(--text); }
+html.ui-next .nx-raised { background: var(--nx-raised-hover); height: 28px; font-size: 12px; }
+html.ui-next .nx-raised:hover { background: #34333D; }
+
+/* Где в style.css оранжевый фон с белым текстом (2.5:1) — тёмный текст */
+html.ui-next .dropdown-item:hover { background: rgba(246, 131, 73, 0.14); }
+html.ui-next :is(.col-add-btn, .board-line-opt, .board-font-item, .board-ctx-item):hover,
+html.ui-next .scheme-chip.on,
+html.ui-next .problems-count-badge { color: var(--nx-ink); }
 html.ui-next .hint { color: var(--muted); }
+
+/* Автокомплит */
+html.ui-next .autocomplete-list { z-index: 600; background: #1E1D24; border-color: rgba(251, 229, 220, 0.12); border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55); }
+html.ui-next .autocomplete-item:hover,
+html.ui-next .autocomplete-item.active { background: var(--accent); color: var(--nx-ink); }
+
+/* Живой индикатор и «сейчас» — мятные */
+html.ui-next .live-dot { background: var(--nx-mint); animation: none; box-shadow: 0 0 0 3px rgba(214, 255, 246, 0.16); }
+html.ui-next .now-line { width: 2px; margin-left: -1px; background: var(--nx-mint); box-shadow: 0 0 12px rgba(214, 255, 246, 0.55); }
+html.ui-next .graph-now-line { stroke: var(--nx-mint); filter: drop-shadow(0 0 4px rgba(214, 255, 246, 0.55)); }
+
+/* ---------- Рабочая область: раздел на всю высоту ---------- */
+html.ui-next main {
+  grid-column: 2;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+html.ui-next .tab-panel.active { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Вводная подсказка раздела — в шапке, в самом разделе скрыта */
+html.ui-next .tab-panel > p.hint:first-child,
+html.ui-next #boardModeTimetable > p.hint:first-child,
+html.ui-next #boardModeScheme > p.hint:first-child,
+html.ui-next #scheduleMeta { display: none; }
+html.ui-next .nx-hide { display: none !important; }
 
 /* Панели */
 html.ui-next .sidebar,
-html.ui-next .dashboard-wrap,
-html.ui-next .graph-wrap,
-html.ui-next .graph-y-panel,
-html.ui-next table,
-html.ui-next .nearest-board-wrap,
+html.ui-next .board-panel,
+html.ui-next .board-side > *,
+html.ui-next .nx-trip-panel,
+html.ui-next #tab-graph .main-area,
+html.ui-next .nx-route-groups,
 html.ui-next .problems-section,
 html.ui-next .board-toolbar,
-html.ui-next .instructions-list > * {
+html.ui-next .instructions-list > *,
+html.ui-next .settings-block {
   background: var(--panel);
-  border: 1px solid rgba(214, 255, 246, 0.07);
+  border: var(--nx-frame);
   border-radius: var(--nx-radius);
+  box-sizing: border-box;
 }
-html.ui-next .sidebar { top: 0; width: 248px; padding: 14px 16px; }
-html.ui-next .sidebar-section h4 { color: var(--muted); letter-spacing: 0.08em; font-weight: 600; }
-html.ui-next .layout-with-sidebar { gap: 8px; }
-html.ui-next .controls { gap: 8px; margin-bottom: 8px; }
-html.ui-next .graph-wrap { max-height: calc(100vh - 240px); }
 
-html.ui-next th { color: var(--muted); letter-spacing: 0.06em; }
-html.ui-next tr:hover td { background: rgba(251, 229, 220, 0.025); }
-html.ui-next tr.clickable-row:hover td { background: rgba(246, 131, 73, 0.10); }
+/* ---------- Фильтры (общие для табло и графика) ---------- */
+html.ui-next .layout-with-sidebar { flex: 1; min-height: 0; display: flex; gap: 8px; align-items: stretch; }
+html.ui-next .sidebar {
+  position: static;
+  width: 248px;
+  flex-shrink: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+html.ui-next .sidebar .nx-ph { position: sticky; top: 0; z-index: 2; background: var(--panel); border-radius: var(--nx-radius) var(--nx-radius) 0 0; }
+html.ui-next .sidebar-section { margin: 0; padding: 12px 16px; border-bottom: 1px solid rgba(251, 229, 220, 0.07); }
+html.ui-next .sidebar-section:last-child { border-bottom: 0; }
+html.ui-next .sidebar-section h4 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+/* «Все · Ничего» — в строку заголовка секции */
+html.ui-next .sidebar-section:has(> .sidebar-actions-row) { position: relative; }
+html.ui-next .sidebar-actions-row { position: absolute; top: 12px; right: 16px; display: flex; gap: 0; margin: 0; }
+html.ui-next .sidebar-actions-row .link-btn + .link-btn::before { content: "\00a0·\00a0"; color: var(--muted); }
+html.ui-next .checkbox-list { max-height: none; gap: 0; }
+html.ui-next .checkbox-list label,
+html.ui-next .switch-row { gap: 9px; padding: 4px 0; font-size: 12.5px; color: var(--nx-text2); }
+html.ui-next .checkbox-list input,
+html.ui-next .switch-row input { width: 14px; height: 14px; margin: 0; flex-shrink: 0; }
+html.ui-next .sidebar .switch-row.next-only { display: flex !important; }
+/* Тип транспорта — чипы (чекбокс прячем, вкл = мятный контур) */
+html.ui-next :is(#dashTypeFilterList, #graphTypeFilterList) { flex-direction: row; flex-wrap: wrap; gap: 6px; }
+html.ui-next :is(#dashTypeFilterList, #graphTypeFilterList) label {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 13px;
+  background: #1E1D24;
+  color: var(--nx-text2);
+  font-size: 12px;
+  gap: 6px;
+}
+html.ui-next :is(#dashTypeFilterList, #graphTypeFilterList) label input { position: absolute; opacity: 0; pointer-events: none; }
+html.ui-next :is(#dashTypeFilterList, #graphTypeFilterList) label .rmk { display: none; }
+html.ui-next :is(#dashTypeFilterList, #graphTypeFilterList) label:has(input:checked) {
+  background: rgba(214, 255, 246, 0.12);
+  color: var(--nx-mint);
+  box-shadow: inset 0 0 0 1px rgba(214, 255, 246, 0.38);
+}
+html.ui-next :is(#dashTypeFilterList, #graphTypeFilterList) label:has(input:focus-visible) { outline: 2px solid var(--nx-mint); }
+/* Мин. интервал: значение — в заголовке справа */
+html.ui-next .nx-mininterval { position: relative; }
+html.ui-next .nx-mininterval #minIntervalValue { position: absolute; top: 12px; right: 16px; margin: 0; font: 400 11px var(--nx-mono); color: var(--text); }
+html.ui-next .nx-mininterval input[type="range"] { width: 100%; }
+html.ui-next .nx-note { display: block !important; margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+/* Порядок секций как в макете: платформы, маршруты, тип, интервал */
+html.ui-next #dashboardSidebar .nx-mininterval { order: 5; border-bottom: 0; }
+/* Свёрнутые фильтры — колонка 48px с одной кнопкой */
+html.ui-next .sidebar.nx-collapsed { width: 48px; align-items: center; }
+html.ui-next .sidebar.nx-collapsed > :not(.nx-ph) { display: none !important; }
+html.ui-next .sidebar.nx-collapsed .nx-ph { height: auto; padding: 8px 0 0; border: 0; justify-content: center; }
+html.ui-next .sidebar.nx-collapsed .nx-ph > span { display: none; }
+html.ui-next .nx-zoom-src { display: none; }
 
-/* Автокомплит */
-html.ui-next .autocomplete-list { background: var(--panel2); border-color: rgba(251, 229, 220, 0.12); border-radius: 10px; box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55); }
-html.ui-next .autocomplete-item:hover { background: var(--accent); color: var(--nx-ink); }
-
-/* Избранное */
-html.ui-next .fav-chip { border-radius: 13px; background: var(--panel2); border-color: transparent; }
-html.ui-next .fav-chip:hover { background: #2A2932; border-color: transparent; }
-html.ui-next .fav-chip.fav-active { background: rgba(246, 131, 73, 0.16); border-color: transparent; color: var(--accent); }
-
-/* Живой индикатор и линия «сейчас» — мятные */
-html.ui-next .live-dot { background: var(--nx-mint); animation: none; box-shadow: 0 0 0 3px rgba(214, 255, 246, 0.16); }
-html.ui-next .now-line { background: var(--nx-mint); box-shadow: 0 0 10px rgba(214, 255, 246, 0.55); }
-
-/* Дашборд станции */
-html.ui-next .dashboard-corner,
-html.ui-next .dashboard-ruler-scroll { background: transparent; }
-html.ui-next .dashboard-ruler .tick { font-family: var(--nx-mono); color: var(--muted); }
-html.ui-next .dashboard-ruler .tick-minor { border-left-color: rgba(251, 229, 220, 0.05); }
-html.ui-next .platform-label { color: var(--text); }
-html.ui-next .entry-block { border-radius: 5px; border-color: rgba(0, 0, 0, 0.3); }
-html.ui-next .entry-block .eb-time { font-family: var(--nx-mono); font-weight: 500; }
-html.ui-next .entry-block .eb-warning { color: var(--nx-ink); }
-html.ui-next .entry-tooltip { background: var(--panel2); border-color: rgba(251, 229, 220, 0.12); border-radius: 10px; box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55); }
-
-/* График движения */
-html.ui-next .graph-legend-item { background: var(--panel2); border-color: transparent; }
-
-/* Карточка маршрута и прочие модалки: шире, чтобы не было пустых полей */
-html.ui-next .modal-overlay { background: rgba(5, 5, 8, 0.72); }
-html.ui-next .modal {
-  max-width: min(1280px, calc(100vw - 64px));
-  max-height: calc(100vh - 64px);
-  border: 1px solid rgba(214, 255, 246, 0.07);
-  border-radius: 16px;
+/* ============================================================
+   4.1 Табло станции
+   ============================================================ */
+html.ui-next #tab-schedule .controls > #scheduleLiveDot { display: none; }
+html.ui-next #stationAC { flex: 0 1 320px; width: 320px; min-width: 200px; }
+html.ui-next #stationAC::before {
+  content: "";
+  position: absolute;
+  left: 12px; top: 11px;
+  width: 16px; height: 16px;
+  background: var(--muted);
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>") center / contain no-repeat;
+          mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>") center / contain no-repeat;
+  pointer-events: none;
+}
+html.ui-next #stationAC::after {
+  content: "Ctrl K";
+  position: absolute;
+  right: 10px; top: 10px;
+  padding: 2px 6px;
+  border-radius: 5px;
   background: var(--panel);
+  color: var(--muted);
+  font: 400 10.5px/1.4 var(--nx-mono);
+  pointer-events: none;
+}
+html.ui-next :is(#stationInput, #routeSearch) {
+  width: 100%;
+  height: 38px;
+  padding: 0 64px 0 38px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+html.ui-next #routeSearch {
+  width: 320px;
+  padding-right: 12px;
+  background: #1E1D24 url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23A0928E' stroke-width='2' stroke-linecap='round'><circle cx='11' cy='11' r='7'/><path d='M20 20l-3.5-3.5'/></svg>") no-repeat 12px center;
 }
 
-/* Проблемные места */
-html.ui-next .problem-card { background: var(--panel2); border-color: transparent; border-radius: 11px; }
-html.ui-next .problem-card:hover { background: #2A2932; }
-html.ui-next .problems-section-header:hover { background: var(--panel2); }
-html.ui-next .problems-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+html.ui-next #tab-schedule .main-area { flex: 1; min-width: 0; display: flex; gap: 8px; }
+html.ui-next .board-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+html.ui-next .nx-board-bar { font-weight: 500; gap: 10px; }
+html.ui-next .nx-board-bar .nx-reset-slot:empty { display: none; }
+html.ui-next #resetDashOverridesBtn { width: auto; background: transparent; color: var(--nx-soft); }
+html.ui-next #resetDashOverridesBtn:hover { background: #1E1D24; color: var(--text); }
+html.ui-next .nx-zoom-seg button,
+html.ui-next .nx-zoom-seg span { height: 28px; min-width: 28px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--nx-soft); font-size: 12.5px; display: inline-flex; align-items: center; justify-content: center; }
+html.ui-next .nx-zoom-seg #dashZoomValue { font-family: var(--nx-mono); color: var(--text); margin: 0; }
+html.ui-next .nx-zoom-seg button:hover { background: var(--nx-raised-hover); color: var(--text); }
 
-/* Редактор: табло и схема */
-html.ui-next .board-toolbar { padding: 8px 10px; }
-html.ui-next .board-mode-switch { display: inline-flex; padding: 3px; gap: 2px; border: 0; border-radius: 10px; background: var(--panel2); }
-html.ui-next .board-mode-btn { border: 0 !important; border-radius: 7px; background: transparent; color: var(--nx-soft); font-weight: 500; }
-html.ui-next .board-mode-btn:hover { background: var(--nx-hover); }
-html.ui-next .board-mode-btn.active { background: var(--text); color: var(--nx-ink); font-weight: 600; }
-html.ui-next .scheme-layout { height: calc(100vh - 250px); }
-html.ui-next .scheme-tools,
-html.ui-next .scheme-props { background: var(--panel); border-color: rgba(214, 255, 246, 0.07); border-radius: var(--nx-radius); }
-html.ui-next .scheme-canvas { border-radius: var(--nx-radius); border-color: rgba(214, 255, 246, 0.07); }
+html.ui-next .dashboard-wrap { flex: 1; min-height: 0; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; overflow: auto; }
+html.ui-next .dashboard-empty { padding: 40px 20px; color: var(--muted); }
+html.ui-next .dashboard { grid-template-columns: 188px 1fr; grid-template-rows: 32px 1fr; }
+html.ui-next .dashboard-corner {
+  justify-content: flex-start;
+  padding-left: 16px;
+  border: 0;
+  border-bottom: 1px solid var(--nx-line);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+html.ui-next .dashboard-ruler-scroll { margin-right: 16px; border-bottom: 1px solid var(--nx-line); background: transparent; overflow: visible; }
+html.ui-next .dashboard-ruler { height: 32px; }
+html.ui-next .dashboard-ruler .tick { border-left: 0; padding: 0; transform: translateX(-50%); font: 400 11px var(--nx-mono); color: var(--muted); }
+html.ui-next .dashboard-ruler .tick-minor { color: transparent; }
+html.ui-next .nx-now-flag {
+  display: inline-block !important;
+  position: absolute;
+  top: 6px;
+  z-index: 3;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  background: var(--nx-mint);
+  color: var(--nx-ink);
+  clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
+  font: 500 11px/1.4 var(--nx-mono);
+  pointer-events: none;
+}
+html.ui-next .dashboard-platforms { border-right: 0; }
+html.ui-next .platform-label {
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--nx-line-soft);
+  color: var(--text);
+  text-align: left;
+}
+html.ui-next .pl-name {
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--text);
+  border-radius: 8px;
+  box-sizing: border-box;
+  font: 500 13px var(--nx-mono);
+  overflow: hidden;
+  white-space: nowrap;
+}
+html.ui-next .pl-meta { display: flex !important; flex-direction: column; min-width: 0; line-height: 1.25; }
+html.ui-next .pl-meta b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .pl-meta small { font-size: 11.5px; font-weight: 400; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .dashboard-grid-scroll { margin-right: 16px; }
+/* Сетка часов поверх строк и «рельсы» платформ */
+html.ui-next .dashboard-grid {
+  background-image:
+    repeating-linear-gradient(90deg, rgba(251, 229, 220, 0.10) 0 1px, transparent 1px var(--nx-hour, 110px)),
+    repeating-linear-gradient(90deg, rgba(251, 229, 220, 0.045) 0 1px, transparent 1px calc(var(--nx-hour, 110px) / 2));
+}
+html.ui-next .grid-row { border-bottom: 1px solid var(--nx-line-soft); }
+html.ui-next .grid-row:hover { background: rgba(41, 39, 65, 0.5); }
+html.ui-next .grid-row::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  top: calc(50% - 6px);
+  height: 12px;
+  border-top: 1px solid rgba(251, 229, 220, 0.12);
+  border-bottom: 1px solid rgba(251, 229, 220, 0.12);
+  box-sizing: border-box;
+  pointer-events: none;
+}
+/* Блок поезда: параллелограмм (срез 60°) с номером; время — в подсказке */
+/* ширина 34 вместо 56 (left считает app.js от центра − 28, margin возвращает центр) */
+html.ui-next .entry-block {
+  top: calc(50% - 13px);
+  width: 34px;
+  margin-left: 11px;
+  height: 26px;
+  border: 0;
+  border-radius: 0;
+  transform: skewX(-11deg);
+  text-shadow: none;
+  font: 500 10.5px var(--nx-mono);
+  justify-content: center;
+}
+html.ui-next .entry-block > * { transform: skewX(11deg); }
+html.ui-next .entry-block .eb-num { font-size: 10.5px; font-weight: 500; position: static; }
+html.ui-next .entry-block :is(.eb-time, .eb-actual-time, .eb-edited-tag, .eb-dwell-nub) { display: none; }
+/* Состояния — как в классическом виде: контур внутри блока + свечение снаружи.
+   Контур (--eb-ring) и свечение (--eb-glow) складываются, поэтому «опаздывает и в конфликте» видно оба */
+html.ui-next .entry-block {
+  --eb-ring: 0 0 0 0 transparent;
+  --eb-glow: 0 0 0 0 transparent;
+  box-shadow: var(--eb-ring), var(--eb-glow);
+  transition: transform .1s, box-shadow .12s, opacity .12s;
+}
+html.ui-next .entry-block.dev-late { --eb-ring: inset 0 0 0 2px var(--amber); }
+html.ui-next .entry-block.dev-early { --eb-ring: inset 0 0 0 2px var(--nx-mint); }
+html.ui-next .entry-block.is-platform-moved { --eb-ring: inset 0 0 0 2px var(--nx-moved); }
+html.ui-next .entry-block.has-conflict { --eb-glow: 0 0 0 2px var(--red), 0 0 10px 2px rgba(255, 107, 129, 0.55); }
+/* сдвинут вручную — жёлтый пунктир со свечением (как в классике) */
+html.ui-next .entry-block.is-edited {
+  border: 0;
+  outline: 2px dashed var(--nx-edited);
+  outline-offset: 2px;
+  --eb-glow: 0 0 9px 2px rgba(255, 230, 107, 0.45);
+}
+html.ui-next .entry-block.is-edited.has-conflict { --eb-glow: 0 0 0 2px var(--red), 0 0 10px 2px rgba(255, 107, 129, 0.55); }
+html.ui-next .entry-block.is-draft {
+  border: 0;
+  opacity: 1;
+  background: repeating-linear-gradient(135deg, #D6FFF6 0 3px, rgba(214, 255, 246, 0.25) 3px 7px) !important;
+  color: var(--nx-ink);
+}
+/* «!» конфликта — маленький значок в углу */
+html.ui-next .entry-block .eb-warning {
+  top: -7px; right: -7px;
+  width: 13px; height: 13px;
+  font: 700 9px/1 var(--nx-font);
+  background: var(--red);
+  color: #1A0710;
+  box-shadow: 0 0 0 2px var(--panel);
+}
+/* живые данные — точка внизу слева (классический ::after), в цвет текста блока */
+html.ui-next .entry-block.is-live::after { bottom: 3px; left: 5px; width: 4px; height: 4px; }
+/* наведение, конфликтная пара, цепочка оборота — подсветка светом */
+html.ui-next .entry-block:hover { transform: skewX(-11deg) scale(1.12); z-index: 10; }
+html.ui-next .entry-block.eb-hover-focus {
+  z-index: 30;
+  box-shadow: var(--eb-ring), 0 0 0 2px #fff, 0 0 12px 3px rgba(255, 255, 255, 0.5);
+}
+html.ui-next .entry-block.eb-hover-pair {
+  z-index: 25;
+  transform: skewX(-11deg) scale(1.08);
+  box-shadow: var(--eb-ring), 0 0 0 2px var(--red), 0 0 12px 3px rgba(255, 107, 129, 0.65);
+}
+html.ui-next .entry-block.chain-hl {
+  z-index: 5;
+  box-shadow: var(--eb-ring), 0 0 0 2px #fff, 0 0 12px 3px rgba(255, 255, 255, 0.45);
+}
+html.ui-next .entry-block.chain-dim { opacity: 0.22; }
+html.ui-next .entry-tooltip { background: #1E1D24; border-color: transparent; border-radius: 10px; box-shadow: 0 12px 28px rgba(10, 4, 30, 0.55); }
 
-/* Настройки: карточки сеткой на всю ширину вместо узкого столбца */
-html.ui-next #tab-settings.active {
+/* Подвал-легенда табло */
+html.ui-next .nx-legend {
+  display: flex !important;
+  align-items: center;
+  gap: 18px;
+  height: 34px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  border-top: 1px solid var(--nx-line);
+  font-size: 11.5px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+html.ui-next .nx-legend::-webkit-scrollbar { display: none; }
+html.ui-next .nx-legend > span,
+html.ui-next .nx-scheme-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+html.ui-next .nx-legend i { display: inline-block; flex-shrink: 0; }
+/* образцы — те же контуры, что у блоков поездов */
+html.ui-next :is(.lg-conflict, .lg-late, .lg-early, .lg-moved, .lg-edited) {
+  width: 16px; height: 11px;
+  transform: skewX(-11deg);
+  background: #3A3846;
+}
+html.ui-next .lg-conflict { box-shadow: 0 0 0 2px var(--red), 0 0 7px 1px rgba(255, 107, 129, 0.6); }
+html.ui-next .lg-late { box-shadow: inset 0 0 0 2px var(--amber); }
+html.ui-next .lg-early { box-shadow: inset 0 0 0 2px var(--nx-mint); }
+html.ui-next .lg-moved { box-shadow: inset 0 0 0 2px var(--nx-moved); }
+html.ui-next .lg-edited { outline: 2px dashed var(--nx-edited); outline-offset: 1px; }
+html.ui-next .lg-draft { width: 18px; height: 12px; clip-path: var(--nx-cut); background: repeating-linear-gradient(135deg, #D6FFF6 0 2px, transparent 2px 5px); }
+
+/* Правая колонка: ближайшие прибытия + конфликты */
+html.ui-next .board-side { width: 348px; flex-shrink: 0; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+html.ui-next #nearestTrainSection { flex: 1; min-height: 0; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+html.ui-next .nearest-board-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  flex-shrink: 0;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--nx-line);
+  background: transparent;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+html.ui-next .nx-after { display: inline !important; margin-left: auto; font: 400 11.5px var(--nx-mono); color: var(--muted); }
+html.ui-next .nearest-board-table { display: block; flex: 1; min-height: 0; overflow-y: auto; margin: 0; background: transparent; border: 0; border-radius: 0; }
+html.ui-next .nearest-board-table thead { display: none; }
+html.ui-next .nearest-board-table tbody { display: block; }
+html.ui-next .nb-row {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
-  gap: 8px;
-  align-content: start;
+  grid-template-columns: 62px auto minmax(0, 1fr) 30px;
+  grid-template-areas: "time route dest plat" "dev route dest plat";
+  column-gap: 12px;
+  align-items: center;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--nx-line-soft);
+  cursor: pointer;
 }
+html.ui-next .nb-row:hover td { background: transparent; }
+html.ui-next .nb-row:hover { background: rgba(41, 39, 65, 0.5); }
+html.ui-next .nb-row td { padding: 0; border: 0; background: transparent; }
+html.ui-next .nb-row td:nth-child(1) { grid-area: route; display: flex; align-items: center; gap: 6px; margin-right: -3px; }
+html.ui-next .nb-row td:nth-child(1) b { font: 500 11px var(--nx-mono); }
+html.ui-next .nb-row td:nth-child(2) { grid-area: dest; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+html.ui-next .nb-row td:nth-child(3) {
+  grid-area: plat;
+  width: 26px; height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(251, 229, 220, 0.35);
+  border-radius: 6px;
+  box-sizing: border-box;
+  font: 400 11px var(--nx-mono);
+  overflow: hidden;
+  white-space: nowrap;
+}
+html.ui-next .nb-row td:nth-child(4) { grid-area: time; font: 500 17px/1.2 var(--nx-mono); }
+html.ui-next .nb-row td:nth-child(5),
+html.ui-next .nb-row td:nth-child(6) { display: none; }
+html.ui-next .nb-row td:nth-child(7) { grid-area: dev; font-size: 11px; line-height: 1.2; }
+html.ui-next .nb-row .dev-pos { color: var(--nx-warn-text); }
+html.ui-next .nb-row .dev-neg { color: var(--nx-mint); }
+html.ui-next .nb-row :is(.nb-ontime, .dev-pos, .dev-neg) { color: var(--nx-mint); font-size: 11px; font-weight: 400; white-space: nowrap; }
+html.ui-next .nb-row .dev-pos { color: var(--nx-warn-text); }
+html.ui-next .nb-ontime .nb-dot { display: none; }
+html.ui-next .nb-ontime .next-only { display: inline !important; }
+
+html.ui-next .nx-conflicts { display: flex !important; flex-direction: column; flex-shrink: 0; height: 336px; overflow: hidden; }
+html.ui-next .nx-conflicts .nx-ph { padding-right: 10px; }
+html.ui-next .nx-conflict-list { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+html.ui-next .nx-ccard { background: #1E1D24; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+html.ui-next .nx-ccard-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+html.ui-next .nx-ccard-top > span:first-child { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+html.ui-next .nx-ccard-top b { font-weight: 600; }
+html.ui-next .nx-gap { font-size: 11px; color: var(--nx-bad-text); white-space: nowrap; }
+html.ui-next .nx-ccard-text { color: var(--nx-text2); font-size: 12.5px; line-height: 1.45; }
+html.ui-next .nx-ccard-fix { color: var(--nx-mint); font-size: 12.5px; line-height: 1.45; }
+html.ui-next .nx-ccard-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* ============================================================
+   4.2 График движения
+   ============================================================ */
+html.ui-next #tab-graph > .controls #newDraftBtnGraph,
+html.ui-next .next-head-tools #newDraftBtnGraph { display: none; }
+html.ui-next :is(#graphFromAC, #graphToAC) { flex: 0 1 200px; width: 200px; min-width: 150px; }
+html.ui-next :is(#graphFromAC, #graphToAC)::before {
+  content: attr(data-tag);
+  position: absolute;
+  left: 10px; top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  padding: 1px 7px;
+  background: var(--text);
+  color: var(--nx-ink);
+  clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+  font: 500 11px/1.4 var(--nx-mono);
+  pointer-events: none;
+}
+html.ui-next :is(#graphFromInput, #graphToInput) { width: 100%; height: 38px; padding: 0 10px 0 38px; border-radius: 10px; font-size: 13px; box-sizing: border-box; }
+html.ui-next #swapStationsBtn { width: 32px; padding: 0; font-size: 15px; }
+
+html.ui-next #tab-graph .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+html.ui-next .nx-graph-bar { gap: 8px; font-weight: 500; overflow: hidden; }
+html.ui-next .nx-legend-slot { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+html.ui-next .nx-legend-slot::-webkit-scrollbar { display: none; }
+html.ui-next .graph-legend { flex-wrap: nowrap; gap: 6px; margin: 0; }
+html.ui-next .graph-legend-item {
+  height: 28px;
+  padding: 0 11px;
+  gap: 7px;
+  border: 0;
+  border-radius: 14px;
+  background: #1E1D24;
+  color: var(--nx-text2);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+html.ui-next .graph-legend-item .rmk.rmk-sm { width: 16px; height: 3px; min-width: 0; border-radius: 2px; clip-path: none; }
+html.ui-next .graph-legend-item.inactive { box-shadow: inset 0 0 0 1px rgba(251, 229, 220, 0.2); }
+html.ui-next .graph-outer-wrap { flex: 1; min-height: 0; max-height: none; border: 0; border-radius: 0; background: transparent; }
+html.ui-next .graph-y-panel { background: transparent; border-right: 0; }
+html.ui-next .graph-wrap { max-height: none; background: transparent; border: 0; border-radius: 0; }
+html.ui-next .graph-gridline { stroke: rgba(251, 229, 220, 0.09); }
+html.ui-next .graph-gridline-minor { stroke: rgba(251, 229, 220, 0.05); }
+html.ui-next .graph-station-label { font-family: var(--nx-font); font-size: 12.5px; font-weight: 500; fill: var(--text); stroke: var(--panel); }
+html.ui-next .graph-conflict-marker { fill: rgba(255, 107, 129, 0.3); stroke: #FF6B81; stroke-width: 2; }
+html.ui-next .graph-conflict-marker:hover { fill: rgba(255, 107, 129, 0.5); }
+html.ui-next .graph-conflict-marker.overtake { fill: rgba(255, 200, 107, 0.3); stroke: #FFC86B; }
+html.ui-next .graph-conflict-link { stroke: rgba(255, 107, 129, 0.5); }
+html.ui-next .graph-wrap.nx-hide-turn .graph-turnaround-link { display: none; }
+html.ui-next .graph-trip-path.chain-hl { filter: drop-shadow(0 0 3px rgba(251, 229, 220, 0.6)); }
+
+/* Панель «Рейс» */
+html.ui-next .nx-trip-panel { display: flex !important; flex-direction: column; width: 330px; flex-shrink: 0; overflow: hidden; }
+html.ui-next .nx-trip-body { flex: 1; min-height: 0; overflow-y: auto; }
+html.ui-next .nx-sec { padding: 12px 16px; border-bottom: 1px solid rgba(251, 229, 220, 0.07); display: flex; flex-direction: column; gap: 8px; }
+html.ui-next .nx-sec.last { border-bottom: 0; }
+html.ui-next .nx-sec h4 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between; }
+html.ui-next .nx-sec h4 .bad { color: var(--nx-bad-text); letter-spacing: 0; }
+html.ui-next .nx-trip-head { display: flex; align-items: center; gap: 12px; }
+html.ui-next .nx-trip-head > span { display: flex; flex-direction: column; line-height: 1.3; min-width: 0; }
+html.ui-next .nx-trip-head b { font-size: 15px; font-weight: 700; }
+html.ui-next .nx-trip-head small { font-size: 12px; color: var(--muted); }
+html.ui-next .nx-row-btns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+html.ui-next .nx-stops { position: relative; }
+html.ui-next .nx-stop { position: relative; display: grid; grid-template-columns: 12px 1fr auto; gap: 12px; align-items: center; height: 30px; font-size: 12.5px; }
+html.ui-next .nx-stop::before { content: ""; position: absolute; left: 5px; top: 0; bottom: 0; width: 2px; background: var(--c); opacity: 0.55; }
+html.ui-next .nx-stop:first-child::before { top: 50%; }
+html.ui-next .nx-stop:last-child::before { bottom: 50%; }
+html.ui-next .nx-stop i { position: relative; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--c); background: var(--panel); box-sizing: border-box; }
+html.ui-next .nx-stop.passed { color: var(--muted); }
+html.ui-next .nx-stop.passed i { background: var(--c); }
+html.ui-next .nx-stop .mono { font-size: 12px; }
+
+/* ============================================================
+   4.3 Станции и маршруты
+   ============================================================ */
+html.ui-next :is(#routeTypeFilter, #routeSourceFilter) { display: none; }
+html.ui-next .nx-sort-btn { display: inline-flex !important; align-items: center; gap: 7px; }
+html.ui-next .nx-sort-btn::before { content: ""; width: 15px; height: 15px; background: currentColor; -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M4 6h10M4 12h7M4 18h4M17 5v14l3-3M17 19l-3-3'/></svg>") center / contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'><path d='M4 6h10M4 12h7M4 18h4M17 5v14l3-3M17 19l-3-3'/></svg>") center / contain no-repeat; }
+html.ui-next .nx-sort-btn.on { background: var(--text); color: var(--nx-ink); }
+html.ui-next #tab-routes .route-table { display: none; }
+html.ui-next .nx-route-groups { display: flex !important; flex: 1; min-height: 0; flex-direction: column; gap: 8px; padding: 12px; overflow-y: auto; }
+html.ui-next .nx-acc { flex-shrink: 0; background: #1E1D24; border-radius: 12px; overflow: hidden; }
+html.ui-next .nx-acch {
+  width: 100%;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px 0 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+}
+html.ui-next .nx-acch:hover { background: var(--nx-hover); }
+html.ui-next .nx-acch .n { font: 400 12px var(--nx-mono); color: var(--muted); }
+html.ui-next .nx-acch .nx-stack { margin-left: 14px; min-width: 0; overflow: hidden; flex-shrink: 1; }
+html.ui-next .nx-acch .nx-stack .nx-rb { height: 18px; min-width: 24px; padding: 0 7px; font-size: 10px; margin-left: -4px; }
+html.ui-next .nx-issues { font-size: 11.5px; font-weight: 400; color: var(--nx-bad-text); }
+html.ui-next .nx-gi { width: 19px; height: 19px; flex-shrink: 0; background: currentColor; -webkit-mask: var(--nx-ic) center / contain no-repeat; mask: var(--nx-ic) center / contain no-repeat; }
+html.ui-next .nx-gi[data-icon="station"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 21V8l6-4v17 M10 21h10V11l-6-3 M14 13h2.5 M14 17h2.5 M6.5 10.5v.01 M6.5 14.5v.01 M3 21h18'/></svg>"); }
+html.ui-next .nx-item .nx-stack { margin-left: 5px; justify-self: start; min-width: 0; max-width: 100%; overflow: hidden; }
+/* у строки станции бейджи занимают обе средние колонки (отклонения у станции нет) */
+html.ui-next .nx-item .nx-stack-wide { grid-column: 3 / 5; }
+html.ui-next .nx-item .nx-cell-skip { display: none; }
+html.ui-next .nx-gi[data-icon="metro"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M6 4h12a2 2 0 0 1 2 2v9a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V6a2 2 0 0 1 2-2z M4 11h16 M8 21l2-3 M16 21l-2-3 M8 14.5v.01 M16 14.5v.01'/></svg>"); }
+html.ui-next .nx-gi[data-icon="tram"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M8 3h8 M12 3v3 M7 6h10a2 2 0 0 1 2 2v8a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V8a2 2 0 0 1 2-2z M5 12h14 M8 21l1.5-2 M16 21l-1.5-2'/></svg>"); }
+html.ui-next .nx-gi[data-icon="bus"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M6 3h12a2 2 0 0 1 2 2v12H4V5a2 2 0 0 1 2-2z M4 11h16 M7 20v-3 M17 20v-3 M7.5 14v.01 M16.5 14v.01'/></svg>"); }
+html.ui-next .nx-gi[data-icon="rail"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M5 21L9 3 M19 21L15 3 M6 17h12 M7 12h10 M8 7.5h8'/></svg>"); }
+html.ui-next .nx-gi[data-icon="draft"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M4 20h4L19 9l-4-4L4 16z M13 7l4 4 M15 20h5'/></svg>"); }
+html.ui-next .nx-gi[data-icon="ship"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 16.5l2.5 4h13l2.5-4z M5 16.5V11h14v5.5 M9 11V7h6v4 M12 3v4'/></svg>"); }
+html.ui-next .nx-gi[data-icon="cable"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M3 3.5l18 5 M12 6v4 M7 10h10a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2z M5 15h14'/></svg>"); }
+html.ui-next .nx-gi[data-icon="plane"] { --nx-ic: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5z'/></svg>"); }
+html.ui-next .nx-chev,
+html.ui-next .nx-chev-r { width: 16px; height: 16px; flex-shrink: 0; background: currentColor; -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>") center / contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'><path d='M6 9l6 6 6-6'/></svg>") center / contain no-repeat; }
+html.ui-next .nx-acc.open .nx-chev { transform: rotate(180deg); }
+html.ui-next .nx-chev-r { width: 14px; height: 14px; color: var(--muted); transform: rotate(-90deg); }
+html.ui-next .nx-acc-body { padding-top: 4px; }
+html.ui-next .nx-colh,
+html.ui-next .nx-item { display: grid; grid-template-columns: minmax(0, 1.6fr) 90px 110px minmax(0, 1fr) 70px 24px; align-items: center; gap: 14px; padding: 0 16px 0 18px; }
+html.ui-next .nx-colh { padding-bottom: 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+html.ui-next .nx-item { height: 46px; border-top: 1px solid var(--nx-line-soft); cursor: pointer; }
+html.ui-next .nx-item:hover { background: var(--nx-hover); }
+html.ui-next .nx-item.sel { background: rgba(214, 255, 246, 0.07); box-shadow: inset 3px 0 0 var(--accent); }
+html.ui-next .nx-item .r,
+html.ui-next .nx-colh .r { text-align: right; }
+html.ui-next .nx-item-name { display: flex; align-items: center; gap: 12px; min-width: 0; }
+html.ui-next .nx-item-name > span:last-child { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+html.ui-next .nx-item-name b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .nx-item-name small { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .nx-star { display: inline-block; width: 11px; height: 11px; background: var(--accent); -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'/></svg>") center / contain no-repeat; mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='black' d='M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8-4.3-4.1 5.9-.8z'/></svg>") center / contain no-repeat; }
+html.ui-next .nx-bar { height: 6px; border-radius: 3px; background: var(--panel); overflow: hidden; }
+html.ui-next .nx-bar > span { display: block; height: 100%; border-radius: 3px; }
+
+/* Карточка маршрута: всплывающее окно по центру (макет «7 · Карточка маршрута»):
+   шапка с действиями | слева паспорт 330px | справа вкладки. Разметка — nextRouteCardHtml */
+html.ui-next .modal-overlay { background: rgba(5, 5, 8, 0.72); }
+html.ui-next .modal { max-width: min(1280px, calc(100vw - 64px)); max-height: calc(100vh - 64px); border: var(--nx-frame); border-radius: 16px; background: var(--panel); }
+html.ui-next #routeModalOverlay {
+  padding: 24px;
+  box-sizing: border-box;
+  background: rgba(6, 5, 10, 0.62);
+  -webkit-backdrop-filter: blur(3px);
+          backdrop-filter: blur(3px);
+  align-items: center;
+  justify-content: center;
+  z-index: 400;
+}
+html.ui-next #routeModalOverlay .modal {
+  width: 1180px;
+  max-width: 100%;
+  height: min(840px, 100%);
+  max-height: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 18px;
+  border-color: rgba(214, 255, 246, 0.09);
+  box-sizing: border-box;
+  box-shadow: 0 30px 80px rgba(4, 2, 16, 0.7), 0 0 0 1px rgba(0, 0, 0, 0.4);
+}
+html.ui-next #routeModalBody { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+html.ui-next #routeModalBody > p.hint { margin: 24px; }
+html.ui-next #routeModalClose { top: 14px; right: 14px; width: 34px; height: 34px; padding: 0; border-radius: 9px; background: transparent; color: var(--nx-soft); z-index: 2; }
+html.ui-next #routeModalClose:hover { background: #1E1D24; color: var(--text); }
+
+html.ui-next .nxc { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+html.ui-next .nxc-hd { display: flex; gap: 16px; align-items: flex-start; padding: 18px 60px 14px 22px; border-bottom: 1px solid rgba(251, 229, 220, 0.08); }
+html.ui-next .nxc-hd > .rmk-lg { height: 48px; min-width: 64px; font-size: 22px; flex-shrink: 0; }
+html.ui-next .nxc-title { flex: 1; min-width: 0; }
+html.ui-next .nxc-title-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+html.ui-next .nxc-title h2 { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.015em; }
+html.ui-next .nxc .nx-card-sub { padding: 4px 0 0; }
+html.ui-next .nxc-chip { font: 400 11px var(--nx-mono); padding: 2px 8px; border-radius: 9px; white-space: nowrap; }
+html.ui-next .nxc-chip.live { background: rgba(214, 255, 246, 0.1); color: var(--nx-mint); }
+html.ui-next .nxc-chip.edit { background: rgba(255, 230, 107, 0.12); color: var(--nx-edited); }
+html.ui-next .nxc-chip.draft { background: rgba(246, 131, 73, 0.14); color: var(--accent); }
+html.ui-next .nxc-actions { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+html.ui-next .nxc-actions button { height: 32px; padding: 0 13px; border-radius: 9px; font-size: 12.5px; font-weight: 500; }
+html.ui-next .nxc-actions button:disabled { opacity: 0.4; }
+html.ui-next .nxc-actions .danger-btn { background: transparent; color: var(--nx-bad-text); box-shadow: inset 0 0 0 1px rgba(255, 107, 129, 0.35); }
+html.ui-next .nxc-actions .danger-btn:hover { background: rgba(255, 107, 129, 0.1); }
+html.ui-next .nxc-fill { flex: 1; }
+html.ui-next .nxc #toggleFavoriteRouteBtn { width: 34px; height: 34px; padding: 0; border-radius: 9px; background: transparent; color: var(--accent) !important; font-size: 18px !important; flex-shrink: 0; }
+html.ui-next .nxc #toggleFavoriteRouteBtn:hover { background: #1E1D24; }
+
+html.ui-next .nxc-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 330px minmax(0, 1fr); }
+html.ui-next .nxc-side { border-right: 1px solid rgba(251, 229, 220, 0.08); overflow: auto; padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+html.ui-next .nxc-side .nx-kpis4 { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; border: 0; }
+html.ui-next .nxc-block[hidden] { display: none; }
+html.ui-next .nxc-cap { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+html.ui-next .nxc-cap > span { letter-spacing: 0; text-transform: none; font-weight: 500; font-family: var(--nx-mono); color: var(--nx-text2); }
+html.ui-next .nxc-cap > .live { color: var(--nx-mint); }
+/* полоса линии: рельс цвета маршрута, станции, поезда с отклонением */
+html.ui-next .nxc-strip { position: relative; height: 70px; margin: 0; padding: 0 20px; border-radius: 10px; background: #1E1D24; }
+html.ui-next .nxc-track { position: absolute; inset: 0 20px; }
+html.ui-next .nxc-rail { position: absolute; left: 20px; right: 20px; top: 32px; height: 5px; border-radius: 3px; background: var(--line); }
+html.ui-next .nxc-st,
+html.ui-next .nxc-train { position: absolute; }
+html.ui-next .nxc-st { top: 27.5px; width: 14px; height: 14px; transform: translateX(-50%); border-radius: 50%; background: var(--text); border: 3px solid var(--line); box-sizing: border-box; }
+html.ui-next .nxc-train { top: 6px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; z-index: 1; }
+html.ui-next .nxc-train b { font: 500 10px var(--nx-mono); padding: 2px 6px; background: var(--c); color: var(--nx-ink); clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%); white-space: nowrap; }
+html.ui-next .nxc-train::after { content: ""; border: 4px solid transparent; border-top: 5px solid var(--c); border-bottom: 0; }
+html.ui-next .nxc-end { position: absolute; top: 49px; max-width: 45%; font-size: 10.5px; color: var(--nx-soft2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .nxc-end.l { left: 10px; }
+html.ui-next .nxc-end.r { right: 10px; text-align: right; }
+html.ui-next #nxcConsist { padding: 8px 10px; border-radius: 10px; background: #1E1D24; overflow-x: auto; }
+html.ui-next #nxcConsist .train-diagram-wrap { display: block; margin: 0; }
+html.ui-next .nxc-meta { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px 14px; margin: 0; font-size: 12.5px; }
+html.ui-next .nxc-meta dt { color: var(--muted); }
+html.ui-next .nxc-meta dd { margin: 0; text-align: right; color: var(--nx-text2); }
+
+html.ui-next .nxc-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+html.ui-next .nxc-tabs { display: flex; gap: 2px; padding: 8px 16px 0; border-bottom: 1px solid rgba(251, 229, 220, 0.08); overflow-x: auto; flex-shrink: 0; }
+html.ui-next .nxc-tab { position: relative; height: 40px; padding: 0 14px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+html.ui-next .nxc-tab:hover { background: transparent; color: var(--text); }
+html.ui-next .nxc-tab.on { color: var(--text); }
+html.ui-next .nxc-tab.on::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: -1px; height: 2px; border-radius: 2px; background: var(--accent); }
+html.ui-next .nxc-tab .n { font: 400 11px var(--nx-mono); padding: 1px 7px; border-radius: 9px; background: #1E1D24; color: var(--nx-soft); }
+html.ui-next .nxc-tab .n.bad { background: rgba(255, 107, 129, 0.18); color: var(--nx-bad-text); }
+html.ui-next .nxc-pane { display: none; flex: 1; min-height: 0; overflow: auto; padding: 16px; flex-direction: column; gap: 10px; }
+html.ui-next .nxc[data-tab="tt"] [data-pane="tt"],
+html.ui-next .nxc[data-tab="stops"] [data-pane="stops"],
+html.ui-next .nxc[data-tab="live"] [data-pane="live"],
+html.ui-next .nxc[data-tab="conf"] [data-pane="conf"] { display: flex; }
+html.ui-next .nxc-pane[data-pane="tt"] { overflow: hidden; }
+html.ui-next .nxc-tt-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12.5px; color: var(--muted); flex-shrink: 0; }
+html.ui-next .nxc-tt-head button { height: 28px; padding: 0 12px; border-radius: 9px; font-size: 12px; flex-shrink: 0; }
+html.ui-next .nxc-pane > .hint { margin: 0; }
+
+/* таблицы внутри окна: тёмная подложка, моно-цифры */
+html.ui-next .nxc .timetable-scroll { flex: 1; min-height: 120px; max-height: none; margin: 0; border: 0; border-radius: 12px; background: #1E1D24; }
+html.ui-next .nxc :is(.timetable-scroll, .nxc-tbl) table { width: 100%; border: 0; border-collapse: separate; border-spacing: 0; background: transparent; }
+html.ui-next .nxc :is(.timetable-scroll, .nxc-tbl) :is(th, td) { height: 32px; padding: 0 12px; font-size: 12px; border: 0; border-bottom: 1px solid var(--nx-line-soft); white-space: nowrap; }
+html.ui-next .nxc :is(.timetable-scroll, .nxc-tbl) td { font-family: var(--nx-mono); text-align: right; }
+html.ui-next .nxc :is(.timetable-scroll, .nxc-tbl) th { color: var(--muted); font-weight: 500; text-align: right; background: #1E1D24; }
+/* z-index/position ячеек — из style.css (закрепление шапки и первого столбца делает JS через transform) */
+html.ui-next .nxc .timetable-scroll .station-col { text-align: left; color: var(--nx-text2); font-family: var(--nx-font); font-weight: 500; background: #1E1D24; }
+html.ui-next .nxc .timetable-deviation-row td { background: #1E1D24 !important; font-weight: 500; }
+html.ui-next .nxc .timetable-deviation-row td.station-col { color: var(--muted); font-weight: 400; }
+html.ui-next .nxc .timetable-scroll .tt-cur { background: #26252E; }
+html.ui-next .nxc .timetable-scroll td.tt-passed { color: #6F6460; }
+html.ui-next .nxc .timetable-scroll td.tt-has-conflict { background: rgba(255, 107, 129, 0.14) !important; box-shadow: inset 0 0 0 1.5px var(--red); }
+html.ui-next .nxc .timetable-scroll .timetable-cell-edited { border: 0 !important; border-bottom: 1px solid var(--nx-line-soft) !important; color: inherit !important; outline: 1.5px dashed rgba(255, 230, 107, 0.75); outline-offset: -4px; }
+html.ui-next .nxc .timetable-scroll th.timetable-cell-edited { outline: 0; box-shadow: inset 0 -2px 0 var(--nx-edited); color: var(--nx-edited) !important; }
+html.ui-next .nxc .timetable-scroll .tt-has-conflict.timetable-cell-edited { outline: 0; }
+html.ui-next .nxc .tt-conflict-icon { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; margin-right: 6px; border-radius: 50%; background: var(--red); color: #1A0710; font: 700 9px/1 var(--nx-font); vertical-align: 1px; }
+html.ui-next .nxc .cell-edited-label { display: none; }
+html.ui-next .nxc .nxc-tbl { border-radius: 12px; background: #1E1D24; overflow: auto; }
+html.ui-next .nxc .nxc-tbl :is(th, td):first-child { text-align: left; }
+html.ui-next .nxc .nxc-tbl :is(th, td):nth-child(2),
+html.ui-next .nxc .nxc-tbl .nxc-tl { text-align: left; font-family: var(--nx-font); }
+html.ui-next .nxc [data-pane="stops"] tr.clickable-row { cursor: pointer; }
+html.ui-next .nxc [data-pane="stops"] tr.clickable-row:hover td { background: #26252E; }
+html.ui-next .nxc [data-pane="stops"] .nxc-tbl :is(th, td):nth-child(3) { text-align: left; }
+html.ui-next .nxc .copy-icon-btn { width: 24px; height: 24px; padding: 0; border-radius: 6px; background: transparent; color: var(--nx-soft); }
+html.ui-next .nxc .copy-icon-btn:hover { background: var(--nx-raised-hover); color: var(--text); }
+html.ui-next .nxc [data-pane="live"] > h4 { margin: 6px 0 0; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+html.ui-next .nxc .live-trips-table { width: 100%; border-radius: 12px; background: #1E1D24; }
+html.ui-next .nxc-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 11.5px; color: var(--muted); flex-shrink: 0; }
+html.ui-next .nxc-legend[hidden] { display: none; }
+html.ui-next .nxc-legend > span { display: inline-flex; align-items: center; gap: 7px; }
+html.ui-next .nxc-legend .muted { color: #7E716D; }
+html.ui-next .nxc-legend .sw { display: inline-block; width: 16px; height: 11px; transform: skewX(-11deg); background: #3A3846; }
+html.ui-next .nxc-legend .sw.conflict { box-shadow: 0 0 0 2px var(--red); }
+html.ui-next .nxc-legend .sw.edited { outline: 2px dashed var(--nx-edited); outline-offset: 1px; }
+html.ui-next .nxc-legend .sw.cur { background: #26252E; box-shadow: inset 0 0 0 1px rgba(251, 229, 220, 0.2); }
+html.ui-next .nxc .formula-block,
+html.ui-next .nxc [data-pane="tt"] > :is(div, ul):last-child:not(.nxc-legend) { flex-shrink: 0; }
+/* конфликты маршрута — вкладка, заголовок не нужен */
+html.ui-next .nxc .nx-card-conflicts { padding: 0; border: 0; }
+html.ui-next .nxc .nx-card-conflicts h4 { display: none; }
+html.ui-next .nx-card-conflicts { display: flex !important; flex-direction: column; gap: 8px; }
+html.ui-next .nx-crow { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: #1E1D24; }
+html.ui-next .nx-crow > span { display: flex; align-items: center; gap: 9px; min-width: 0; }
+html.ui-next .nx-crow b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .nx-crow .muted { color: var(--muted); font-family: var(--nx-mono); }
+html.ui-next .nx-crow > .nx-crow-btns { display: flex; gap: 6px; flex-shrink: 0; }
+html.ui-next .nx-crow .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html.ui-next .nx-kpis4 { display: grid !important; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+html.ui-next .nx-kpi { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; background: #1E1D24; }
+html.ui-next .nx-kpi span { font-size: 11.5px; color: var(--muted); }
+html.ui-next .nx-kpi b { font: 500 19px var(--nx-mono); }
+html.ui-next .nx-card-sub { display: block !important; font-size: 12.5px; color: var(--muted); }
+
+/* Метки маршрутов в новом виде: параллелограмм как бейдж макета (20px, DM Mono 11) */
+html.ui-next .rmk-parallelogram.rmk-md { height: 20px; min-width: 28px; padding: 0 9px; clip-path: var(--nx-cut); }
+html.ui-next .rmk-parallelogram.rmk-md b { font: 500 11px var(--nx-mono); }
+html.ui-next .rmk-parallelogram.rmk-lg b { font-family: var(--nx-mono); font-weight: 500; }
+
+/* ============================================================
+   4.4 Задержки и проблемы
+   ============================================================ */
+html.ui-next .nx-problems-tools .nx-seg { display: inline-flex; }
+html.ui-next #problemsContent {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 8px;
+}
+html.ui-next #problemsContent > p.hint { grid-column: 1 / -1; }
+html.ui-next .nx-pkpis { display: grid !important; grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+html.ui-next .nx-pkpi { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; padding: 16px 20px; border: var(--nx-frame); border-radius: var(--nx-radius); background: var(--panel); }
+html.ui-next .nx-pkpi span { display: block; font-size: 12.5px; color: var(--muted); }
+html.ui-next .nx-pkpi b { display: block; margin-top: 6px; font: 500 38px/1.05 var(--nx-mono); }
+html.ui-next .nx-pkpi small { font-size: 12px; line-height: 1.4; text-align: right; color: var(--nx-soft2); }
+html.ui-next .problems-section { margin: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+html.ui-next .problems-section-header {
+  height: 48px;
+  flex-shrink: 0;
+  gap: 10px;
+  padding: 0 12px 0 16px;
+  border-bottom: 1px solid var(--nx-line);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: default;
+  justify-content: flex-start;
+}
+html.ui-next .problems-section-header:hover { background: transparent; }
+html.ui-next .problems-chevron { display: none; }
+html.ui-next .problems-count-badge { padding: 2px 8px; border-radius: 10px; background: rgba(255, 107, 129, 0.16); color: var(--nx-bad-text); font: 400 11px var(--nx-mono); }
+html.ui-next #ps-delayed-now .problems-count-badge { background: rgba(255, 200, 107, 0.15); color: var(--nx-warn-text); }
+html.ui-next #ps-delays .problems-count-badge { background: #1E1D24; color: var(--muted); }
+html.ui-next .problems-section-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px; }
+html.ui-next .problems-grid,
+html.ui-next .problems-section:not(.open) .problems-grid { display: flex; flex-direction: column; gap: 8px; max-height: none; overflow: visible; }
+html.ui-next .problem-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 11px 13px;
+  border: 0 !important;
+  border-radius: 11px;
+  background: #1E1D24;
+}
+html.ui-next .problem-card:hover { background: var(--nx-hover); }
+html.ui-next .problem-card-name { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 13.5px; font-weight: 600; min-width: 0; }
+html.ui-next .problem-card-sub { font-size: 12px; color: var(--nx-soft2); }
+html.ui-next .nx-pbtns { display: flex; gap: 6px; }
+html.ui-next .nx-pbtns .next-only { display: inline-flex !important; align-items: center; }
+html.ui-next .problem-fix-btn { height: 28px; padding: 0 13px; border: 0; border-radius: 9px; background: var(--nx-raised-hover); color: var(--text); font-size: 12px; }
+/* «Сейчас опаздывают»: крупное отклонение справа */
+html.ui-next #ps-delayed-now .problem-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+html.ui-next #ps-delayed-now .problem-card-sub { grid-column: 2; grid-row: 1; font: 500 18px var(--nx-mono); }
+html.ui-next .problem-card-sub.dev-late,
+html.ui-next .problem-card-sub.dev-pos { color: var(--nx-warn-text); }
+
+/* ============================================================
+   4.5 Схема сети и 4.6 Генераторы табло (вкладка «Редактор»)
+   ============================================================ */
+html.ui-next .board-mode-switch { display: none; }
+html.ui-next #tab-board.active { overflow-y: auto; }
+/* Схема: тулбар + холст слева одной панелью, свойства 312px справа на всю высоту.
+   .scheme-layout — display: contents, его дети встают в сетку режима */
+html.ui-next #boardModeScheme:not([style*="none"]) {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 312px;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  column-gap: 8px;
+}
+html.ui-next #boardModeScheme > p.hint:first-child { display: none; }
+html.ui-next #boardModeScheme .board-toolbar { grid-column: 1; grid-row: 1; }
+html.ui-next #schemeStatus { grid-column: 1; grid-row: 2; }
+html.ui-next #boardModeScheme .board-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 7px 12px 7px 16px;
+  border-bottom: 1px solid var(--nx-line);
+  border-radius: var(--nx-radius) var(--nx-radius) 0 0;
+}
+html.ui-next .board-toolbar-group { gap: 8px; }
+html.ui-next .board-sections { color: var(--muted); font-size: 12px; gap: 7px; }
+html.ui-next .board-sections select { height: 32px; padding: 0 8px; font-size: 12.5px; }
+html.ui-next #schemeGenerateBtn { order: -1; background: var(--text); color: var(--nx-ink); font-weight: 600; }
+html.ui-next #schemeGenerateBtn:hover { background: #fff; }
+html.ui-next label:has(#schemeLiveToggle) { color: var(--nx-mint); }
+html.ui-next #schemeStatus { margin: 0; padding: 4px 16px; background: var(--panel); border-left: var(--nx-frame); border-right: var(--nx-frame); }
+html.ui-next #schemeStatus:empty { display: none; }
+html.ui-next .scheme-layout { display: contents; }
+html.ui-next .scheme-canvas { grid-column: 1; grid-row: 3; min-height: 360px; border: var(--nx-frame); border-top: 0; border-radius: 0 0 var(--nx-radius) var(--nx-radius); }
+html.ui-next .scheme-tools {
+  position: absolute;
+  left: 12px; top: 55%;
+  z-index: 5;
+  transform: translateY(-50%);
+  gap: 3px;
+  padding: 6px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--panel);
+  box-shadow: 0 12px 30px rgba(36, 22, 81, 0.35);
+}
+html.ui-next .scheme-tools .icon-btn { width: 40px; height: 40px; padding: 0; border-radius: 9px; background: transparent; color: var(--nx-soft2); display: flex; align-items: center; justify-content: center; }
+html.ui-next .scheme-tools .icon-btn:hover { background: var(--nx-raised-hover); color: var(--text); }
+html.ui-next #tab-board .scheme-tools .icon-btn.active { background: var(--accent); color: var(--nx-ink); outline: 0; }
+html.ui-next .scheme-tools-sep { width: auto; margin: 3px 6px; background: rgba(251, 229, 220, 0.16); align-self: stretch; }
+html.ui-next .scheme-zoom { left: 12px; right: auto; bottom: 12px; display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: var(--panel); opacity: 1; }
+html.ui-next .scheme-zoom .board-zoom-btn { width: 32px; height: 30px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--nx-soft); }
+html.ui-next .scheme-zoom .board-zoom-btn:hover { background: #1E1D24; color: var(--text); }
+html.ui-next .scheme-zoom .board-zoom-label { width: 46px; text-align: center; font: 400 12px var(--nx-mono); color: var(--text); }
+html.ui-next .scheme-tool-hint { left: auto; right: 12px; top: 12px; bottom: auto; max-width: 55%; padding: 6px 10px; background: var(--panel); color: var(--nx-soft); border-radius: 10px; font-size: 11.5px; line-height: 1.45; }
+html.ui-next .scheme-tool-hint { display: none; }
+html.ui-next #boardModeScheme:has(#schemeLiveToggle:checked) .nx-scheme-legend {
+  display: flex !important;
+  position: absolute;
+  right: 12px; bottom: 12px;
+  gap: 14px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--panel);
+  font-size: 12px;
+}
+html.ui-next .lg-ring { width: 9px; height: 9px; border-radius: 50%; border: 2px solid var(--red); box-sizing: border-box; }
+html.ui-next .nx-scheme-legend .lg-late { width: 14px; height: 5px; border-radius: 3px; }
+html.ui-next .scheme-props { grid-column: 2; grid-row: 1 / 4; min-height: 0; padding: 6px 16px 16px; border: var(--nx-frame); border-radius: var(--nx-radius); gap: 10px; }
+html.ui-next .scheme-props-title { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
+html.ui-next .scheme-props input:not([type="checkbox"]):not([type="color"]):not([type="range"]),
+html.ui-next .scheme-props select { height: 34px; }
+
+html.ui-next #boardModeTimetable .board-toolbar { padding: 8px 10px; margin-bottom: 8px; }
+html.ui-next .board-tool-caption { color: var(--muted); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+html.ui-next .board-zoom-controls { background: var(--panel); border-radius: 18px; padding: 3px; opacity: 0.9; }
+html.ui-next .board-zoom-label { color: var(--text); }
+
+/* ============================================================
+   4.7 Настройки: карточки в колонках (masonry), без своего меню —
+   разделы и так видны целиком, а боковое меню приложения уже есть
+   ============================================================ */
+html.ui-next #tab-settings.active { display: flex; flex-direction: column; overflow-y: auto; }
+html.ui-next #tab-settings > .settings-cards { flex: 1 0 auto; }
+/* колонки — на обёртке без высоты: у панели фиксированная высота, и колонки уезжали бы вбок */
+html.ui-next .settings-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: stretch;
+}
+html.ui-next .settings-cards > .settings-block {
+  display: flex;
+  flex-direction: column;
+}
+/* широкий экран: «Метки маршрутов» (самая высокая) — правая колонка на всю высоту,
+   остальные карточки — две колонки слева, всё помещается без прокрутки */
+@media (min-width: 1200px) {
+  html.ui-next .settings-cards { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.25fr);
+    /* свободная высота делится между рядами карточек, подвал остаётся по содержимому */
+    grid-template-rows: repeat(4, minmax(auto, 1fr)) auto;
+  }
+  html.ui-next .settings-cards > .settings-block:nth-child(1) { grid-column: 1; grid-row: 1; }
+  html.ui-next .settings-cards > .settings-block:nth-child(2) { grid-column: 2; grid-row: 1; }
+  html.ui-next .settings-cards > .settings-block:nth-child(3) { grid-column: 2; grid-row: 2; }
+  html.ui-next .settings-cards > .settings-block:nth-child(4) { grid-column: 1; grid-row: 2 / span 2; }
+  html.ui-next .settings-cards > .settings-block:nth-child(5) { grid-column: 2; grid-row: 3; }
+  html.ui-next .settings-cards > .settings-block:nth-child(6) { grid-column: 3; grid-row: 1 / span 4; }
+  html.ui-next .settings-cards > .settings-block:nth-child(7) { grid-column: 1; grid-row: 4; }
+  html.ui-next .settings-cards > .settings-block:nth-child(8) { grid-column: 2; grid-row: 4; }
+}
+/* версия и кнопки обновлений — подвал на всю ширину */
+html.ui-next .settings-cards > .settings-footer {
+  grid-column: 1 / -1;
+  flex-direction: row;
+  padding: 12px 18px;
+}
+html.ui-next .settings-cards > .settings-footer #appVersionLabel { margin-right: auto; }
 html.ui-next .settings-block {
   max-width: none;
   margin: 0;
-  padding: 16px 18px;
-  border: 1px solid rgba(214, 255, 246, 0.07);
-  border-radius: var(--nx-radius);
-  background: var(--panel);
+  padding: 0 18px 16px;
+  gap: 14px;
+  scroll-margin-top: 0;
 }
-html.ui-next .settings-block > label:first-child { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+html.ui-next .settings-block > label:first-child {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  margin: 0 -18px 2px;
+  padding: 0 18px;
+  border-bottom: 1px solid rgba(251, 229, 220, 0.08);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+/* карточка без заголовка (примечание, версия) — просто тело */
+html.ui-next .settings-block:not(:has(> label:first-child)) { padding-top: 16px; }
+html.ui-next .settings-block select,
+html.ui-next .settings-block input[type="text"] { height: 34px; padding: 0 10px; font-size: 12.5px; }
+html.ui-next .settings-block .hint.small { font-size: 12px; line-height: 1.5; margin: 0; }
+/* Переключатели 36×20: вкл — оранжевый с тёмным кругом, выкл — с контуром */
+html.ui-next .settings-block .switch-row { justify-content: space-between; flex-direction: row-reverse; gap: 16px; padding: 0; font-size: 13px; color: var(--text); }
+html.ui-next .settings-block .switch-row input[type="checkbox"] {
+  -webkit-appearance: none;
+          appearance: none;
+  position: relative;
+  width: 36px; height: 20px;
+  margin: 0;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 10px;
+  background: #1E1D24;
+  box-shadow: inset 0 0 0 1px rgba(251, 229, 220, 0.2);
+  cursor: pointer;
+}
+html.ui-next .settings-block .switch-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px; left: 3px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: left 0.15s;
+}
+html.ui-next .settings-block .switch-row input[type="checkbox"]:checked { background: var(--accent); box-shadow: none; }
+html.ui-next .settings-block .switch-row input[type="checkbox"]:checked::after { left: 19px; background: var(--panel); }
 
-/* Узкое окно: меню превращается в полосу сверху */
+/* Инструкции и прочее */
+html.ui-next #tab-instructions.active,
+html.ui-next #tab-routes.active { overflow: hidden; }
+html.ui-next #tab-instructions.active { overflow-y: auto; }
+html.ui-next .instructions-list { display: flex; flex-direction: column; gap: 8px; }
+html.ui-next th { color: var(--muted); letter-spacing: 0.06em; }
+html.ui-next tr:hover td { background: rgba(251, 229, 220, 0.025); }
+html.ui-next tr.clickable-row:hover td { background: rgba(41, 39, 65, 0.5); }
+
+/* ---------- Узкое окно: меню полосой сверху, колонки стопкой ---------- */
 @media (max-width: 900px) {
-  html.ui-next body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); }
+  html.ui-next body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); overflow: auto; height: auto; min-height: 100vh; }
   html.ui-next nav.tabs { grid-column: 1; grid-row: 1; flex-direction: row; overflow-x: auto; padding: 6px; }
-  html.ui-next .next-brand { display: none !important; }
+  html.ui-next .next-brand,
+  html.ui-next .next-nav-group,
+  html.ui-next .next-favs { display: none !important; }
   html.ui-next .tab-btn[data-tab="instructions"] { margin-top: 0; }
-  html.ui-next .topbar { grid-column: 1; grid-row: 2; }
-  html.ui-next main { grid-column: 1; grid-row: 3; }
+  html.ui-next .tab-btn:is([data-tab="schedule"], [data-tab="graph"]) { padding-left: 10px; height: 38px; }
+  html.ui-next .topbar { grid-column: 1; grid-row: 2; flex-wrap: wrap; }
+  html.ui-next .next-head-tools { flex-wrap: wrap; margin-left: 0; }
+  html.ui-next .next-head-tools > .controls { flex-wrap: wrap; }
+  html.ui-next :is(#stationAC, #routeSearch, #graphFromAC, #graphToAC) { width: 100%; }
+  html.ui-next main { grid-column: 1; grid-row: 3; overflow: visible; }
+  html.ui-next .layout-with-sidebar,
+  html.ui-next #tab-schedule .main-area { flex-direction: column; }
+  html.ui-next .sidebar,
+  html.ui-next .board-side,
+  html.ui-next .nx-trip-panel { width: auto; }
+  html.ui-next .board-panel { min-height: 420px; }
+  html.ui-next #problemsContent,
+  html.ui-next .nx-pkpis { grid-template-columns: minmax(0, 1fr); }
+  html.ui-next .settings-cards { grid-template-columns: minmax(0, 1fr); }
+  html.ui-next .settings-cards > .settings-block { grid-column: auto !important; }
+  html.ui-next .nx-colh,
+  html.ui-next .nx-item { grid-template-columns: minmax(0, 1fr) 70px 24px; }
+  html.ui-next .nx-colh > :nth-child(2), html.ui-next .nx-colh > :nth-child(3), html.ui-next .nx-colh > :nth-child(4),
+  html.ui-next .nx-item > :nth-child(2), html.ui-next .nx-item > :nth-child(3), html.ui-next .nx-item > :nth-child(4) { display: none; }
+  html.ui-next #routeModalOverlay { padding: 0; }
+  html.ui-next #routeModalOverlay .modal { height: 100%; border-radius: 0; }
+  html.ui-next .nxc-body { grid-template-columns: minmax(0, 1fr); overflow: auto; }
+  html.ui-next .nxc-side { border-right: 0; border-bottom: 1px solid rgba(251, 229, 220, 0.08); overflow: visible; }
+  html.ui-next .nxc-pane[data-pane="tt"] { min-height: 420px; }
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  html.ui-next #problemsContent,
+  html.ui-next .nx-pkpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -619,172 +619,20 @@ const BoardEditor = (function () {
     }
   }
 
-  // ── Схема маршрутов станции (линейная карта) ────────────────────────────
-  // Ствол — самый длинный маршрут через станцию, рисуется вертикально со
-  // всеми станциями. Остальные маршруты через станцию — ветки: общий со
-  // стволом участок не дублируется, после точки расхождения ветка уходит
-  // кривой в боковую «полосу» и рисуется до своей конечной. Красным с
-  // кружком выделяются пересадочные (через них проходит ≥2 маршрутов) и
-  // конечные станции; обычные — серые с прямоугольной засечкой. Добавляется
-  // как НАБОР отдельных объектов, чтобы пользователь мог править поштучно.
+  // ── Схема станции ───────────────────────────────────────────────────────
+  // Строится движком «Схемы сети» только из маршрутов через выбранную станцию
+  // и открывается там как новая схема: пользователь правит видимость маршрутов,
+  // цвета и т.д., а кнопка «В табло» возвращает её сюда картинкой.
   async function insertStationScheme() {
     if (!selectedStationId) { setStatus(tt("boardSelectStationFirst")); return; }
+    if (!window.NetworkScheme || typeof window.NetworkScheme.createStationScheme !== "function") {
+      setStatus(tt("boardSchemeError"));
+      return;
+    }
     setStatus(tt("boardLoadingSchedule"));
     try {
-      const [routesMap, stations] = await Promise.all([fetchRoutesCached(), fetchStationsCached()]);
-      const stName = new Map(stations.map((s) => [s.id, s.name]));
-
-      // Маршруты с известным списком станций; прямой/обратный — одна линия
-      // (dedup по канонич. ключу последовательности станций).
-      const groups = new Map();
-      for (const r of routesMap.values()) {
-        const ids = r.stationIds || [];
-        if (ids.length < 2) continue;
-        const fwd = ids.join("|"), rev = ids.slice().reverse().join("|");
-        const key = fwd < rev ? fwd : rev;
-        if (!groups.has(key)) groups.set(key, { ids, route: r });
-      }
-      const all = [...groups.values()];
-
-      // Число линий через каждую станцию — для пометки пересадочных
-      const linesPerStation = new Map();
-      for (const g of all) {
-        for (const id of new Set(g.ids)) linesPerStation.set(id, (linesPerStation.get(id) || 0) + 1);
-      }
-
-      const through = all.filter((g) => g.ids.includes(selectedStationId));
-      if (!through.length) { setStatus(tt("boardSchemeError")); return; }
-      through.sort((a, b) => b.ids.length - a.ids.length);
-      const trunk = through[0].ids;
-      const trunkIdx = new Map(trunk.map((id, i) => [id, i]));
-
-      // Ветки: ориентируем по стволу, находим общий участок и хвосты
-      // до/после него (до конечной ветки).
-      const branches = [];
-      for (const g of through.slice(1)) {
-        let ids = g.ids;
-        const shared = ids.filter((id) => trunkIdx.has(id));
-        if (shared.length === ids.length) continue; // целиком внутри ствола
-        if (shared.length >= 2 && trunkIdx.get(shared[0]) > trunkIdx.get(shared[shared.length - 1])) {
-          ids = ids.slice().reverse();
-        }
-        let first = -1, last = -1;
-        ids.forEach((id, i) => { if (trunkIdx.has(id)) { if (first < 0) first = i; last = i; } });
-        if (first < 0) continue;
-        // Хвост после расхождения (вниз) и «голова» до входа на ствол (вверх)
-        if (last < ids.length - 1) branches.push({ junction: ids[last], tail: ids.slice(last + 1), dir: 1 });
-        if (first > 0) branches.push({ junction: ids[first], tail: ids.slice(0, first).reverse(), dir: -1 });
-      }
-
-      // ── Геометрия ──
-      const ROW = 36, LANE_GAP = 78, NAME_W = 170;
-      const stroke = "#3a3f45", grey = "#3f4348", red = "#c1272d";
-      const items = [];
-      let minRow = 0, maxRow = trunk.length - 1;
-
-      // Распределение веток по боковым полосам без пересечений
-      const lanes = { 1: [], "-1": [] }; // side → массив занятых интервалов по полосам
-      const placed = [];
-      branches.forEach((b, bi) => {
-        const jRow = trunkIdx.get(b.junction);
-        const r0 = b.dir > 0 ? jRow : jRow - b.tail.length;
-        const r1 = b.dir > 0 ? jRow + b.tail.length : jRow;
-        const side = bi % 2 === 0 ? 1 : -1;
-        const sideLanes = lanes[side];
-        let lane = 0;
-        for (; lane < sideLanes.length; lane++) {
-          if (!sideLanes[lane].some(([a, z]) => r0 <= z + 1 && r1 >= a - 1)) break;
-        }
-        if (lane === sideLanes.length) sideLanes.push([]);
-        sideLanes[lane].push([r0, r1]);
-        placed.push({ ...b, side, lane, jRow });
-        minRow = Math.min(minRow, r0);
-        maxRow = Math.max(maxRow, r1);
-      });
-
-      // Ствол отступает от левого края на ширину подписей и левых полос
-      // веток; верхний отступ — по самой высокой ветке (minRow может быть <0)
-      const lanesL = lanes["-1"].length, lanesR = lanes["1"].length;
-      const TRUNK_X = 24 + NAME_W + 14 + lanesL * LANE_GAP;
-      const oy = 40 - minRow * ROW;
-      const rowY = (row) => oy + row * ROW;
-
-      // Фон-«зебра»: чередующиеся серые полосы каждые 5 рядов
-      const bgL = TRUNK_X - NAME_W - 14 - lanesL * LANE_GAP - 10;
-      const bgR = TRUNK_X + NAME_W + 14 + lanesR * LANE_GAP + 10;
-      for (let band = Math.floor(minRow / 5); band * 5 <= maxRow; band++) {
-        if (band % 2 === 0) continue;
-        items.push(new fabric.Rect({
-          left: bgL, top: rowY(band * 5) - ROW / 2, width: bgR - bgL, height: ROW * 5,
-          fill: "#d3d6da", selectable: true, strokeWidth: 0,
-        }));
-      }
-
-      // Станция: кружок (пересадка/конечная) или засечка + подпись
-      const isMajor = (id, isTerminus) => isTerminus || (linesPerStation.get(id) || 0) >= 2;
-      const addStation = (id, x, row, nameSide, isTerminus) => {
-        const y = rowY(row);
-        const major = isMajor(id, isTerminus);
-        if (major) {
-          items.push(new fabric.Circle({
-            left: x - 6.5, top: y - 6.5, radius: 6.5, fill: "#ffffff", stroke, strokeWidth: 3,
-          }));
-        } else {
-          items.push(new fabric.Rect({ left: x - 5, top: y - 2, width: 10, height: 4, fill: stroke, strokeWidth: 0 }));
-        }
-        const nm = stName.get(id) || "?";
-        items.push(new fabric.Textbox(nm, {
-          left: nameSide < 0 ? x - 14 - NAME_W : x + 14,
-          top: y - 7, width: NAME_W, fontSize: 12,
-          fontWeight: major ? "bold" : "normal",
-          fill: major ? red : grey,
-          textAlign: nameSide < 0 ? "right" : "left",
-          fontFamily: tableFontFamily,
-        }));
-      };
-
-      // Ствол: линия + станции (подписи слева)
-      items.push(new fabric.Line([TRUNK_X, rowY(0) - 14, TRUNK_X, rowY(trunk.length - 1) + 14], {
-        stroke, strokeWidth: 6, strokeLineCap: "round",
-      }));
-      trunk.forEach((id, i) => addStation(id, TRUNK_X, i, -1, i === 0 || i === trunk.length - 1));
-
-      // Ветки: кривая от ствола в боковую полосу + станции до конечной
-      for (const b of placed) {
-        const bx = TRUNK_X + b.side * (LANE_GAP + b.lane * LANE_GAP);
-        const jy = rowY(b.jRow);
-        if (b.tail.length === 1) {
-          // Короткий отросток: горизонтально на ряду развилки (как тупик)
-          items.push(new fabric.Line([TRUNK_X, jy, bx, jy], { stroke, strokeWidth: 6, strokeLineCap: "round" }));
-          addStation(b.tail[0], bx, b.jRow, b.side, true);
-          continue;
-        }
-        const endRow = b.jRow + b.dir * b.tail.length;
-        const k = 18 * b.dir; // радиус скругления поворота
-        const d = "M " + TRUNK_X + " " + jy +
-          " L " + (bx - b.side * 18) + " " + jy +
-          " Q " + bx + " " + jy + " " + bx + " " + (jy + k) +
-          " L " + bx + " " + (rowY(endRow) + 8 * b.dir);
-        items.push(new fabric.Path(d, { fill: "", stroke, strokeWidth: 6, strokeLineCap: "round" }));
-        b.tail.forEach((id, ti) => {
-          const row = b.jRow + b.dir * (ti + 1);
-          addStation(id, bx, row, b.side, ti === b.tail.length - 1);
-        });
-      }
-
-      items.forEach((o) => canvas.add(o));
-      // Если схема больше листа — ужимаем выделение целиком и центрируем
-      const sel = new fabric.ActiveSelection(items, { canvas });
-      const k2 = Math.min(1, (pageH - 80) / (sel.height || 1), (pageW - 60) / (sel.width || 1));
-      if (k2 < 1) {
-        sel.scale(k2);
-        sel.set({ left: Math.max(10, (pageW - sel.getScaledWidth()) / 2), top: 30 });
-        sel.setCoords();
-      }
-      canvas.setActiveObject(sel);
-      canvas.requestRenderAll();
-      requestHistoryPush();
-      setStatus(tt("boardSchemeInserted", { name: stName.get(selectedStationId) || "" }));
+      const ok = await window.NetworkScheme.createStationScheme(selectedStationId);
+      setStatus(ok ? "" : tt("boardSchemeError"));
     } catch (err) {
       setStatus(tt("boardSchemeError") + ": " + err.message);
     }

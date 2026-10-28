@@ -19,11 +19,22 @@
     }
   } catch (e) {}
 </script>
+<script src="titlebar.js"></script>
 </head>
 <body>
   <header class="topbar">
     <h1 data-i18n="appTitle">MTR Schedule Manager</h1>
-    <span id="nextPageTitle" class="next-only next-page-title"></span>
+    <div class="next-only next-head">
+      <div id="nextCrumbs" class="next-crumbs"></div>
+      <div class="next-title-row"><div id="nextPageTitle" class="next-page-title"></div><span id="nextTitleExtra"></span></div>
+      <p id="nextPageLead" class="next-page-lead"></p>
+    </div>
+    <!-- Новый вид: переключатель «Табло / График» и инструменты раздела (переносятся сюда из .controls вкладки) -->
+    <div class="next-only nx-seg next-view-seg" role="tablist">
+      <button type="button" data-next-goto="schedule" data-i18n="nextNavSchedule">Табло станции</button>
+      <button type="button" data-next-goto="graph" data-i18n="tabGraph">График движения</button>
+    </div>
+    <div class="next-only next-head-tools" id="nextHeadTools"><span class="nx-help" id="nextHelp" hidden><button type="button" class="nx-help-btn" aria-label="?">?</button><span class="nx-help-pop" id="nextHelpPop" role="tooltip"></span></span></div>
     <div id="statusBadge" class="status-badge" data-i18n="statusConnecting">Подключение...</div>
   </header>
 
@@ -32,12 +43,17 @@
       <svg width="26" height="26" viewBox="120 123 266 266"><path fill="#F68349" d="M327.558 131C336.068 131 343.947 135.316 348.399 142.364L348.819 143.054L378 192.903L341.026 213.605L317.061 172.667H259.167L359.961 345.154C369.295 361.126 357.502 381 338.691 381H239.373C230.589 381 222.477 376.401 218.113 368.946L181.225 305.934L218.2 285.233L249.871 339.333H307.488L210.095 172.667H190.547L164.974 216.352L128 195.648L158.789 143.054L159.209 142.364C163.661 135.316 171.54 131 180.049 131H327.558Z"/></svg>
       <b>Schedule Manager</b>
     </div>
-    <button class="tab-btn active" data-tab="schedule" data-i18n="tabSchedule">Расписание по станции</button>
+    <!-- data-i18n-next — подпись пункта в экспериментальном UI (названия разделов из макетов) -->
+    <div class="next-only next-nav-group" data-i18n="nextGroupSchedules">Расписания</div>
+    <button class="tab-btn active" data-tab="schedule" data-i18n="tabSchedule" data-i18n-next="nextNavSchedule">Расписание по станции</button>
     <button class="tab-btn" data-tab="graph" data-i18n="tabGraph">График движения</button>
-    <button class="tab-btn" data-tab="routes" data-i18n="tabRoutes">Маршруты</button>
-    <button class="tab-btn" data-tab="board" data-i18n="tabBoard">Редактор</button>
-    <button class="tab-btn" data-tab="problems" data-i18n="problemsTabTitle">Проблемные места</button>
-    <button class="tab-btn" data-tab="instructions" data-i18n="tabInstructions">Инструкции</button>
+    <button class="tab-btn" data-tab="routes" data-i18n="tabRoutes" data-i18n-next="nextNavRoutes">Маршруты</button>
+    <button class="tab-btn" data-tab="board" data-i18n="tabBoard" data-i18n-next="nextNavBoards">Редактор</button>
+    <!-- новый вид: «Схема сети» — отдельный пункт меню (режим вкладки «Редактор») -->
+    <button class="tab-btn next-only" data-tab="board" data-board-mode="scheme" id="nextNavScheme" data-i18n="boardModeScheme">Схема сети</button>
+    <button class="tab-btn" data-tab="problems"><span class="tab-label" data-i18n="problemsTabTitle" data-i18n-next="nextNavProblems">Проблемные места</span><span class="next-only nx-cnt" id="nextProblemsCount"></span></button>
+    <div class="next-only next-favs" id="nextFavs"></div>
+    <button class="tab-btn" data-tab="instructions" data-i18n="tabInstructions" data-i18n-next="nextNavHelp">Инструкции</button>
     <button class="tab-btn" data-tab="settings" data-i18n="tabSettings">Настройки</button>
   </nav>
 
@@ -51,14 +67,18 @@
         </div>
         <span id="scheduleLiveDot" class="live-dot" data-i18n-title="liveDotHint" title="Автообновление активно"></span>
         <button id="toggleFavoriteStationBtn" class="icon-btn" title="" style="font-size:16px;">☆</button>
-        <button id="newDraftBtnSchedule" data-i18n="newDraftBtn">+ Создать пробный маршрут</button>
+        <button id="newDraftBtnSchedule" data-i18n="newDraftBtn" data-i18n-next="nextNewDraft">+ Создать пробный маршрут</button>
       </div>
       <div id="favoritesBar" class="favorites-bar" style="display:none;"></div>
       <p class="hint" id="scheduleMeta"></p>
 
       <div class="layout-with-sidebar">
         <aside class="sidebar" id="dashboardSidebar">
-          <div class="sidebar-section">
+          <div class="next-only nx-ph">
+            <span data-i18n="nextFilters">Фильтры</span>
+            <button type="button" class="nx-ib nx-collapse" data-nx-collapse="dashboardSidebar" data-i18n-title="nextCollapse" title="Свернуть"></button>
+          </div>
+          <div class="sidebar-section nx-zoom-src">
             <h4 data-i18n="zoomLabel">Масштаб</h4>
             <div class="zoom-row">
               <button class="icon-btn" id="dashZoomOut">−</button>
@@ -68,10 +88,11 @@
             <div class="hint small" data-i18n="zoomWheelHint">Ctrl+колесо мыши над графиком — тоже масштабирует.</div>
           </div>
 
-          <div class="sidebar-section">
-            <h4 data-i18n="minIntervalLabel">Мин. интервал для конфликта</h4>
+          <div class="sidebar-section nx-mininterval">
+            <h4 data-i18n="minIntervalLabel" data-i18n-next="nextMinInterval">Мин. интервал для конфликта</h4>
             <input type="range" id="minIntervalSlider" min="0" max="5" step="0.5" value="3">
             <div class="hint small" id="minIntervalValue"></div>
+            <p class="next-only nx-note" data-i18n="nextDragHint">Тяните блок поезда, чтобы сдвинуть рейс. Shift — весь маршрут, Ctrl+клик — цепочка оборота.</p>
           </div>
 
           <div class="sidebar-section">
@@ -101,20 +122,33 @@
             <div id="dashTypeFilterList" class="checkbox-list"></div>
           </div>
 
-          <div class="sidebar-section">
+          <div class="sidebar-section nx-hide">
             <button class="full-btn secondary-btn" id="resetDashFiltersBtn" data-i18n="resetFilters">Сбросить фильтры</button>
           </div>
 
-          <div class="sidebar-section">
+          <div class="sidebar-section nx-hide">
             <button class="full-btn" id="resetDashOverridesBtn" data-i18n="resetEdits">Сбросить ручные правки</button>
           </div>
 
-          <div class="sidebar-section hint small" data-i18n="dragHint">
+          <div class="sidebar-section hint small nx-hide" data-i18n="dragHint">
             Перетащите блок поезда по горизонтали мышкой, чтобы вручную сдвинуть его время — изменённый рейс станет пунктирным.
           </div>
         </aside>
 
         <div class="main-area">
+          <div class="board-panel">
+          <div class="next-only nx-ph nx-board-bar" id="nextBoardBar">
+            <div class="nx-seg" role="group" id="nextDashWindow">
+              <button type="button" data-hours="3">3 ч</button><button type="button" data-hours="6">6 ч</button><button type="button" data-hours="12">12 ч</button><button type="button" data-hours="24" data-i18n="nextDay">Сутки</button>
+            </div>
+            <button type="button" id="nextDashNow" data-i18n="nextNow">Сейчас</button>
+            <div class="nx-seg nx-zoom-seg" id="nextDashZoom"></div>
+            <span class="nx-fill"></span>
+            <span class="nx-chip bad" id="nextDashConflicts"></span>
+            <span class="nx-chip warn" id="nextDashLate"></span>
+            <span class="nx-chip live" id="nextDashDrafts"></span>
+            <span class="nx-reset-slot" id="nextDashReset"></span>
+          </div>
           <div class="dashboard-wrap" id="dashboardWrap">
             <div class="dashboard-empty" id="dashboardEmpty" data-i18n="dashboardEmptyDefault">Выберите станцию, чтобы увидеть дашборд прибытий по платформам</div>
             <div class="dashboard" id="dashboard" style="display:none;">
@@ -128,10 +162,27 @@
               </div>
             </div>
           </div>
+          <div class="next-only nx-legend" id="nextBoardLegend">
+            <span><i class="lg-conflict"></i><span data-i18n="nextLgConflict">конфликт</span></span>
+            <span><i class="lg-late"></i><span data-i18n="nextLgLate">опоздание</span></span>
+            <span><i class="lg-early"></i><span data-i18n="nextLgEarly">раньше графика</span></span>
+            <span><i class="lg-moved"></i><span data-i18n="platformMovedLabel">платф. изменена</span></span>
+            <span><i class="lg-edited"></i><span data-i18n="nextLgEdited">сдвинут вручную</span></span>
+            <span><i class="lg-draft"></i><span data-i18n="nextLgDraft">пробный</span></span>
+            <span class="nx-fill"></span>
+            <span id="nextBoardTz"></span>
+          </div>
+          </div>
+          <div class="board-side">
           <!-- Табло ближайших прибытий — под графиком дашборда -->
           <div id="nearestTrainSection" style="display:none;" class="nearest-board-wrap">
-            <div class="nearest-board-title" data-i18n="nearestTrainLabel">Ближайшие прибытия</div>
+            <div class="nearest-board-title"><span data-i18n="nearestTrainLabel">Ближайшие прибытия</span><span class="next-only nx-after" id="nextNearestAfter"></span></div>
             <table class="nearest-board-table" id="nearestTrainList"></table>
+          </div>
+          <div class="next-only nx-conflicts" id="nextConflictsPanel">
+            <div class="nx-ph"><span data-i18n="nextConflicts">Конфликты</span><span class="nx-chip bad" id="nextConflictsCount"></span><span class="nx-fill"></span><button type="button" class="nx-ghost" id="nextResolveAll" data-i18n="nextResolveAll">Решить все</button></div>
+            <div class="nx-conflict-list" id="nextConflictList"></div>
+          </div>
           </div>
         </div>
       </div>
@@ -151,12 +202,16 @@
           <input type="text" id="graphToInput" data-i18n-placeholder="graphToPlaceholder" placeholder="Станция Б..." autocomplete="off">
           <div class="autocomplete-list" id="graphToACList"></div>
         </div>
-        <button id="buildGraphBtn" data-i18n="buildGraphBtn">Построить график</button>
-        <button id="newDraftBtnGraph" data-i18n="newDraftBtn">+ Создать пробный маршрут</button>
+        <button id="buildGraphBtn" data-i18n="buildGraphBtn" data-i18n-next="nextBuild">Построить график</button>
+        <button id="newDraftBtnGraph" data-i18n="newDraftBtn" data-i18n-next="nextNewDraft">+ Создать пробный маршрут</button>
       </div>
 
       <div class="layout-with-sidebar">
         <aside class="sidebar" id="graphSidebar">
+          <div class="next-only nx-ph">
+            <span data-i18n="nextFilters">Фильтры</span>
+            <button type="button" class="nx-ib nx-collapse" data-nx-collapse="graphSidebar" data-i18n-title="nextCollapse" title="Свернуть"></button>
+          </div>
           <div class="sidebar-section">
             <label class="switch-row">
               <input type="checkbox" id="showReverseToggle">
@@ -170,6 +225,10 @@
               <input type="checkbox" id="showGraphConflictsToggle" checked>
               <span data-i18n="showConflictsLabel">Показывать конфликты</span>
             </label>
+            <label class="switch-row next-only">
+              <input type="checkbox" id="nextShowTurnLinks" checked>
+              <span data-i18n="nextTurnLinks">Связки оборота</span>
+            </label>
           </div>
 
           <div class="sidebar-section">
@@ -181,7 +240,7 @@
             <div id="graphTypeFilterList" class="checkbox-list"></div>
           </div>
 
-          <div class="sidebar-section">
+          <div class="sidebar-section nx-zoom-src">
             <h4 data-i18n="zoomLabel">Масштаб</h4>
             <div class="zoom-row">
               <button class="icon-btn" id="graphZoomOut">−</button>
@@ -200,20 +259,28 @@
             <div id="graphStationFilterList" class="checkbox-list"></div>
           </div>
 
-          <div class="sidebar-section">
+          <div class="sidebar-section nx-hide">
             <button class="full-btn secondary-btn" id="resetGraphFiltersBtn" data-i18n="resetFilters">Сбросить фильтры</button>
           </div>
 
-          <div class="sidebar-section">
+          <div class="sidebar-section nx-hide">
             <button class="full-btn" id="resetGraphOverridesBtn" data-i18n="resetEdits">Сбросить ручные правки</button>
           </div>
 
-          <div class="sidebar-section hint small" data-i18n="dragHintGraph">
+          <div class="sidebar-section hint small nx-hide" data-i18n="dragHintGraph">
             Перетащите линию поезда по горизонтали мышкой, чтобы вручную сдвинуть её время — изменённый рейс станет пунктирным.
           </div>
         </aside>
 
         <div class="main-area">
+          <div class="next-only nx-ph nx-graph-bar" id="nextGraphBar">
+            <div class="nx-legend-slot" id="nextGraphLegendSlot"></div>
+            <span class="nx-chip bad" id="nextGraphConflicts"></span>
+            <div class="nx-seg" role="group" id="nextGraphWindow">
+              <button type="button" data-hours="3">3 ч</button><button type="button" data-hours="6">6 ч</button><button type="button" data-hours="24" data-i18n="nextDay">Сутки</button>
+            </div>
+            <button type="button" id="nextGraphNow" data-i18n="nextNow">Сейчас</button>
+          </div>
           <div id="graphLegend" class="graph-legend"></div>
           <div class="graph-outer-wrap">
             <div class="graph-y-panel" id="graphYPanel">
@@ -224,6 +291,10 @@
             </div>
           </div>
         </div>
+        <aside class="next-only nx-trip-panel" id="nextTripPanel">
+          <div class="nx-ph"><span data-i18n="nextTrip">Рейс</span><span class="nx-fill"></span><button type="button" class="nx-ib nx-close" id="nextTripClose" data-i18n-title="nextClose" title="Закрыть"></button></div>
+          <div class="nx-trip-body" id="nextTripBody"></div>
+        </aside>
       </div>
     </section>
 
@@ -238,7 +309,8 @@
           <option value="real" data-i18n="sourceFilterReal">Только настоящие</option>
           <option value="draft" data-i18n="sourceFilterDraft">Только пробные</option>
         </select>
-        <button id="newDraftBtn" data-i18n="newDraftBtn">+ Создать пробный маршрут</button>
+        <button type="button" class="next-only nx-sort-btn" id="nextRoutesSort" data-i18n="nextSortSamples">Больше замеров сначала</button>
+        <button id="newDraftBtn" data-i18n="newDraftBtn" data-i18n-next="nextNewDraft">+ Создать пробный маршрут</button>
       </div>
       <table class="route-table">
         <thead>
@@ -257,6 +329,8 @@
           <tr><td colspan="8" class="empty">...</td></tr>
         </tbody>
       </table>
+      <!-- новый вид: тот же список, сгруппированный по типам транспорта (аккордеон) -->
+      <div class="next-only nx-route-groups" id="nextRouteGroups"></div>
     </section>
 
     <!-- ===== Конструктор бумажных расписаний (Aushangfahrplan) ===== -->
@@ -522,7 +596,7 @@
             <button id="schemeExportPngBtn" class="secondary-btn" type="button" data-i18n="schemeExportPng">Экспорт PNG</button>
             <button id="schemeExportSvgBtn" class="secondary-btn" type="button" data-i18n="schemeExportSvg">Экспорт SVG</button>
             <button id="schemeToBoardBtn" class="secondary-btn" type="button" data-i18n="schemeToBoard" data-i18n-title="schemeToBoardTitle" title="Вставить схему картинкой на холст табло">В табло</button>
-            <button id="schemePublishBtn" class="secondary-btn" type="button" data-i18n="schemePublishBtn">Опубликовать ссылкой</button>
+            <button id="schemePublishBtn" class="secondary-btn" type="button" data-i18n="schemePublishBtn">Поделиться</button>
           </div>
           <div class="board-toolbar-group">
             <button id="schemeResetBtn" class="secondary-btn" type="button" data-i18n="schemeResetBtn">Новая пустая схема</button>
@@ -553,6 +627,10 @@
               <button id="schemeFitBtn" class="board-zoom-btn scheme-fit-btn" type="button" data-i18n-title="schemeFitBtn" title="Вписать в экран">⤢</button>
             </div>
             <div class="scheme-tool-hint" id="schemeToolHint"></div>
+            <div class="next-only nx-scheme-legend">
+              <span><i class="lg-ring"></i><span data-i18n="nextLgStationConflict">конфликт на станции</span></span>
+              <span><i class="lg-late"></i><span data-i18n="nextLgLineLate">линия опаздывает</span></span>
+            </div>
           </div>
           <aside class="scheme-props" id="schemeProps"></aside>
         </div>
@@ -562,6 +640,12 @@
     <!-- ===== Проблемные места ===== -->
     <section id="tab-problems" class="tab-panel">
       <p class="hint" data-i18n="problemsHint">Маршруты и станции с наибольшим числом конфликтов или опозданий.</p>
+      <div class="controls next-only nx-problems-tools">
+        <div class="nx-seg" role="group" id="nextProblemsScope">
+          <button type="button" data-scope="all" data-i18n="nextScopeAll">Вся сеть</button><button type="button" data-scope="fav" data-i18n="nextScopeFav">Избранное</button>
+        </div>
+        <button type="button" id="nextProblemsRescan" data-i18n="nextRescan">Пересчитать</button>
+      </div>
       <div id="problemsContent"><p class="hint">...</p></div>
     </section>
 
@@ -573,6 +657,7 @@
 
     <!-- ===== Настройки ===== -->
     <section id="tab-settings" class="tab-panel">
+      <div class="settings-cards">
       <div class="settings-block">
         <label data-i18n="languageLabel">Язык интерфейса</label>
         <select id="languageSelect">
@@ -601,9 +686,6 @@
         <label data-i18n="timezoneLabel">Часовой пояс</label>
         <select id="timezoneSelect"></select>
         <p class="hint small" id="tzDetectedHint"></p>
-
-      </div>
-      <div class="settings-block">
         <p class="hint small" data-i18n="settingsNote">Все времена в приложении (расписания, графики, аналитика) автоматически пересчитываются под выбранный часовой пояс. Исходные данные сервер всегда хранит в UTC.</p>
       </div>
 
@@ -657,6 +739,12 @@
         <p class="hint small" data-i18n="experimentalUiHint">Новый вид приложения: боковое меню, тёмная палитра и шрифты нового логотипа. Логика и данные те же — выключите, чтобы вернуть классический вид.</p>
       </div>
 
+      <div class="settings-block" id="routeMarkersBlock">
+        <label data-i18n="routeMarkersLabel">Метки маршрутов</label>
+        <p class="hint small" data-i18n="routeMarkersHint">Как отмечать маршруты каждого типа в списках, карточках и табло: форма метки и что внутри.</p>
+        <div id="routeMarkersList"></div>
+      </div>
+
       <div class="settings-block">
         <label data-i18n="updatesSectionLabel">Обновления</label>
         <label class="switch-row">
@@ -672,10 +760,11 @@
         <p class="hint small" data-i18n="diagReportHint">Сохранит текстовый файл с версией, статусом сервера, настройками и последними ошибками — приложите его к сообщению об ошибке. Паролей и личных данных в файле нет.</p>
       </div>
 
-      <div class="settings-block" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div class="settings-block settings-footer" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
         <span class="hint small" id="appVersionLabel" style="opacity:0.6;"></span>
         <button class="secondary-btn" id="checkUpdateBtn" data-i18n="checkUpdateBtn">Проверить обновления</button>
         <button class="secondary-btn" id="supportBtn" data-i18n="supportBtn">Поддержка</button>
+      </div>
       </div>
     </section>
   </main>
@@ -741,37 +830,28 @@
     </div>
   </div>
 
-  <!-- ===== Публикация схемы сети ссылкой ===== -->
+  <!-- ===== «Поделиться» схемой сети: HTML-файл / системный браузер ===== -->
   <div id="schemePublishOverlay" class="modal-overlay" style="display:none;">
     <div class="modal">
       <button class="modal-close" id="schemePublishClose">&times;</button>
-      <h3 data-i18n="schemePublishTitle">Публикация схемы</h3>
-      <p class="hint small" data-i18n="schemePublishHint">Ссылка содержит всю схему целиком — её можно отправить кому угодно, установка приложения не нужна. После правок опубликуйте заново: старая ссылка покажет прежнюю версию.</p>
-      <div class="scheme-live-publish">
-        <h4 data-i18n="schemeLivePubTitle">Живая ссылка</h4>
-        <p class="hint small" data-i18n="schemeLivePubHint">Схема хранится в открытом JSON-хранилище (jsonblob.com), ссылка остаётся той же, а «Обновить» заменяет содержимое — у всех, кто открыл ссылку, откроется свежая версия.</p>
-        <label class="scheme-field"><span data-i18n="schemeViewerBase">Страница просмотра</span><input type="text" id="schemeViewerBase"></label>
-        <input type="text" id="schemeLiveUrl" readonly style="width:100%;font-family:monospace;font-size:11px;" placeholder="—">
-        <div class="modal-buttons">
-          <button id="schemeLivePublish" type="button" data-i18n="schemeLivePublish">Опубликовать</button>
-          <button id="schemeLiveCopy" class="secondary-btn" type="button" data-i18n="schemePublishCopy">Скопировать ссылку</button>
-          <button id="schemeLiveForget" class="secondary-btn" type="button" data-i18n="schemeLiveForget">Отвязать</button>
-        </div>
-        <p class="hint small" id="schemeLiveStatus"></p>
+      <h3 data-i18n="schemePublishTitle">Поделиться схемой</h3>
+      <h4 data-i18n="schemeHtmlTitle">HTML-файл</h4>
+      <p class="hint small" data-i18n="schemePublishHint">Один файл со всей схемой: открывается в любом браузере, в том числе на телефоне, без интернета и без приложения. Отправьте его кому угодно или выложите на любой хостинг. После правок сохраните файл заново.</p>
+      <div class="controls" style="margin-top:6px;">
+        <button id="schemeHtmlSave" type="button" data-i18n="schemeHtmlSave">Сохранить HTML-файл</button>
       </div>
-      <h4 data-i18n="schemeStaticPubTitle">Статичная ссылка</h4>
-      <textarea id="schemePublishUrl" rows="5" readonly style="width:100%;font-family:monospace;font-size:11px;word-break:break-all;"></textarea>
-      <p class="hint small" id="schemePublishSize"></p>
-      <div class="controls" style="margin-top:10px;">
-        <button id="schemePublishCopy" type="button" data-i18n="schemePublishCopy">Скопировать ссылку</button>
-        <button id="schemePublishOpen" class="secondary-btn" type="button" data-i18n="schemePublishOpen">Открыть в браузере</button>
-        <button id="schemePublishLocal" class="secondary-btn" type="button" data-i18n="schemePublishLocal">Предпросмотр</button>
+      <h4 data-i18n="schemeBrowserTitle">В браузере</h4>
+      <p class="hint small" data-i18n="schemeBrowserHint">Открывает схему в системном браузере. Пока приложение запущено, вкладка обновляется сама после каждой правки.</p>
+      <div class="controls" style="margin-top:6px;">
+        <button id="schemeBrowserOpen" class="secondary-btn" type="button" data-i18n="schemePublishOpen">Открыть в браузере</button>
       </div>
+      <p class="hint small" id="schemeShareStatus"></p>
     </div>
   </div>
 
   <script src="vendor/fabric.min.js"></script>
   <script src="vendor/lz-string.min.js"></script>
+  <script src="routeMarkers.js"></script>
   <script src="app.js"></script>
   <script src="boardEditor.js"></script>
   <script src="schemeCore.js"></script>

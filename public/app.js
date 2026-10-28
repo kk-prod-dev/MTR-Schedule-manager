@@ -217,6 +217,158 @@ const I18N = {
     interfaceSectionLabel: "Интерфейс",
     experimentalUiLabel: "Экспериментальный интерфейс",
     experimentalUiHint: "Новый вид приложения: боковое меню, тёмная палитра и шрифты нового логотипа. Логика и данные те же — выключите, чтобы вернуть классический вид.",
+    routeMarkersLabel: "Метки маршрутов",
+    routeMarkersHint: "Как отмечать маршруты каждого типа в списках, карточках и табло: форма метки и что внутри.",
+    routeMarkerShape: "Форма",
+    routeMarkerContent: "Внутри",
+    rmShape_circle: "Круг",
+    rmShape_parallelogram: "Параллелограмм",
+    rmShape_plaque: "Плашка",
+    rmShape_capsule: "Капсула",
+    rmShape_square: "Квадрат",
+    rmShape_diamond: "Ромб",
+    rmShape_hexagon: "Шестиугольник",
+    rmShape_triangle: "Треугольник",
+    rmContent_none: "Пусто",
+    rmContent_number: "Номер маршрута",
+    rmContent_icon_train: "Значок: поезд",
+    rmContent_icon_metro: "Значок: метро",
+    rmContent_icon_tram: "Значок: трамвай",
+    rmContent_icon_bus: "Значок: автобус",
+    rmContent_icon_cable: "Значок: канатная дорога",
+    rmContent_icon_ship: "Значок: судно",
+    rmContent_icon_plane: "Значок: самолёт",
+    rmContent_icon_fast: "Значок: скоростной",
+    rtype_train_normal: "Поезд",
+    rtype_train_light_rail: "Лёгкое метро",
+    rtype_train_high_speed: "Скоростной поезд",
+    rtype_train_metro: "Метро",
+    rtype_train_tram: "Трамвай",
+    rtype_train_bus: "Автобус",
+    rtype_train_sbahn: "S-Bahn",
+    rtype_train_intercity: "InterCity",
+    rtype_train_regional: "Regional",
+    rtype_cable_car_normal: "Канатная дорога",
+    rtype_boat_normal: "Судно",
+    rtype_boat_light_rail: "Паром",
+    rtype_boat_high_speed: "Скоростное судно",
+    rtype_airplane_normal: "Самолёт",
+    nextGroupSchedules: "Расписания",
+    nextNavSchedule: "Табло станции",
+    nextNavRoutes: "Станции и маршруты",
+    nextNavProblems: "Задержки и проблемы",
+    nextNavHelp: "Справка",
+    nextStatusOnline: "MTR онлайн",
+    nextStatusCached: "MTR недоступен · данные из кэша",
+    nextStatusOffline: "Нет связи с MTR",
+    nextHome: "Главная",
+    nextProblemsLead: "Где сеть буксует прямо сейчас и что накопилось за период",
+    nextSettingsLead: "Изменения сохраняются сразу",
+    nextFilters: "Фильтры",
+    nextCollapse: "Свернуть / развернуть",
+    nextClose: "Закрыть",
+    nextDragHint: "Тяните блок поезда, чтобы сдвинуть рейс. Shift — весь маршрут, Ctrl+клик — цепочка оборота.",
+    nextDay: "Сутки",
+    nextHours: "{n} ч",
+    nextNow: "Сейчас",
+    nextLgConflict: "конфликт",
+    nextLgLate: "опоздание",
+    nextLgEdited: "сдвинут вручную",
+    nextLgEarly: "раньше графика",
+    nxcOnLine: "в движении · {n}",
+    nxcEdits: "правок: {n}",
+    nxcGraph: "График движения",
+    nxcCopyDraft: "Копия как пробный",
+    nxcTabTimetable: "Расписание",
+    nxcTabStops: "Остановки",
+    nxcTabLive: "Сейчас на линии",
+    nxcTabConflicts: "Конфликты",
+    nxcTrains: "поездов: {n}",
+    nxcConsist: "Состав",
+    nxcCars: "{n} ваг.",
+    nxcPassport: "Паспорт",
+    nxcStopsN: "Остановок",
+    nxcCarsLabel: "Вагонов в составе",
+    nxcColTrip: "Рейс",
+    nxcColWhere: "Где сейчас",
+    nxcColNext: "Следующая",
+    nxcColArrival: "Прибытие",
+    nxcNoTrains: "Сейчас поездов на линии нет",
+    nxcTtHint: "Плановое время; в скобках — живое отклонение там, куда поезд ещё не доехал. Клик по ячейке — табло станции.",
+    nxcNow: "Сейчас",
+    nxcLgCurrent: "текущий рейс",
+    nxcLgPassed: "серым — станции, которые поезд уже прошёл",
+    nxcShiftBy: "Сдвинуть на {n} мин",
+    nxcWith: "с {r}",
+    nextLgDraft: "пробный",
+    nextConflicts: "Конфликты",
+    nextResolveAll: "Решить все",
+    nextTurnLinks: "Связки оборота",
+    nextTrip: "Рейс",
+    nextScopeAll: "Вся сеть",
+    nextScopeFav: "Избранное",
+    nextRescan: "Пересчитать",
+    nextLgStationConflict: "конфликт на станции",
+    nextLgLineLate: "линия опаздывает",
+    nextNavBoards: "Генераторы табло",
+    nextSortSamples: "Больше замеров сначала",
+    nextNewDraft: "+ Пробный маршрут",
+    nextBuild: "Построить",
+    nextChipConflicts: "{n} конфл.",
+    nextChipLate: "{n} опаздывают",
+    nextChipDrafts: "{n} пробный",
+    nextLocalTime: "Время локальное, {tz}",
+    nextNoConflicts: "Конфликтов нет",
+    nextOverlap: "перекрытие",
+    nextGap: "интервал {gap}",
+    nextPlatformN: "платформа {p}",
+    nextConflictText: "{r1} и {r2} ближе {min} мин друг к другу",
+    nextShiftBy: "Сдвинуть {r} на +{n} мин",
+    nextShow: "Показать",
+    nextAfter: "после {time}",
+    nextGraphLead: "{s} станций · {r} маршрутов на участке",
+    nextGraphChip: "{c} конфл. · {o} обгон.",
+    nextTripGone: "Рейс скрыт фильтрами или пропал после перестройки графика",
+    nextTripHint: "Нажмите на линию поезда, чтобы увидеть рейс: остановки, время в пути и конфликты.",
+    nextShiftShort: "{r} {n} мин",
+    nextShiftTrip: "Рейс {n} мин",
+    nextConflictAtStation: "Конфликт на станции",
+    nextOvertake: "Обгон",
+    nextDepShort: "отпр. {t}",
+    nextTravel: "{n} мин в пути",
+    nextRouteCard: "Карточка маршрута",
+    nextChain: "Цепочка оборота",
+    nextTripConflicts: "Конфликты рейса",
+    nextRoutesLead: "Всё, что есть на сервере: {s} станций, {r} маршрутов, {d} пробных",
+    nextColConflicts: "Конфл.",
+    nextDraftRoutes: "Пробные маршруты",
+    nextOtherRoutes: "Другие",
+    nextConflictsN: "{n} конфл.",
+    nextDepot: "депо «{d}»",
+    nextKpiInterval: "Интервал",
+    nextKpiTravel: "В пути",
+    nextKpiTrips: "Рейсов / сутки",
+    nextKpiAvgDev: "Ср. отклонение",
+    nextRouteConflicts: "Конфликты маршрута",
+    nextOpen: "Открыть",
+    nextKpiConflictsNow: "Конфликтов сейчас",
+    nextKpiOnStations: "на {n} станциях",
+    nextKpiLateNow: "Опаздывают сейчас",
+    nextKpiLateNote: "пар маршрутов",
+    nextKpiNetAvg: "Среднее опоздание сети",
+    nextKpiSamples: "{n} замеров",
+    nextKpiOnTime: "Идёт по графику",
+    nextKpiOnTimeNote: "замеров у маршрутов<br>со средним в ±1 мин",
+    nextOnTime: "по графику",
+    nextMinInterval: "Мин. интервал",
+    nextStationRoutes: "{n} маршрутов",
+    nextColRoutes: "Маршрутов",
+    nextStationsGroup: "Станции и остановки",
+    nextStationsWithConflicts: "{n} с конфликтами",
+    nextPsStations: "Станции с конфликтами",
+    nextPsRoutes: "Маршруты с конфликтами",
+    nextPsLateNow: "Сейчас опаздывают",
+    nextPsAvg: "Среднее опоздание",
     liveDotHint: "Автообновление активно",
     swapStationsHint: "Поменять местами А и Б",
     boardHourGapTitle: "% высоты строки",
@@ -228,6 +380,7 @@ const I18N = {
     serverTzLabel: "Часовой пояс сервера MTR",
     serverTzHint: "Если времена поездов отображаются со сдвигом — выберите часовой пояс сервера.",
     favStationHint: "Избранная станция — кликни для быстрого перехода",
+    favMissingHint: "Этой станции нет на текущем сервере — уберите её крестиком",
     favRouteHint: "Избранный маршрут — кликни для открытия карточки",
     conflictSuggestTitle: "Найден конфликт — предложение:",
     conflictSuggestShift: "Сдвинуть {name} на {mins} мин",
@@ -372,7 +525,7 @@ const I18N = {
     schemeLiveTitle: "Конфликты на станциях и опоздания линий прямо на схеме",
     schemeExportPng: "Экспорт PNG",
     schemeExportSvg: "Экспорт SVG",
-    schemePublishBtn: "Опубликовать ссылкой",
+    schemePublishBtn: "Поделиться",
     schemeToolSelect: "Выбор и перемещение",
     schemeToolLine: "Нарисовать линию",
     schemeToolStation: "Поставить станцию",
@@ -390,14 +543,16 @@ const I18N = {
     schemeResetConfirm: "Удалить текущую схему и начать с пустой? Отменить можно через Ctrl+Z.",
     schemeLiveStatus: "Живые данные: станций с конфликтами {c}, опаздывающих маршрутов {d}.",
     schemeLiveError: "Не удалось получить живые данные",
-    schemePublishTitle: "Публикация схемы",
-    schemePublishHint: "Ссылка содержит всю схему целиком — её можно отправить кому угодно, установка приложения не нужна. После правок опубликуйте заново: старая ссылка покажет прежнюю версию.",
-    schemePublishCopy: "Скопировать ссылку",
+    schemePublishTitle: "Поделиться схемой",
+    schemePublishHint: "Один файл со всей схемой: открывается в любом браузере, в том числе на телефоне, без интернета и без приложения. Отправьте его кому угодно или выложите на любой хостинг. После правок сохраните файл заново.",
     schemePublishOpen: "Открыть в браузере",
-    schemePublishLocal: "Предпросмотр",
-    schemePublishSize: "Длина ссылки: {kb} КБ",
-    schemePublishCopied: "Ссылка на схему скопирована.",
-    schemePublishEmpty: "Схема пуста — публиковать нечего.",
+    schemePublishEmpty: "Схема пуста — делиться нечем.",
+    schemeHtmlTitle: "HTML-файл",
+    schemeHtmlSave: "Сохранить HTML-файл",
+    schemeHtmlSaved: "Файл сохранён ({kb} КБ).",
+    schemeBrowserTitle: "В браузере",
+    schemeBrowserHint: "Открывает схему в системном браузере. Пока приложение запущено, вкладка обновляется сама после каждой правки.",
+    schemeBrowserOpened: "Схема открыта в браузере — правки появятся там автоматически.",
     schemeNewStation: "Станция {n}",
     schemeNewLine: "Линия {n}",
     schemePropStation: "Станция",
@@ -455,10 +610,6 @@ const I18N = {
     schemeAskNewScheme: "Название новой схемы",
     schemeAskRenameScheme: "Название схемы",
     schemeDeleteConfirm: "Удалить схему «{name}»? Это нельзя отменить.",
-    schemeLivePublishing: "Публикуем…",
-    schemeLiveDone: "Опубликовано в {time}",
-    schemeLiveFail: "Не удалось опубликовать",
-    schemeLiveUpdate: "Обновить",
     schemeSwitchTitle: "Несколько схем: метро, трамваи, вся сеть…",
     schemeSwitchLabel: "Схема",
     schemeNewTitle: "Добавить схему",
@@ -471,7 +622,7 @@ const I18N = {
     schemeFieldMapScale: "Масштаб схемы",
     schemeMapScaleDown: "Сжать схему относительно центра (линии и подписи прежнего размера)",
     schemeMapScaleUp: "Раздвинуть схему относительно центра (линии и подписи прежнего размера)",
-    schemeMapScaleLimit: "Дальше масштабировать нельзя: шаг сетки должен быть от 8 до 96",
+    schemeMapScaleLimit: "Сжать нельзя: не все станции и узлы лежат на чётных клетках сетки (масштаб — ×2 / ÷2, чтобы всё осталось по сетке и диагонали не ломались)",
     schemeLabelReset: "Вернуть подпись на место",
     schemeBadgeReset: "Вернуть номера на место",
     schemeFieldBadgeShow: "Номера маршрутов",
@@ -489,11 +640,6 @@ const I18N = {
     schemeToolHint_ellipse: "Тяните на холсте — эллипс (Shift — круг). Клик — стандартный размер",
     schemeToolHint_shapeline: "Тяните — отрезок (Shift — под 45°). Клик — стандартная длина",
     schemeToolHint_text: "Клик по холсту — добавить надпись",
-    schemeLivePubTitle: "Живая ссылка",
-    schemeLivePubHint: "Схема хранится в открытом JSON-хранилище (jsonblob.com). Ссылка остаётся той же, «Обновить» заменяет содержимое — у всех, кто откроет ссылку, будет свежая версия. Любой, кто знает ссылку, видит схему.",
-    schemeViewerBase: "Страница просмотра (любой статический хостинг с map.html)",
-    schemeLivePublish: "Опубликовать",
-    schemeLiveForget: "Отвязать",
     schemeStaticPubTitle: "Статичная ссылка (схема целиком в адресе)",
     schemeStStyle_square: "Квадрат",
     schemeCompressSkipped: "Сжатие пустот не применено: схема уже построена без него. Чтобы сжать, нажмите «Новая пустая схема» и постройте заново.",
@@ -524,6 +670,14 @@ const I18N = {
     schemeFieldCorner: "Радиус углов",
     schemeFieldStationScale: "Размер станций",
     schemeFieldTransferScale: "Толщина пересадок",
+    schemeFieldTransferStyle: "Вид пересадок",
+    schemeTrStyle_default: "Как в схеме (по умолчанию — перемычка)",
+    schemeTrStyle_bar: "Перемычка",
+    schemeTrStyle_capsule: "Капсула",
+    schemeTrStyle_dumbbell: "Гантель",
+    schemeTrStyle_curve: "Кривой переход",
+    schemeTrStyle_dashed: "Пунктирный переход",
+    schemeTrStyle_none: "Без соединения",
     schemeFieldStationFill: "Заливка станций",
     schemeFieldStationStroke: "Обводка станций",
     schemeFieldLabelAuto: "Подписи без наложений (авто)",
@@ -552,6 +706,9 @@ const I18N = {
     schemeDash_dashed: "Пунктир",
     schemeDash_dotted: "Точки",
     schemeDash_double: "Двойная",
+    schemeDash_rail: "Железная дорога",
+    schemeDash_dashdot: "Штрих-пунктир",
+    schemeStStyle_stump: "Пенёк",
     schemeLineEditHint: "Квадратные точки на углах тянутся мышью, двойной клик по линии добавляет новую точку.",
     schemeDeleteVertex: "Удалить точку",
     schemeOpenRoute: "Открыть карточку маршрута",
@@ -786,6 +943,7 @@ const I18N = {
     serverTzLabel: "MTR server timezone",
     serverTzHint: "If train times appear shifted — select the server's timezone.",
     favStationHint: "Favorite station — click to open",
+    favMissingHint: "This station is not on the current server — remove it with ×",
     favRouteHint: "Favorite route — click to open card",
     conflictSuggestTitle: "Conflict found — suggested fix:",
     conflictSuggestShift: "Shift {name} by {mins} min",
@@ -856,6 +1014,158 @@ const I18N = {
     interfaceSectionLabel: "Interface",
     experimentalUiLabel: "Experimental interface",
     experimentalUiHint: "New look of the app: sidebar navigation, dark palette and the new logo fonts. Same features and data — turn it off to return to the classic look.",
+    routeMarkersLabel: "Route markers",
+    routeMarkersHint: "How routes of each type are marked in lists, cards and boards: marker shape and what goes inside.",
+    routeMarkerShape: "Shape",
+    routeMarkerContent: "Inside",
+    rmShape_circle: "Circle",
+    rmShape_parallelogram: "Parallelogram",
+    rmShape_plaque: "Plate",
+    rmShape_capsule: "Capsule",
+    rmShape_square: "Square",
+    rmShape_diamond: "Diamond",
+    rmShape_hexagon: "Hexagon",
+    rmShape_triangle: "Triangle",
+    rmContent_none: "Empty",
+    rmContent_number: "Route number",
+    rmContent_icon_train: "Icon: train",
+    rmContent_icon_metro: "Icon: metro",
+    rmContent_icon_tram: "Icon: tram",
+    rmContent_icon_bus: "Icon: bus",
+    rmContent_icon_cable: "Icon: cable car",
+    rmContent_icon_ship: "Icon: ship",
+    rmContent_icon_plane: "Icon: plane",
+    rmContent_icon_fast: "Icon: high-speed",
+    rtype_train_normal: "Train",
+    rtype_train_light_rail: "Light rail",
+    rtype_train_high_speed: "High-speed train",
+    rtype_train_metro: "Metro",
+    rtype_train_tram: "Tram",
+    rtype_train_bus: "Bus",
+    rtype_train_sbahn: "S-Bahn",
+    rtype_train_intercity: "InterCity",
+    rtype_train_regional: "Regional",
+    rtype_cable_car_normal: "Cable car",
+    rtype_boat_normal: "Ship",
+    rtype_boat_light_rail: "Ferry",
+    rtype_boat_high_speed: "High-speed boat",
+    rtype_airplane_normal: "Airplane",
+    nextGroupSchedules: "Schedules",
+    nextNavSchedule: "Station board",
+    nextNavRoutes: "Stations and routes",
+    nextNavProblems: "Delays and issues",
+    nextNavHelp: "Help",
+    nextStatusOnline: "MTR online",
+    nextStatusCached: "MTR unreachable · cached data",
+    nextStatusOffline: "No connection to MTR",
+    nextHome: "Home",
+    nextProblemsLead: "Where the network is struggling right now and what has piled up",
+    nextSettingsLead: "Changes are saved immediately",
+    nextFilters: "Filters",
+    nextCollapse: "Collapse / expand",
+    nextClose: "Close",
+    nextDragHint: "Drag a train block to shift the trip. Shift moves the whole route, Ctrl+click highlights the turnaround chain.",
+    nextDay: "Day",
+    nextHours: "{n} h",
+    nextNow: "Now",
+    nextLgConflict: "conflict",
+    nextLgLate: "delay",
+    nextLgEdited: "moved by hand",
+    nextLgEarly: "ahead of schedule",
+    nxcOnLine: "running · {n}",
+    nxcEdits: "edits: {n}",
+    nxcGraph: "Train graph",
+    nxcCopyDraft: "Copy as draft",
+    nxcTabTimetable: "Timetable",
+    nxcTabStops: "Stops",
+    nxcTabLive: "On the line now",
+    nxcTabConflicts: "Conflicts",
+    nxcTrains: "trains: {n}",
+    nxcConsist: "Consist",
+    nxcCars: "{n} cars",
+    nxcPassport: "Details",
+    nxcStopsN: "Stops",
+    nxcCarsLabel: "Cars per train",
+    nxcColTrip: "Trip",
+    nxcColWhere: "Where now",
+    nxcColNext: "Next",
+    nxcColArrival: "Arrival",
+    nxcNoTrains: "No trains on the line right now",
+    nxcTtHint: "Planned time; live deviation in brackets where the train has not arrived yet. Click a cell to open the station board.",
+    nxcNow: "Now",
+    nxcLgCurrent: "current trip",
+    nxcLgPassed: "grey — stations the train has already passed",
+    nxcShiftBy: "Shift by {n} min",
+    nxcWith: "with {r}",
+    nextLgDraft: "draft",
+    nextConflicts: "Conflicts",
+    nextResolveAll: "Resolve all",
+    nextTurnLinks: "Turnaround links",
+    nextTrip: "Trip",
+    nextScopeAll: "Whole network",
+    nextScopeFav: "Favorites",
+    nextRescan: "Recalculate",
+    nextLgStationConflict: "station conflict",
+    nextLgLineLate: "line is late",
+    nextNavBoards: "Board generators",
+    nextSortSamples: "Most samples first",
+    nextNewDraft: "+ Draft route",
+    nextBuild: "Build",
+    nextChipConflicts: "{n} conflicts",
+    nextChipLate: "{n} late",
+    nextChipDrafts: "{n} draft",
+    nextLocalTime: "Local time, {tz}",
+    nextNoConflicts: "No conflicts",
+    nextOverlap: "overlap",
+    nextGap: "gap {gap}",
+    nextPlatformN: "platform {p}",
+    nextConflictText: "{r1} and {r2} are closer than {min} min",
+    nextShiftBy: "Shift {r} by +{n} min",
+    nextShow: "Show",
+    nextAfter: "after {time}",
+    nextGraphLead: "{s} stations · {r} routes on the section",
+    nextGraphChip: "{c} conflicts · {o} overtakes",
+    nextTripGone: "The trip is hidden by filters or gone after the graph was rebuilt",
+    nextTripHint: "Click a train line to see the trip: stops, travel time and conflicts.",
+    nextShiftShort: "{r} {n} min",
+    nextShiftTrip: "Trip {n} min",
+    nextConflictAtStation: "Station conflict",
+    nextOvertake: "Overtake",
+    nextDepShort: "dep. {t}",
+    nextTravel: "{n} min travel",
+    nextRouteCard: "Route card",
+    nextChain: "Turnaround chain",
+    nextTripConflicts: "Trip conflicts",
+    nextRoutesLead: "Everything on the server: {s} stations, {r} routes, {d} drafts",
+    nextColConflicts: "Confl.",
+    nextDraftRoutes: "Draft routes",
+    nextOtherRoutes: "Other",
+    nextConflictsN: "{n} conflicts",
+    nextDepot: "depot “{d}”",
+    nextKpiInterval: "Headway",
+    nextKpiTravel: "Travel time",
+    nextKpiTrips: "Trips / day",
+    nextKpiAvgDev: "Avg. deviation",
+    nextRouteConflicts: "Route conflicts",
+    nextOpen: "Open",
+    nextKpiConflictsNow: "Conflicts now",
+    nextKpiOnStations: "at {n} stations",
+    nextKpiLateNow: "Late right now",
+    nextKpiLateNote: "route pairs",
+    nextKpiNetAvg: "Network average delay",
+    nextKpiSamples: "{n} samples",
+    nextKpiOnTime: "On schedule",
+    nextKpiOnTimeNote: "samples of routes<br>averaging within ±1 min",
+    nextOnTime: "on time",
+    nextMinInterval: "Min. interval",
+    nextStationRoutes: "{n} routes",
+    nextColRoutes: "Routes",
+    nextStationsGroup: "Stations and stops",
+    nextStationsWithConflicts: "{n} with conflicts",
+    nextPsStations: "Stations with conflicts",
+    nextPsRoutes: "Routes with conflicts",
+    nextPsLateNow: "Late right now",
+    nextPsAvg: "Average delay",
     liveDotHint: "Auto-refresh is active",
     swapStationsHint: "Swap A and B",
     boardHourGapTitle: "% of row height",
@@ -954,7 +1264,7 @@ const I18N = {
     schemeLiveTitle: "Station conflicts and line delays right on the map",
     schemeExportPng: "Export PNG",
     schemeExportSvg: "Export SVG",
-    schemePublishBtn: "Publish as link",
+    schemePublishBtn: "Share",
     schemeToolSelect: "Select and move",
     schemeToolLine: "Draw a line",
     schemeToolStation: "Place a station",
@@ -972,14 +1282,16 @@ const I18N = {
     schemeResetConfirm: "Delete the current map and start from an empty one? You can undo with Ctrl+Z.",
     schemeLiveStatus: "Live data: {c} stations with conflicts, {d} delayed routes.",
     schemeLiveError: "Could not load live data",
-    schemePublishTitle: "Publish map",
-    schemePublishHint: "The link contains the whole map — send it to anyone, no app needed. Publish again after editing: an old link shows the old version.",
-    schemePublishCopy: "Copy link",
+    schemePublishTitle: "Share map",
+    schemePublishHint: "One file with the whole map: opens in any browser, phones included, with no internet and no app. Send it to anyone or put it on any web host. Save the file again after editing.",
     schemePublishOpen: "Open in browser",
-    schemePublishLocal: "Preview",
-    schemePublishSize: "Link length: {kb} KB",
-    schemePublishCopied: "Map link copied.",
-    schemePublishEmpty: "The map is empty — nothing to publish.",
+    schemePublishEmpty: "The map is empty — nothing to share.",
+    schemeHtmlTitle: "HTML file",
+    schemeHtmlSave: "Save HTML file",
+    schemeHtmlSaved: "File saved ({kb} KB).",
+    schemeBrowserTitle: "In the browser",
+    schemeBrowserHint: "Opens the map in your system browser. While the app is running, the tab updates itself after every edit.",
+    schemeBrowserOpened: "Map opened in the browser — edits will show up there automatically.",
     schemeNewStation: "Station {n}",
     schemeNewLine: "Line {n}",
     schemePropStation: "Station",
@@ -1037,10 +1349,6 @@ const I18N = {
     schemeAskNewScheme: "Name of the new map",
     schemeAskRenameScheme: "Map name",
     schemeDeleteConfirm: "Delete the map “{name}”? This cannot be undone.",
-    schemeLivePublishing: "Publishing…",
-    schemeLiveDone: "Published at {time}",
-    schemeLiveFail: "Could not publish",
-    schemeLiveUpdate: "Update",
     schemeSwitchTitle: "Several maps: metro, trams, whole network…",
     schemeSwitchLabel: "Map",
     schemeNewTitle: "Add a map",
@@ -1053,7 +1361,7 @@ const I18N = {
     schemeFieldMapScale: "Map scale",
     schemeMapScaleDown: "Shrink the map around its centre (lines and labels keep their size)",
     schemeMapScaleUp: "Spread the map around its centre (lines and labels keep their size)",
-    schemeMapScaleLimit: "Can't scale further: the grid step must stay between 8 and 96",
+    schemeMapScaleLimit: "Can't shrink: not every station and node sits on an even grid cell (scale is ×2 / ÷2 so everything stays on the grid and diagonals stay intact)",
     schemeLabelReset: "Reset label position",
     schemeBadgeReset: "Reset route numbers position",
     schemeFieldBadgeShow: "Route numbers",
@@ -1071,11 +1379,6 @@ const I18N = {
     schemeToolHint_ellipse: "Drag on the canvas for an ellipse (Shift — circle). Click for default size",
     schemeToolHint_shapeline: "Drag for a segment (Shift — 45° steps). Click for default length",
     schemeToolHint_text: "Click the canvas to add a label",
-    schemeLivePubTitle: "Live link",
-    schemeLivePubHint: "The map is stored in an open JSON store (jsonblob.com). The link stays the same; “Update” replaces its content so everyone sees the latest version. Anyone with the link can view it.",
-    schemeViewerBase: "Viewer page (any static host serving map.html)",
-    schemeLivePublish: "Publish",
-    schemeLiveForget: "Unlink",
     schemeStaticPubTitle: "Static link (whole map in the address)",
     schemeStStyle_square: "Square",
     schemeCompressSkipped: "Gap compression not applied: this map was built without it. To compress, press “New empty map” and build again.",
@@ -1106,6 +1409,14 @@ const I18N = {
     schemeFieldCorner: "Corner radius",
     schemeFieldStationScale: "Station size",
     schemeFieldTransferScale: "Interchange width",
+    schemeFieldTransferStyle: "Interchange style",
+    schemeTrStyle_default: "Same as map (default: bar)",
+    schemeTrStyle_bar: "Bar",
+    schemeTrStyle_capsule: "Capsule",
+    schemeTrStyle_dumbbell: "Dumbbell",
+    schemeTrStyle_curve: "Curved link",
+    schemeTrStyle_dashed: "Dashed link",
+    schemeTrStyle_none: "No connector",
     schemeFieldStationFill: "Station fill",
     schemeFieldStationStroke: "Station outline",
     schemeFieldLabelAuto: "Auto-avoid label overlaps",
@@ -1134,6 +1445,9 @@ const I18N = {
     schemeDash_dashed: "Dashed",
     schemeDash_dotted: "Dotted",
     schemeDash_double: "Double",
+    schemeDash_rail: "Railway",
+    schemeDash_dashdot: "Dash-dot",
+    schemeStStyle_stump: "Stump",
     schemeLineEditHint: "Drag the square points at the corners, double-click the line to add a new point.",
     schemeDeleteVertex: "Delete point",
     schemeOpenRoute: "Open route card",
@@ -1230,6 +1544,7 @@ const settings = {
   delayThresholdMin: 5,   // порог опоздания для уведомления, минут
   betaUpdates: false,     // ставить бета-версии (пре-релизы GitHub) автообновлением
   experimentalUi: false,  // новый интерфейс (класс ui-next на <html>, стили в ui-next.css)
+  routeMarkers: {},       // метки маршрутов по типам: { [type]: { shape, content } }, см. routeMarkers.js
 };
 function currentLang() {
   return settings.langMode === "auto" ? detectSystemLang() : settings.langMode;
@@ -1303,8 +1618,10 @@ function pluralWord(count, kind) {
 
 function applyI18n() {
   document.documentElement.lang = currentLang();
+  // data-i18n-next — подпись в экспериментальном UI (там разделы названы как в макетах)
+  const uiNext = document.documentElement.classList.contains("ui-next");
   document.querySelectorAll("[data-i18n]").forEach((el) => {
-    el.textContent = t(el.dataset.i18n);
+    el.textContent = t(uiNext && el.dataset.i18nNext ? el.dataset.i18nNext : el.dataset.i18n);
   });
   document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
     el.placeholder = t(el.dataset.i18nPlaceholder);
@@ -1937,7 +2254,10 @@ function renderProblemsSections(el) {
   const merged = new Map();
   for (const s of _conflictScan.stations) merged.set(s.stationId, s);
   for (const s of (state._conflictedStations || new Map()).values()) merged.set(s.stationId, s);
-  const allStationConflicts = Array.from(merged.values());
+  // Новый вид, охват «Избранное»: только избранные станции и маршруты
+  const favOnly = isNextUi() && state.nxProblemsScope === "fav";
+  const favRoute = (rid) => routePairMemberIds(rid).some((id) => favRouteIds.has(id));
+  const allStationConflicts = Array.from(merged.values()).filter((s) => !favOnly || favStationIds.has(s.stationId));
   const conflictsByRoute = new Map();
   for (const st of allStationConflicts) {
     for (const rid of st.routeIds || []) {
@@ -1983,7 +2303,7 @@ function renderProblemsSections(el) {
         `<div class="problem-card" data-goto-station="${escapeHtml(st.stationId)}" style="cursor:pointer;">
           <div class="problem-card-name">${favStationIds.has(st.stationId) ? "★ " : ""}${escapeHtml(st.stationName)}</div>
           <div class="problem-card-sub">${st.conflictCount} ${escapeHtml(pluralWord(st.conflictCount, "conflict"))}</div>
-          <button class="problem-fix-btn" data-fix-station="${escapeHtml(st.stationId)}">${escapeHtml(t("problemsFixConflict"))}</button>
+          <div class="nx-pbtns"><button class="problem-fix-btn" data-fix-station="${escapeHtml(st.stationId)}">${escapeHtml(t("problemsFixConflict"))}</button><button type="button" class="next-only nx-ghost">${escapeHtml(t("nextOpen"))}</button></div>
         </div>`).join("")}</div>`
     : "";
 
@@ -1992,6 +2312,7 @@ function renderProblemsSections(el) {
   const rtPairs = new Map(); // pairKey → { rid, stations:Set }
   for (const [rid, sts] of conflictsByRoute.entries()) {
     if (!state.routesById.has(rid)) continue;
+    if (favOnly && !favRoute(rid)) continue;
     const key = routePairKey(rid);
     if (!rtPairs.has(key)) rtPairs.set(key, { rid, stations: new Set() });
     for (const s of sts) rtPairs.get(key).stations.add(s);
@@ -2009,7 +2330,7 @@ function renderProblemsSections(el) {
         const label = routePairLabel(rid);
         const isFav = routePairMemberIds(rid).some((id) => favRouteIds.has(id));
         return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(rid)}" style="border-left:3px solid ${r?.color || "#888"}">
-          <div class="problem-card-name">${isFav ? "★ " : ""}${escapeHtml(label)}</div>
+          <div class="problem-card-name">${r ? routeMarker(r.type, r.color, r.number, "md") : ""}${isFav ? "★ " : ""}${escapeHtml(label)}</div>
           <div class="problem-card-sub">${stations.size} ${escapeHtml(pluralWord(stations.size, "station"))}</div>
         </div>`;
       }).join("")}</div>`
@@ -2033,7 +2354,7 @@ function renderProblemsSections(el) {
   const isFavPair = (rid) => routePairMemberIds(rid).some((id) => favRouteIds.has(id));
 
   const liveDelayed = groupByPair(
-    (state._liveDelays || []).filter((d) => state.routesById.has(d.routeId)),
+    (state._liveDelays || []).filter((d) => state.routesById.has(d.routeId) && (!favOnly || favRoute(d.routeId))),
     (d) => d.routeId,
     (d) => d.maxDeviationMs,
   )
@@ -2047,28 +2368,29 @@ function renderProblemsSections(el) {
     ? `<div class="problems-grid">${liveDelayed.map((d) => {
         const r = state.routesById.get(d.routeId);
         return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(d.routeId)}" style="border-left:3px solid ${r?.color || "#888"}">
-          <div class="problem-card-name">${isFavPair(d.routeId) ? "★ " : ""}${escapeHtml(routePairLabel(d.routeId))}</div>
+          <div class="problem-card-name">${r ? routeMarker(r.type, r.color, r.number, "md") : ""}${isFavPair(d.routeId) ? "★ " : ""}${escapeHtml(routePairLabel(d.routeId))}</div>
           <div class="problem-card-sub ${deviationClass(d.maxDeviationMs)}">${formatDeviation(d.maxDeviationMs)}</div>
         </div>`;
       }).join("")}</div>`
     : "";
 
-  const byDelayPaired = groupByPair(byDelay, (a) => a.routeId, (a) => a.avgDeviationMs);
+  const byDelayPaired = groupByPair(byDelay.filter((a) => !favOnly || favRoute(a.routeId)), (a) => a.routeId, (a) => a.avgDeviationMs);
   const delayHtml = byDelayPaired.length
     ? `<div class="problems-grid">${byDelayPaired.map((a) => {
         const r = state.routesById.get(a.routeId);
         return `<div class="problem-card clickable-row" data-route-id="${escapeHtml(a.routeId)}" style="border-left:3px solid ${r?.color || "#888"}">
-          <div class="problem-card-name">${isFavPair(a.routeId) ? "★ " : ""}${escapeHtml(routePairLabel(a.routeId))}</div>
+          <div class="problem-card-name">${r ? routeMarker(r.type, r.color, r.number, "md") : ""}${isFavPair(a.routeId) ? "★ " : ""}${escapeHtml(routePairLabel(a.routeId))}</div>
           <div class="problem-card-sub ${deviationClass(a.avgDeviationMs)}">${formatDeviation(a.avgDeviationMs)} · ${a.sampleCount} ${escapeHtml(t("colSamples")).toLowerCase()}</div>
         </div>`;
       }).join("")}</div>`
     : "";
 
-  el.innerHTML =
-    makeSection("conflicts-st", t("problemsTitleConflicts") + " — " + t("colStation"), stItems.length, stHtml) +
-    makeSection("conflicts-rt", t("problemsTitleConflicts") + " — " + t("tabRoutes"), rtItems.length, rtHtml) +
-    makeSection("delayed-now", t("problemsTitleDelayed"), liveDelayed.length, liveDelayedHtml) +
-    makeSection("delays", t("problemsTitleDelays"), byDelayPaired.length, delayHtml);
+  nextSyncProblemsScope();
+  el.innerHTML = nextProblemsKpis(stItems, liveDelayed) +
+    makeSection("conflicts-st", isNextUi() ? t("nextPsStations") : t("problemsTitleConflicts") + " — " + t("colStation"), stItems.length, stHtml) +
+    makeSection("conflicts-rt", isNextUi() ? t("nextPsRoutes") : t("problemsTitleConflicts") + " — " + t("tabRoutes"), rtItems.length, rtHtml) +
+    makeSection("delayed-now", isNextUi() ? t("nextPsLateNow") : t("problemsTitleDelayed"), liveDelayed.length, liveDelayedHtml) +
+    makeSection("delays", isNextUi() ? t("nextPsAvg") : t("problemsTitleDelays"), byDelayPaired.length, delayHtml);
 
   el.querySelectorAll(".problems-section-header").forEach((h) => {
     h.addEventListener("click", () => document.getElementById(h.dataset.toggle)?.classList.toggle("open"));
@@ -2341,13 +2663,984 @@ function applyExperimentalUi() {
   document.documentElement.classList.toggle("ui-next", !!settings.experimentalUi);
   const cb = document.getElementById("experimentalUiToggle");
   if (cb) cb.checked = !!settings.experimentalUi;
-  updateNextPageTitle();
+  applyI18n(); // подписи меню различаются между видами (data-i18n-next); внутри — updateNextPageTitle
+  renderNextFavorites();
+  // метки маршрутов по умолчанию, табло, списки — в новом виде другие
+  try { rerenderRouteMarkers(); } catch (e) {}
 }
-// Заголовок страницы в шапке нового UI = подпись активной вкладки.
+// Шапка нового UI: крошки «Главная → (Расписания →) Раздел», заголовок, подзаголовок.
+// Заголовок — подпись раздела, у табло станции — имя станции (как в макете).
 function updateNextPageTitle() {
-  const el = document.getElementById("nextPageTitle");
-  const active = document.querySelector(".tab-btn.active");
-  if (el && active) el.textContent = active.textContent;
+  const titleEl = document.getElementById("nextPageTitle");
+  const panel = document.querySelector(".tab-panel.active");
+  if (!titleEl || !panel) return;
+  syncNextLayout();
+  const tab = document.body.dataset.nxTab || "";
+  const btn = tab === "scheme"
+    ? document.getElementById("nextNavScheme")
+    : document.querySelector(`.tab-btn[data-tab="${panel.id.slice(4)}"]:not([data-board-mode])`);
+  const label = btn ? (btn.querySelector(".tab-label") || btn).textContent.trim() : "";
+  let title = label;
+  if (tab === "schedule" && state.currentStationId) {
+    const st = state.stations.find((s) => s.id === state.currentStationId);
+    if (st) title = st.name;
+  }
+  titleEl.textContent = title;
+
+  const crumbs = document.getElementById("nextCrumbs");
+  if (crumbs) {
+    crumbs.innerHTML = "";
+    const add = (text, goto) => {
+      if (crumbs.childNodes.length) {
+        const sep = document.createElement("span");
+        sep.setAttribute("aria-hidden", "true");
+        sep.textContent = "→";
+        crumbs.appendChild(sep);
+      }
+      const el = document.createElement(goto ? "button" : "span");
+      el.textContent = text;
+      if (goto) { el.type = "button"; el.addEventListener("click", () => switchToTab(goto)); }
+      else el.className = "cur";
+      crumbs.appendChild(el);
+    };
+    add(t("nextHome"), "schedule");
+    if (tab === "schedule" || tab === "graph") add(t("nextGroupSchedules"), "schedule");
+    add(label, null);
+  }
+
+  const leadEl = document.getElementById("nextPageLead");
+  if (leadEl) {
+    let lead = "";
+    if (tab === "schedule") lead = (document.getElementById("scheduleMeta")?.textContent || "").trim();
+    else if (tab === "graph") lead = nextGraphLead();
+    else if (tab === "routes") lead = nextRoutesLead();
+    else if (tab === "problems") lead = t("nextProblemsLead");
+    else if (tab === "settings") lead = t("nextSettingsLead");
+    else if (tab === "scheme" || tab === "boards") {
+      const mode = document.getElementById(tab === "scheme" ? "boardModeScheme" : "boardModeTimetable");
+      lead = (mode?.querySelector(":scope > p.hint:first-child")?.textContent || "").trim();
+    } else lead = (panel.querySelector(":scope > p.hint:first-child")?.textContent || "").trim();
+    leadEl.textContent = lead;
+    leadEl.title = lead;
+    // длинный подзаголовок прячется в «?» рядом с инструментами шапки
+    const help = document.getElementById("nextHelp");
+    if (help) {
+      document.getElementById("nextHelpPop").textContent = lead;
+      help.hidden = !lead;
+    }
+  }
+  updateNextProblemsCount();
+  nextLocalizeSegments();
+}
+// Переключатель «Табло / Схема сети» меняет вводную подсказку редактора
+document.addEventListener("click", (e) => {
+  if (e.target.closest && e.target.closest(".board-mode-btn")) setTimeout(updateNextPageTitle, 0);
+});
+// Строку о станции пишет loadSchedule — следим за ней, чтобы подзаголовок шапки не отставал
+{
+  const meta = document.getElementById("scheduleMeta");
+  if (meta) new MutationObserver(updateNextPageTitle).observe(meta, { childList: true, characterData: true, subtree: true });
+}
+
+// ============================================================
+// Новый интерфейс (ui-next): каркас и экраны по макетам Claude Design.
+// Спецификация — docs/ui-next-spec.md. Всё здесь срабатывает только при
+// html.ui-next; классический вид не меняется.
+// ============================================================
+function isNextUi() { return document.documentElement.classList.contains("ui-next"); }
+
+// Инструменты разделов живут в своих вкладках (классика), а в новом виде
+// переезжают в шапку и панели. Узел переносится целиком (с обработчиками),
+// на старом месте остаётся метка-комментарий, по ней он возвращается.
+const _nxMoved = [];
+function nxMove(node, target) {
+  if (!node || !target || node.parentNode === target) return;
+  const mark = document.createComment("nx");
+  node.parentNode.insertBefore(mark, node);
+  _nxMoved.push({ node, mark });
+  target.appendChild(node);
+}
+function nxRestoreAll() {
+  while (_nxMoved.length) {
+    const { node, mark } = _nxMoved.pop();
+    if (mark.parentNode) { mark.parentNode.insertBefore(node, mark); mark.remove(); }
+  }
+}
+// Мелкие пояснения карточек настроек прячутся в «?» в углу карточки: кнопка
+// ставится перед абзацем, а CSS показывает абзац всплывашкой по наведению
+// (текст остаётся в самом абзаце, так что перевод интерфейса продолжает работать)
+const NX_FOLD_HINTS = ["#serverUrlHint", '[data-i18n="settingsNote"]', '[data-i18n="experimentalUiHint"]',
+  '[data-i18n="routeMarkersHint"]', '[data-i18n="betaUpdatesHint"]', '[data-i18n="diagReportHint"]'];
+function nxFoldHints() {
+  document.querySelectorAll(NX_FOLD_HINTS.map((s) => ".settings-block > " + s).join(",")).forEach((p) => {
+    if (p._nxFolded) return;
+    p._nxFolded = true;
+    p.classList.add("nx-help-src");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "nx-help-btn nx-help-abs";
+    b.textContent = "?";
+    p.parentNode.insertBefore(b, p);
+  });
+}
+function syncNextLayout() {
+  nxRestoreAll();
+  const panel = document.querySelector(".tab-panel.active");
+  const tab = panel ? panel.id.slice(4) : "";
+  const schemeMode = tab === "board" && document.getElementById("boardModeScheme")?.style.display !== "none";
+  document.body.dataset.nxTab = tab === "board" ? (schemeMode ? "scheme" : "boards") : tab;
+  const next = isNextUi();
+  // «Генераторы табло» и «Схема сети» — два пункта меню одной вкладки «Редактор»
+  const boardBtn = document.querySelector('.tab-btn[data-tab="board"]:not([data-board-mode])');
+  const schemeBtn = document.getElementById("nextNavScheme");
+  if (boardBtn) boardBtn.classList.toggle("active", tab === "board" && (!next || !schemeMode));
+  if (schemeBtn) schemeBtn.classList.toggle("active", next && schemeMode);
+  if (!next) return;
+  nxFoldHints();
+  nxMove(panel && panel.querySelector(":scope > .controls"), document.getElementById("nextHeadTools"));
+  if (tab === "schedule") nxMove(document.getElementById("toggleFavoriteStationBtn"), document.getElementById("nextTitleExtra"));
+  const zoom = document.getElementById("nextDashZoom");
+  ["dashZoomOut", "dashZoomValue", "dashZoomIn"].forEach((id) => nxMove(document.getElementById(id), zoom));
+  nxMove(document.getElementById("resetDashOverridesBtn"), document.getElementById("nextDashReset"));
+  nxMove(document.getElementById("graphLegend"), document.getElementById("nextGraphLegendSlot"));
+  // без полосы окна Electron (браузер) статус MTR — внизу меню, а не в шапке
+  if (!document.documentElement.classList.contains("has-titlebar")) nxMove(document.getElementById("statusBadge"), document.querySelector("nav.tabs"));
+  document.querySelectorAll("[data-next-goto]").forEach((b) => b.classList.toggle("on", b.dataset.nextGoto === tab));
+  // карточка маршрута пристыкована справа под шапкой — её верх = низ шапки
+  const top = document.querySelector(".topbar");
+  if (top) document.documentElement.style.setProperty("--nx-top", Math.round(top.getBoundingClientRect().bottom + 8) + "px");
+}
+window.addEventListener("resize", () => { if (isNextUi()) syncNextLayout(); });
+
+// Подписи окон времени («3 ч», «Сутки») — по языку
+function nextLocalizeSegments() {
+  document.querySelectorAll("#nextDashWindow [data-hours], #nextGraphWindow [data-hours]").forEach((b) => {
+    const h = Number(b.dataset.hours);
+    b.textContent = h === 24 ? t("nextDay") : t("nextHours", { n: h });
+  });
+  const ac = document.getElementById("graphFromAC"), bc = document.getElementById("graphToAC");
+  if (ac) ac.dataset.tag = "A";
+  if (bc) bc.dataset.tag = currentLang() === "ru" ? "Б" : "B";
+}
+
+// Пункт меню «Схема сети» и «Генераторы табло» включают нужный режим редактора
+document.querySelectorAll('.tab-btn[data-tab="board"]').forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (!isNextUi()) return;
+    const id = btn.dataset.boardMode === "scheme" ? "boardModeSchemeBtn" : "boardModeTimetableBtn";
+    document.getElementById(id)?.click();
+    setTimeout(updateNextPageTitle, 0);
+  });
+});
+// Сегмент «Табло станции / График движения» в шапке
+document.querySelectorAll("[data-next-goto]").forEach((b) => b.addEventListener("click", () => switchToTab(b.dataset.nextGoto)));
+// Свернуть / развернуть панель фильтров
+document.querySelectorAll("[data-nx-collapse]").forEach((b) => {
+  b.addEventListener("click", () => document.getElementById(b.dataset.nxCollapse)?.classList.toggle("nx-collapsed"));
+});
+// Ctrl+K — в поле поиска текущего раздела
+document.addEventListener("keydown", (e) => {
+  // по физической клавише: с русской раскладкой e.key = «л»
+  if (!isNextUi() || !(e.ctrlKey || e.metaKey) || e.altKey || (e.code !== "KeyK" && e.key.toLowerCase() !== "k")) return;
+  const input = document.querySelector('#nextHeadTools input[type="text"]')
+    || document.querySelector(".tab-panel.active input[type='text'], .tab-panel.active input[type='search']");
+  if (!input) return;
+  e.preventDefault();
+  input.focus();
+  input.select();
+});
+
+// Счётчик у пункта «Задержки и проблемы» — станции с конфликтами (обход сети + просмотренные)
+function updateNextProblemsCount() {
+  const el = document.getElementById("nextProblemsCount");
+  if (!el) return;
+  let n = 0;
+  try {
+    const ids = new Set(_conflictScan.stations.map((s) => s.stationId));
+    for (const s of (state._conflictedStations || new Map()).values()) if (s.conflictCount > 0) ids.add(s.stationId);
+    n = ids.size;
+  } catch (e) {}
+  el.textContent = n > 0 ? String(n) : "";
+}
+
+// Короткие бейджи линий (мотив «срез 60°» из макета) — для избранного и групп маршрутов
+function nxBadge(color, number, extraCls, title) {
+  const c = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(color || "")) ? color : "#8b8f9a";
+  const ink = window.RouteMarkers && RouteMarkers.inkFor ? RouteMarkers.inkFor(c) : "#fff";
+  const tip = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<span class="nx-rb${extraCls ? " " + extraCls : ""}" style="background:${c};color:${ink}"${tip}>${escapeHtml(String(number || "•"))}</span>`;
+}
+// Подпись бейджа: номер, а у маршрута без номера — первое слово названия; не длиннее 7 знаков
+// (полное название вроде «БТВ1 - ММС кроме ЛГ БО ТР» раздувало бейдж и залезало на соседние колонки)
+function nxShortLabel(number, name) {
+  const w = number ? String(number).trim() : String(name || "").trim().split(/[\s|]+/)[0] || "";
+  return w.length > 7 ? w.slice(0, 6) + "…" : w;
+}
+// Для стопки бейджей: маршруты с одинаковой видимой подписью и цветом («БТВ1 …» ×3) — один бейдж
+function nxUniqBadges(routes) {
+  const seen = new Set();
+  return routes.filter((r) => { const k = nxShortLabel(r.number, r.name) + r.color; if (seen.has(k)) return false; seen.add(k); return true; });
+}
+function nxRouteBadge(r) {
+  const full = [r.number, r.name].filter(Boolean).join(" · ");
+  return nxBadge(r.color, nxShortLabel(r.number, r.name), "", full);
+}
+function nxMoreBadge(n) { return `<span class="nx-rb more">+${n}</span>`; }
+// Маршруты, проходящие через станцию (уникальные по номеру+цвету — прямой и обратный один бейдж)
+function nxRoutesAtStation(stationId) {
+  const seen = new Set(), out = [];
+  for (const r of state.routes || []) {
+    if (r.isDraft || !Array.isArray(r.stationIds) || !r.stationIds.includes(stationId)) continue;
+    const key = (r.number || r.name) + "|" + r.color;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
+// ---------- Табло станции ----------
+// Окно времени: масштаб, при котором N часов помещаются в видимую ширину табло
+function nextSetDashWindow(hours) {
+  const gs = document.getElementById("gridScroll");
+  if (!gs || !gs.clientWidth) return;
+  state.dashPxPerHour = Math.max(20, Math.min(1100, Math.round(gs.clientWidth / hours)));
+  const v = document.getElementById("dashZoomValue");
+  if (v) v.textContent = `${Math.round((state.dashPxPerHour / ZOOM_BASE_PX_PER_HOUR) * 100)}%`;
+  renderDashboardFromCache();
+  scrollToNow();
+}
+function nextSetGraphWindow(hours) {
+  const gw = document.getElementById("graphWrap");
+  if (!gw || !gw.clientWidth) return;
+  state.graphPxPerHour = Math.max(20, Math.min(1100, Math.round(gw.clientWidth / hours)));
+  const v = document.getElementById("graphZoomValue");
+  if (v) v.textContent = `${Math.round((state.graphPxPerHour / ZOOM_BASE_PX_PER_HOUR) * 100)}%`;
+  renderGraphFromCache();
+  scrollGraphToNow();
+}
+// Подсветка сегмента окна, если текущий масштаб ему соответствует
+function nextMarkWindow(segId, scrollId, pxPerHour) {
+  const seg = document.getElementById(segId), sc = document.getElementById(scrollId);
+  if (!seg || !sc || !sc.clientWidth) return;
+  const hoursVisible = sc.clientWidth / pxPerHour;
+  seg.querySelectorAll("[data-hours]").forEach((b) => {
+    b.classList.toggle("on", Math.abs(hoursVisible - Number(b.dataset.hours)) / Number(b.dataset.hours) < 0.12);
+  });
+}
+document.querySelectorAll("#nextDashWindow [data-hours]").forEach((b) => b.addEventListener("click", () => nextSetDashWindow(Number(b.dataset.hours))));
+document.querySelectorAll("#nextGraphWindow [data-hours]").forEach((b) => b.addEventListener("click", () => nextSetGraphWindow(Number(b.dataset.hours))));
+document.getElementById("nextDashNow")?.addEventListener("click", () => scrollToNow());
+document.getElementById("nextGraphNow")?.addEventListener("click", () => scrollGraphToNow());
+
+// Пары конфликтов на табло: из state.conflictDetails (ключ записи → партнёры)
+function nextDashConflictPairs() {
+  const entries = state.currentDashboardEntries || [];
+  const byKey = new Map(entries.map((e) => [e.entryKey, e]));
+  const pairs = [], seen = new Set();
+  for (const [key, partners] of state.conflictDetails || new Map()) {
+    const a0 = byKey.get(key);
+    if (!a0) continue;
+    for (const p of partners) {
+      const b0 = byKey.get(p.entryKey) || p;
+      const [a, b] = a0.effArrival <= b0.effArrival ? [a0, b0] : [b0, a0];
+      const id = a.entryKey + "|" + b.entryKey;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      pairs.push({ a, b });
+    }
+  }
+  // ближайшие к «сейчас» — первыми (по кругу суток)
+  const now = getNowMsOfDay();
+  const ahead = (ms) => ((ms - now + 3600000) % MS_PER_DAY + MS_PER_DAY) % MS_PER_DAY;
+  return pairs.sort((x, y) => ahead(x.a.effArrival) - ahead(y.a.effArrival));
+}
+function nextRenderBoardBar() {
+  if (!isNextUi()) return;
+  const entries = state.currentDashboardEntries || [];
+  const pairs = nextDashConflictPairs();
+  const late = entries.filter((e) => e.deviationMs > 60000).length;
+  const drafts = new Set(entries.filter((e) => e.isDraft).map((e) => e.routeId)).size;
+  const set = (id, n, key) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = n > 0 ? t(key, { n }) : "";
+  };
+  set("nextDashConflicts", pairs.length, "nextChipConflicts");
+  set("nextDashLate", late, "nextChipLate");
+  set("nextDashDrafts", drafts, "nextChipDrafts");
+  // сетка часов на строках платформ (фон .dashboard-grid в ui-next.css)
+  document.getElementById("dashboardGrid")?.style.setProperty("--nx-hour", state.dashPxPerHour + "px");
+  const off = currentTzOffsetMin();
+  const tz = document.getElementById("nextBoardTz");
+  if (tz) tz.textContent = t("nextLocalTime", { tz: "UTC" + (off >= 0 ? "+" : "−") + Math.abs(off / 60) });
+  nextMarkWindow("nextDashWindow", "gridScroll", state.dashPxPerHour);
+  nextRenderConflicts(pairs);
+}
+// Панель «Конфликты» справа от табло: время, платформа, интервал, сдвиг одной кнопкой
+function nextRenderConflicts(pairs) {
+  const list = document.getElementById("nextConflictList");
+  const cnt = document.getElementById("nextConflictsCount");
+  if (!list) return;
+  if (cnt) cnt.textContent = pairs.length ? String(pairs.length) : "";
+  const minMs = (state.minIntervalMin || 0) * 60000;
+  if (!pairs.length) {
+    list.innerHTML = `<p class="nx-empty">${escapeHtml(t("nextNoConflicts"))}</p>`;
+    return;
+  }
+  list.innerHTML = pairs.slice(0, 40).map(({ a, b }, i) => {
+    const aEnd = Math.max(a.effDeparture ?? a.effArrival, a.effArrival + (a.dwellTimeMs || 0));
+    const gapMs = b.effArrival - aEnd;
+    const needMin = Math.max(1, Math.ceil((minMs - gapMs) / 60000));
+    const gap = gapMs <= 0 ? t("nextOverlap") : t("nextGap", { gap: formatSecondsShort(Math.round(gapMs / 1000)) });
+    const r1 = a.routeNumber || a.routeName || "?", r2 = b.routeNumber || b.routeName || "?";
+    return `<div class="nx-ccard">
+      <div class="nx-ccard-top"><span><i class="nx-dot bad"></i><b class="mono">${formatLocal(a.effArrival)}</b> ${escapeHtml(t("nextPlatformN", { p: a.effPlatform }))}</span><span class="mono nx-gap">${escapeHtml(gap)}</span></div>
+      <div class="nx-ccard-text">${escapeHtml(t("nextConflictText", { r1, r2, min: state.minIntervalMin }))}</div>
+      <div class="nx-ccard-btns"><button type="button" class="nx-raised" data-nx-shift="${i}" data-min="${needMin}">${escapeHtml(t("nextShiftBy", { r: r2, n: needMin }))}</button><button type="button" class="nx-ghost" data-nx-show="${i}">${escapeHtml(t("nextShow"))}</button></div>
+    </div>`;
+  }).join("");
+  list.querySelectorAll("[data-nx-shift]").forEach((btn) => btn.addEventListener("click", () => {
+    const { b } = pairs[Number(btn.dataset.nxShift)];
+    pushUndoSnapshot();
+    setOverride(b.routeId, b.tripOriginMs, getOverride(b.routeId, b.tripOriginMs) + Number(btn.dataset.min) * 60000);
+    renderDashboardFromCache();
+    renderGraphFromCache();
+  }));
+  list.querySelectorAll("[data-nx-show]").forEach((btn) => btn.addEventListener("click", () => {
+    const { a, b } = pairs[Number(btn.dataset.nxShow)];
+    state.chainHl = new Set([`${a.routeId}:${a.tripOriginMs}`, `${b.routeId}:${b.tripOriginMs}`]);
+    renderDashboardFromCache();
+    const gs = document.getElementById("gridScroll");
+    if (gs) {
+      const x = (toDisplayMs(a.effArrival) / MS_PER_DAY) * dashTimelineWidth() - gs.clientWidth / 3;
+      gs.scrollLeft = Math.max(0, x);
+      const rs = document.getElementById("rulerScroll");
+      if (rs) rs.scrollLeft = gs.scrollLeft;
+    }
+  }));
+}
+document.getElementById("nextResolveAll")?.addEventListener("click", async (e) => {
+  if (!state.currentStationId) return;
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  try {
+    await autoResolveStation(state.currentStationId);
+    renderDashboardFromCache();
+    renderGraphFromCache();
+  } finally { btn.disabled = false; }
+});
+// Подпись строки платформы: тип транспорта и главное направление по рейсам платформы
+function nextPlatformMeta(list) {
+  if (!list || !list.length) return { kind: "", dest: "" };
+  const top = (arr) => {
+    const m = new Map();
+    arr.filter(Boolean).forEach((v) => m.set(v, (m.get(v) || 0) + 1));
+    return [...m.entries()].sort((x, y) => y[1] - x[1]).map((x) => x[0]);
+  };
+  const kinds = top(list.map((e) => e.routeType)).map(routeTypeName);
+  const dests = top(list.map((e) => {
+    const r = state.routesById.get(e.routeId) || {};
+    return r.terminus || (r.lastStationId && state.stations.find((s) => s.id === r.lastStationId)?.name) || "";
+  }));
+  return { kind: kinds.slice(0, 2).join(", "), dest: dests.length > 1 ? `${dests[0]} +${dests.length - 1}` : (dests[0] || "") };
+}
+// Флажок текущего времени на линейке (мятный, срез 60°)
+function nextPositionNowFlag() {
+  const ruler = document.getElementById("dashboardRuler");
+  if (!ruler) return;
+  let flag = document.getElementById("dashNowFlag");
+  if (!flag || flag.parentNode !== ruler) {
+    flag = document.createElement("span");
+    flag.id = "dashNowFlag";
+    flag.className = "next-only nx-now-flag";
+    ruler.appendChild(flag);
+  }
+  const nowMs = getNowMsOfDay();
+  flag.textContent = formatLocal(nowMs);
+  flag.style.left = (toDisplayMs(nowMs) / MS_PER_DAY) * dashTimelineWidth() + "px";
+  const after = document.getElementById("nextNearestAfter");
+  if (after) after.textContent = t("nextAfter", { time: formatLocal(nowMs) });
+}
+setInterval(() => { if (isNextUi()) nextPositionNowFlag(); }, 30000);
+
+// ---------- График движения ----------
+function nextGraphLead() {
+  const d = state.lastGraphData;
+  if (!d || !Array.isArray(d.routes)) return (document.querySelector("#tab-graph > p.hint:first-child")?.textContent || "").trim();
+  const stations = new Set();
+  d.routes.forEach((r) => (r.trips || []).forEach((tr) => (tr.points || []).forEach((p) => p.stationId && stations.add(p.stationId))));
+  return t("nextGraphLead", { s: stations.size, r: d.routes.length });
+}
+function nextRenderGraphBar() {
+  if (!isNextUi()) return;
+  const cs = state._graphConflicts || [];
+  const st = cs.filter((c) => c.kind === "station").length, ov = cs.length - st;
+  const el = document.getElementById("nextGraphConflicts");
+  if (el) el.textContent = cs.length ? t("nextGraphChip", { c: st, o: ov }) : "";
+  nextMarkWindow("nextGraphWindow", "graphWrap", state.graphPxPerHour);
+  const lead = document.getElementById("nextPageLead");
+  if (lead && document.body.dataset.nxTab === "graph") lead.textContent = nextGraphLead();
+  if (state._nxTrip) nextShowTrip(state._nxTrip, true);
+}
+document.getElementById("nextShowTurnLinks")?.addEventListener("change", (e) => {
+  document.getElementById("graphWrap")?.classList.toggle("nx-hide-turn", !e.target.checked);
+});
+document.getElementById("nextTripClose")?.addEventListener("click", () => { state._nxTrip = null; nextShowTrip(null); });
+// Панель «Рейс»: выбранная линия поезда — остановки, время в пути, конфликты и решения.
+// sel = { routeId, t0 }; ищем рейс заново в state.graphTripRefs (после перерисовки индексы другие)
+function nextShowTrip(sel, quiet) {
+  const body = document.getElementById("nextTripBody");
+  if (!body) return;
+  const ref = sel && (state.graphTripRefs || []).find((r) => r.route.routeId === sel.routeId && r.trip.tripOriginMs === sel.t0);
+  if (!ref) {
+    body.innerHTML = `<p class="nx-empty">${escapeHtml(t(quiet && sel ? "nextTripGone" : "nextTripHint"))}</p>`;
+    return;
+  }
+  const route = ref.route;
+  const pts = (ref.effPoints || []).slice().sort((a, b) => a.arrivalMs - b.arrivalMs);
+  const first = pts[0], last = pts[pts.length - 1];
+  const dep = first ? (first.departureMs ?? first.arrivalMs) : null;
+  const travelMin = first && last ? Math.round((last.arrivalMs - dep) / 60000) : 0;
+  const nameOf = (p) => p.stationName || state.stations.find((s) => s.id === p.stationId)?.name || p.stationId || "—";
+  const nowMs = getNowMsOfDay();
+  const dir = first && last ? `${nameOf(first)} → ${nameOf(last)}` : "";
+  const stops = pts.map((p) => {
+    const passed = normalizeMs(p.arrivalMs) < nowMs;
+    return `<div class="nx-stop${passed ? " passed" : ""}" style="--c:${/^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(route.color || "")) ? route.color : "#8b8f9a"}"><i></i><span>${escapeHtml(nameOf(p))}</span><span class="mono">${formatLocal(normalizeMs(p.arrivalMs))}</span></div>`;
+  }).join("");
+  const mine = (x) => x && x.routeId === route.routeId && x.t0 === ref.trip.tripOriginMs;
+  const cs = (state._graphConflicts || []).filter((c) => mine(c.a) || mine(c.b));
+  const minMs = (state.minIntervalMin || 0) * 60000;
+  const conflicts = cs.map((c, i) => {
+    const other = mine(c.a) ? c.b : c.a;
+    let btns = "";
+    if (c.kind === "station" && c.a.end != null) {
+      const need = Math.max(1, Math.ceil((minMs - (c.b.arr - c.a.end)) / 60000));
+      btns = `<div class="nx-ccard-btns"><button type="button" class="nx-raised" data-nx-tshift="${i}" data-who="other" data-min="${need}">${escapeHtml(t("nextShiftShort", { r: other.routeNumber || "?", n: "+" + need }))}</button><button type="button" class="nx-ghost" data-nx-tshift="${i}" data-who="me" data-min="${-need}">${escapeHtml(t("nextShiftTrip", { n: "−" + need }))}</button></div>`;
+    }
+    return `<div class="nx-ccard"><div class="nx-ccard-top"><span><i class="nx-dot ${c.kind === "station" ? "bad" : "warn diamond"}"></i><b>${escapeHtml(c.kind === "station" ? t("nextConflictAtStation") : t("nextOvertake"))}</b></span></div>
+      <div class="nx-ccard-text">${escapeHtml(c.problem || "")}</div><div class="nx-ccard-fix">${escapeHtml(c.solution || "")}</div>${btns}</div>`;
+  }).join("");
+  body.innerHTML = `
+    <div class="nx-sec">
+      <div class="nx-trip-head">${nxBadge(route.color, nxShortLabel(route.routeNumber, route.routeName), "lg", route.routeName)}<span><b>${escapeHtml(dir)}</b><small>${escapeHtml(routeTypeName(route.type))} · ${escapeHtml(t("nextDepShort", { t: dep != null ? formatLocal(normalizeMs(dep)) : "—" }))} · ${escapeHtml(t("nextTravel", { n: travelMin }))}</small></span></div>
+      <div class="nx-row-btns"><button type="button" class="nx-raised" id="nextTripCard">${escapeHtml(t("nextRouteCard"))}</button><button type="button" class="nx-raised" id="nextTripChain">${escapeHtml(t("nextChain"))}</button></div>
+    </div>
+    <div class="nx-sec"><h4>${escapeHtml(t("modalStops"))}</h4><div class="nx-stops">${stops}</div></div>
+    <div class="nx-sec last"><h4>${escapeHtml(t("nextTripConflicts"))} <span class="bad">${cs.length || ""}</span></h4>${conflicts || `<p class="nx-empty">${escapeHtml(t("nextNoConflicts"))}</p>`}</div>`;
+  body.querySelector("#nextTripCard").addEventListener("click", () => openRouteModal(route.routeId));
+  body.querySelector("#nextTripChain").addEventListener("click", () => toggleChainHighlight(route.routeId, ref.trip.tripOriginMs));
+  body.querySelectorAll("[data-nx-tshift]").forEach((b) => b.addEventListener("click", () => {
+    const c = cs[Number(b.dataset.nxTshift)];
+    const who = b.dataset.who === "me" ? { routeId: route.routeId, t0: ref.trip.tripOriginMs } : (mine(c.a) ? c.b : c.a);
+    pushUndoSnapshot();
+    setOverride(who.routeId, who.t0, getOverride(who.routeId, who.t0) + Number(b.dataset.min) * 60000);
+    renderGraphFromCache();
+    renderDashboardFromCache();
+  }));
+}
+
+// ---------- Станции и маршруты ----------
+function nextRoutesLead() {
+  const drafts = (state.routes || []).filter((r) => r.isDraft).length;
+  return t("nextRoutesLead", { s: state.stations.length, r: (state.routes || []).length - drafts, d: drafts });
+}
+// Конфликты по маршрутам: обход сети + просмотренные станции (число станций с конфликтом)
+function nextRouteConflictCounts() {
+  const by = new Map();
+  try {
+    const merged = new Map();
+    for (const s of _conflictScan.stations) merged.set(s.stationId, s);
+    for (const s of (state._conflictedStations || new Map()).values()) merged.set(s.stationId, s);
+    for (const s of merged.values()) for (const rid of s.routeIds || []) by.set(rid, (by.get(rid) || 0) + 1);
+  } catch (e) {}
+  return by;
+}
+if (!state.nxOpenGroups) state.nxOpenGroups = null; // null = раскрыта первая группа маршрутов
+function nextRenderRouteGroups(routes) {
+  const box = document.getElementById("nextRouteGroups");
+  if (!box || !isNextUi()) return;
+  const conf = nextRouteConflictCounts();
+  const stName = (id) => state.stations.find((s) => s.id === id)?.name || "";
+  const sel = state.lastRouteDetail && document.getElementById("routeModalOverlay")?.style.display !== "none" ? state.lastRouteDetail.id : null;
+  const groups = new Map();
+  for (const r of routes) {
+    const key = r.isDraft ? "~draft" : (r.type || "~other");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const order = [...groups.keys()].sort((a, b) => {
+    if (a === "~draft") return 1;
+    if (b === "~draft") return -1;
+    const ka = RouteMarkers.KNOWN_TYPES.indexOf(a), kb = RouteMarkers.KNOWN_TYPES.indexOf(b);
+    return (ka < 0 ? 99 : ka) - (kb < 0 ? 99 : kb) || a.localeCompare(b);
+  });
+  if (!state.nxOpenGroups) state.nxOpenGroups = new Set(order.slice(0, 1));
+  const iconFor = (key) => key === "~draft" ? "draft" : /bus/.test(key) ? "bus" : /tram|light_rail/.test(key) ? "tram" : /metro/.test(key) ? "metro" : /boat/.test(key) ? "ship" : /cable/.test(key) ? "cable" : /airplane/.test(key) ? "plane" : "rail";
+  const devColor = (ms) => ms == null ? "var(--muted)" : Math.abs(ms) >= 90000 ? "#FF97A6" : Math.abs(ms) >= 40000 ? "#FFD08A" : "#D6FFF6";
+  const row = (r) => {
+    const a = r.analytics;
+    const ends = r.firstStationId && r.lastStationId ? `${stName(r.firstStationId)} → ${stName(r.lastStationId)}` : "";
+    const c = conf.get(r.id) || 0;
+    const avg = a ? a.avgDeviationMs : null;
+    const bar = avg == null ? 0 : Math.min(100, (Math.abs(avg) / 150000) * 100);
+    return `<div class="nx-item${r.id === sel ? " sel" : ""}" data-route-id="${escapeHtml(r.id)}" tabindex="0">
+      <span class="nx-item-name">${routeMarker(r.type, r.color, r.number, "md")}<span><b>${escapeHtml(r.name)}${isFavoriteRoute(r.id) ? ' <i class="nx-star"></i>' : ""}</b><small>${escapeHtml(ends)}</small></span></span>
+      <span class="mono r">${r.stopCount ?? "—"}</span>
+      <span class="mono" style="color:${devColor(avg)}">${a ? escapeHtml(formatDeviation(avg)) : "—"}</span>
+      <span class="nx-bar"><span style="width:${bar.toFixed(0)}%;background:${devColor(avg)}"></span></span>
+      <span class="mono r" style="color:${c ? "#FF97A6" : "var(--muted)"}">${c || "—"}</span>
+      <i class="nx-chev-r"></i>
+    </div>`;
+  };
+  const head = `<div class="nx-colh"><span>${escapeHtml(t("colLine"))}</span><span class="r">${escapeHtml(t("colStops"))}</span><span>${escapeHtml(t("colAvgDev"))}</span><span></span><span class="r">${escapeHtml(t("nextColConflicts"))}</span><span></span></div>`;
+  const stationsHtml = nextStationsGroup(conf);
+  box.innerHTML = stationsHtml + order.map((key) => {
+    const list = groups.get(key);
+    const open = state.nxOpenGroups.has(key);
+    const issues = list.reduce((s, r) => s + (conf.get(r.id) || 0), 0);
+    const peek = nxUniqBadges(list);
+    const title = key === "~draft" ? t("nextDraftRoutes") : key === "~other" ? t("nextOtherRoutes") : routeTypeName(key);
+    return `<div class="nx-acc${open ? " open" : ""}">
+      <button type="button" class="nx-acch" data-group="${escapeHtml(key)}" aria-expanded="${open}">
+        <i class="nx-gi" data-icon="${iconFor(key)}"></i><span>${escapeHtml(title)}</span><span class="n">${list.length}</span>
+        <span class="nx-stack">${peek.slice(0, 3).map((r) => nxRouteBadge(r)).join("")}${peek.length > 3 ? nxMoreBadge(peek.length - 3) : ""}</span>
+        <span class="nx-fill"></span>${issues ? `<span class="mono nx-issues">${escapeHtml(t("nextConflictsN", { n: issues }))}</span>` : ""}<i class="nx-chev"></i>
+      </button>
+      ${open ? `<div class="nx-acc-body">${head}${list.map(row).join("")}</div>` : ""}
+    </div>`;
+  }).join("") || `<p class="nx-empty">${escapeHtml(t("analyticsEmptyNoMatch"))}</p>`;
+  box.querySelectorAll("[data-nx-station]").forEach((el) => {
+    const open = () => gotoStationSchedule(el.dataset.nxStation);
+    el.addEventListener("click", open);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  });
+  box.querySelectorAll(".nx-acch").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.group;
+    if (state.nxOpenGroups.has(k)) state.nxOpenGroups.delete(k); else state.nxOpenGroups.add(k);
+    nextRenderRouteGroups(routes);
+  }));
+  box.querySelectorAll(".nx-item[data-route-id]").forEach((el) => {
+    const open = () => openRouteModal(el.dataset.routeId);
+    el.addEventListener("click", open);
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+  });
+}
+// Группа «Станции и остановки»: станции по числу маршрутов, конфликты — из обхода сети
+function nextStationsGroup(routeConf) {
+  const q = (document.getElementById("routeSearch")?.value || "").trim().toLowerCase();
+  const byStation = new Map();
+  for (const r of state.routes || []) {
+    if (r.isDraft) continue;
+    for (const id of r.stationIds || []) {
+      if (!byStation.has(id)) byStation.set(id, []);
+      byStation.get(id).push(r);
+    }
+  }
+  const stConf = new Map();
+  try {
+    for (const s of _conflictScan.stations) stConf.set(s.stationId, s.conflictCount || 0);
+    for (const s of (state._conflictedStations || new Map()).values()) stConf.set(s.stationId, s.conflictCount || 0);
+  } catch (e) {}
+  const list = state.stations
+    .filter((s) => !q || s.name.toLowerCase().includes(q))
+    .map((s) => ({ s, routes: byStation.get(s.id) || [] }))
+    .sort((a, b) => b.routes.length - a.routes.length || a.s.name.localeCompare(b.s.name));
+  if (!list.length) return "";
+  const key = "~stations";
+  const open = state.nxOpenGroups.has(key);
+  const issues = list.filter((x) => stConf.get(x.s.id) > 0).length;
+  const uniq = (routes) => {
+    const seen = new Set();
+    return routes.filter((r) => { const k = (r.number || r.name) + r.color; if (seen.has(k)) return false; seen.add(k); return true; });
+  };
+  const peek = nxUniqBadges(list.slice(0, 3).flatMap((x) => x.routes)).slice(0, 3);
+  const rows = open ? list.slice(0, 300).map(({ s, routes }) => {
+    const u = uniq(routes);
+    const ub = nxUniqBadges(u);
+    const c = stConf.get(s.id) || 0;
+    return `<div class="nx-item" data-nx-station="${escapeHtml(s.id)}" tabindex="0">
+      <span class="nx-item-name"><span class="nx-rb more">${escapeHtml(s.name.slice(0, 3))}</span><span><b>${escapeHtml(s.name)}</b><small>${escapeHtml(t("nextStationRoutes", { n: u.length }))}</small></span></span>
+      <span class="mono r">${u.length}</span>
+      <span class="nx-stack nx-stack-wide">${ub.slice(0, 3).map((r) => nxRouteBadge(r)).join("")}${ub.length > 3 ? nxMoreBadge(ub.length - 3) : ""}</span>
+      <span class="nx-cell-skip"></span>
+      <span class="mono r" style="color:${c ? "#FF97A6" : "var(--muted)"}">${c || "—"}</span>
+      <i class="nx-chev-r"></i>
+    </div>`;
+  }).join("") : "";
+  const head = `<div class="nx-colh"><span>${escapeHtml(t("colStation"))}</span><span class="r">${escapeHtml(t("nextColRoutes"))}</span><span></span><span></span><span class="r">${escapeHtml(t("nextColConflicts"))}</span><span></span></div>`;
+  return `<div class="nx-acc${open ? " open" : ""}">
+    <button type="button" class="nx-acch" data-group="${key}" aria-expanded="${open}">
+      <i class="nx-gi" data-icon="station"></i><span>${escapeHtml(t("nextStationsGroup"))}</span><span class="n">${list.length}</span>
+      <span class="nx-stack">${peek.map((r) => nxRouteBadge(r)).join("")}</span>
+      <span class="nx-fill"></span>${issues ? `<span class="mono nx-issues">${escapeHtml(t("nextStationsWithConflicts", { n: issues }))}</span>` : ""}<i class="nx-chev"></i>
+    </button>
+    ${open ? `<div class="nx-acc-body">${head}${rows}</div>` : ""}
+  </div>`;
+}
+document.getElementById("nextRoutesSort")?.addEventListener("click", () => {
+  const on = state.routeSort.key === "sampleCount" && state.routeSort.dir === -1;
+  state.routeSort = on ? { key: null, dir: 1 } : { key: "sampleCount", dir: -1 };
+  document.getElementById("nextRoutesSort").classList.toggle("on", !on);
+  applyRouteFilters();
+});
+
+// ---------- Карточка маршрута: подзаголовок, KPI, конфликты (только в новом виде) ----------
+function nextRouteCardExtras(data, timetable, conflictedTrips) {
+  const stops = data.stops || [];
+  const from = stops[0]?.stationName || "", to = stops[stops.length - 1]?.stationName || "";
+  const depots = (data.depots || []).filter(Boolean);
+  const sub = [from && to ? `${from} → ${to}` : "", routeTypeName(data.type), depots.length ? t("nextDepot", { d: depots.join(", ") }) : ""]
+    .filter(Boolean).join(" · ");
+  const trips = timetable && timetable.trips ? timetable.trips.map((tr) => tr.tripOriginMs).sort((a, b) => a - b) : [];
+  const gaps = trips.slice(1).map((v, i) => v - trips[i]).filter((g) => g > 0).sort((a, b) => a - b);
+  const interval = gaps.length ? gaps[Math.floor(gaps.length / 2)] : null;
+  const an = (state.lastAnalytics || []).find((a) => a.routeId === data.id);
+  const kpi = (label, value, color) => `<div class="nx-kpi"><span>${escapeHtml(label)}</span><b${color ? ` style="color:${color}"` : ""}>${escapeHtml(value)}</b></div>`;
+  const devCol = an ? (Math.abs(an.avgDeviationMs) >= 90000 ? "#FF97A6" : Math.abs(an.avgDeviationMs) >= 40000 ? "#FFD08A" : "#D6FFF6") : null;
+  const kpis = `<div class="next-only nx-kpis4">
+    ${kpi(t("nextKpiInterval"), interval ? formatSecondsShort(Math.round(interval / 1000)) : "—")}
+    ${kpi(t("nextKpiTravel"), data.totalDurationMs ? formatMinutesShort((data.totalDurationMs / 60000).toFixed(0)) : "—")}
+    ${kpi(t("nextKpiTrips"), trips.length ? String(trips.length) : "—")}
+    ${kpi(t("nextKpiAvgDev"), an ? formatDeviation(an.avgDeviationMs) : "—", devCol)}
+  </div>`;
+  const items = [];
+  if (conflictedTrips && conflictedTrips.forEach && timetable) {
+    conflictedTrips.forEach((stationIds, t0) => {
+      const trip = timetable.trips.find((tr) => tr.tripOriginMs === t0);
+      (stationIds instanceof Set ? [...stationIds] : []).forEach((sid) => {
+        const idx = timetable.stations.findIndex((s) => (s.stationId || s.id) === sid);
+        const cell = trip && idx >= 0 ? trip.times[idx] : null;
+        const name = (idx >= 0 && (timetable.stations[idx].stationName || timetable.stations[idx].name)) || state.stations.find((s) => s.id === sid)?.name || sid;
+        items.push({ sid, t0, name, time: cell ? formatUtc(normalizeMs(cell.arrivalMs - (trip.deviationMs || 0)), false) : "", fix: routeConflictFix(t0, sid) });
+      });
+    });
+  }
+  const conflicts = `<div class="next-only nx-card-conflicts"><h4>${escapeHtml(t("nextRouteConflicts"))} <span class="bad">${items.length || ""}</span></h4>${
+    items.length ? items.slice(0, 30).map((c) => {
+      const f = c.fix;
+      const info = f ? ` · ${t("nxcWith", { r: f.partner })} · ${f.gapMs <= 0 ? t("nextOverlap") : t("nextGap", { gap: formatSecondsShort(Math.round(f.gapMs / 1000)) })}` : "";
+      const shiftBtn = f ? `<button type="button" class="nx-raised" data-nxc-shift="${escapeHtml(String(c.t0))}" data-ms="${f.shiftMs}">${escapeHtml(t("nxcShiftBy", { n: (f.shiftMs > 0 ? "+" : "−") + Math.abs(f.shiftMs / 60000) }))}</button>` : "";
+      return `<div class="nx-crow"><span><i class="nx-dot bad"></i><b>${escapeHtml(c.name)}</b><span class="muted">${escapeHtml(c.time + info)}</span></span><span class="nx-crow-btns">${shiftBtn}<button type="button" class="nx-ghost" data-nx-goto="${escapeHtml(c.sid)}">${escapeHtml(t("nextOpen"))}</button></span></div>`;
+    }).join("")
+      : `<p class="nx-empty">${escapeHtml(t("nextNoConflicts"))}</p>`}</div>`;
+  return { sub: `<div class="next-only nx-card-sub">${escapeHtml(sub)}</div>`, kpis, conflicts, conflictCount: items.length };
+}
+
+// Карточка маршрута в новом виде — вставляется после nextRouteCardExtras (см. patch.py)
+
+// Насколько сдвинуть НАШ рейс, чтобы на станции sid разойтись со всеми партнёрами по конфликту.
+// Если мы приезжаем позже партнёра — сдвигаем позже, до его отправления + мин. интервал;
+// если раньше — сдвигаем раньше, чтобы наше отправление + интервал было до его прибытия.
+// Берём самого «тяжёлого» партнёра, округляем модуль вверх до минуты (не меньше 1).
+function routeConflictFix(t0, sid) {
+  const p = state.lastRouteConflictPairs && state.lastRouteConflictPairs.get(`${t0}|${sid}`);
+  if (!p || !p.partners.length) return null;
+  const minMs = (state.minIntervalMin || 0) * 60000;
+  const end = (e) => Math.max(e.effDeparture ?? e.effArrival, e.effArrival + (e.dwellTimeMs || 0));
+  let best = null;
+  for (const o of p.partners) {
+    const later = p.me.effArrival >= o.effArrival;
+    const gapMs = later ? p.me.effArrival - end(o) : o.effArrival - end(p.me);
+    const need = later ? end(o) + minMs - p.me.effArrival : o.effArrival - minMs - end(p.me);
+    if (!best || Math.abs(need) > Math.abs(best.need)) best = { need, gapMs, partner: o.routeNumber || o.routeName || "?" };
+  }
+  const min = Math.max(1, Math.ceil(Math.abs(best.need) / 60000));
+  return { shiftMs: (best.need < 0 ? -1 : 1) * min * 60000, gapMs: best.gapMs, partner: best.partner };
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-nxc-shift]");
+  const route = state.lastRouteDetail;
+  if (!b || !route) return;
+  const t0 = Number(b.dataset.nxcShift);
+  pushUndoSnapshot();
+  setOverride(route.id, t0, getOverride(route.id, t0) + Number(b.dataset.ms));
+  try { renderDashboardFromCache(); } catch (err) {}
+  try { renderGraphFromCache(); } catch (err) {}
+  openRouteModal(route.id); // пересчитать конфликты карточки с новой правкой
+});
+
+// Какие рейсы маршрута сейчас в пути (по расписанию с живым отклонением и ручными правками)
+// и какой рейс «текущий» для таблицы: идущий сейчас, иначе ближайший следующий.
+// frac — доля пройденного пути по ВРЕМЕНИ; станции на полосе стоят по той же шкале (stationFrac),
+// поэтому поезд между ними оказывается в правильном месте без пересчёта расстояний.
+function routeTripsNow(data, timetable) {
+  const res = { curIdx: -1, onLine: [], stationFrac: [] };
+  const trips = timetable && timetable.trips ? timetable.trips : [];
+  if (!trips.length) return res;
+  const now = getNowMsOfDay();
+  const t0 = trips[0].times || [];
+  const len0 = t0.length > 1 ? normalizeMs(t0[t0.length - 1].arrivalMs - t0[0].arrivalMs) : 0;
+  res.stationFrac = t0.map((x) => (len0 ? normalizeMs(x.arrivalMs - t0[0].arrivalMs) / len0 : 0));
+  let wait = Infinity;
+  trips.forEach((trip, i) => {
+    const times = trip.times || [];
+    if (times.length < 2) return;
+    const delta = getOverride(data.id, trip.tripOriginMs);
+    const start = times[0].arrivalMs + delta;
+    const len = normalizeMs(times[times.length - 1].arrivalMs - times[0].arrivalMs);
+    const rel = normalizeMs(now - start);
+    if (len > 0 && rel <= len) {
+      let k = 0;
+      for (let j = 0; j < times.length; j++) if (normalizeMs(times[j].arrivalMs - times[0].arrivalMs) <= rel) k = j;
+      const dep = times[k].departureMs != null ? times[k].departureMs : times[k].arrivalMs;
+      const atStation = normalizeMs(dep - times[0].arrivalMs) >= rel;
+      res.onLine.push({ idx: i, trip, delta, frac: rel / len, k, atStation, dev: trip.deviationMs || 0 });
+      if (wait > 0) { wait = 0; res.curIdx = i; }
+    } else if (wait > 0) {
+      const w = normalizeMs(start - now);
+      if (w < wait) { wait = w; res.curIdx = i; }
+    }
+  });
+  return res;
+}
+
+// Карточка маршрута в новом виде: всплывающее окно — шапка с действиями, слева «паспорт»
+// (KPI, поезда на линии, состав, сведения), справа вкладки. Кнопки сохраняют id классической
+// карточки, поэтому обработчики renderRouteModal работают без изменений.
+function nextRouteCardHtml({ data, timetable, nx, tripNow, stopsTableHtml, stationTimetableHtml, formulaHtml }) {
+  const tab = state.nxCardTab || "tt";
+  const color = /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(String(data.color || "")) ? data.color : "#8b8f9a";
+  const devColor = (ms) => Math.abs(ms) >= 90000 ? "#FF97A6" : Math.abs(ms) >= 40000 ? "#FFD08A" : "#D6FFF6";
+  // на полосе места мало: «+1:10» / «0:00» вместо «+1 мин 10 с» / «по графику» (полная форма — в подсказке)
+  const devShort = (ms) => {
+    const sec = Math.round(Math.abs(ms) / 1000);
+    return (ms > 0 && sec ? "+" : ms < 0 && sec ? "−" : "") + Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0");
+  };
+  const onLine = tripNow.onLine;
+  const stations = timetable && timetable.stations ? timetable.stations : [];
+  const stName = (k) => (stations[k] && (stations[k].stationName || stations[k].name)) || (data.stops[k] && data.stops[k].stationName) || "";
+  const edits = timetable ? timetable.trips.filter((tr) => getOverride(data.id, tr.tripOriginMs) !== 0).length : 0;
+  const chips = [
+    onLine.length ? `<span class="nxc-chip live">${escapeHtml(t("nxcOnLine", { n: onLine.length }))}</span>` : "",
+    edits ? `<span class="nxc-chip edit">${escapeHtml(t("nxcEdits", { n: edits }))}</span>` : "",
+    data.isDraft ? `<span class="nxc-chip draft">${escapeHtml(t("draftBadge"))}</span>` : "",
+  ].join("");
+
+  // вагонов в составе: живые данные, иначе кеш состава
+  const depTrips = _depIdxCache.get(data.id);
+  let carCounts = depTrips ? [...new Set(depTrips.filter((x) => x.carCount != null).map((x) => x.carCount))] : [];
+  const cars = _carsCache.get(data.number) || null;
+  if (!carCounts.length && Array.isArray(cars) && cars.length) carCounts = [cars.length];
+  const diagram = cars && cars.length ? buildTrainDiagramSvg(data.number || data.name, data.type, cars.length, "#ffffff", cars) : "";
+
+  // полоса линии: станции по времени хода, поезда — по доле пройденного времени
+  const ends = data.stops.length ? [data.stops[0].stationName, data.stops[data.stops.length - 1].stationName] : ["", ""];
+  const dots = tripNow.stationFrac.map((f, k) =>
+    `<span class="nxc-st" style="left:${(f * 100).toFixed(2)}%" title="${escapeHtml(stName(k))}"></span>`).join("");
+  const trainsHtml = onLine.map((o) => {
+    const where = o.atStation ? stName(o.k) : `${stName(o.k)} → ${stName(o.k + 1)}`;
+    return `<span class="nxc-train" style="left:${(o.frac * 100).toFixed(2)}%;--c:${devColor(o.dev)}" title="${escapeHtml(`#${o.idx + 1} · ${where} · ${formatDeviation(o.dev)}`)}"><b>${devShort(o.dev)}</b></span>`;
+  }).join("");
+  const strip = tripNow.stationFrac.length > 1
+    ? `<div class="nxc-strip" style="--line:${color}"><span class="nxc-rail"></span><span class="nxc-track">${dots}${trainsHtml}</span><span class="nxc-end l">${escapeHtml(ends[0])}</span><span class="nxc-end r">${escapeHtml(ends[1])}</span></div>`
+    : `<p class="nx-empty">${escapeHtml(t("nxcNoTrains"))}</p>`;
+
+  const meta = [
+    [t("modalType"), routeTypeName(data.type)],
+    [t("modalDepots"), (data.depots || []).filter(Boolean).join(", ") || "—"],
+    [t("nxcStopsN"), String(data.stops.length)],
+    [t("modalActiveTrips"), String(data.activeTripCount ?? "—")],
+    [t("nxcCarsLabel"), carCounts.length ? carCounts.join(" / ") : "—"],
+    [t("modalTotalDuration"), formatMinutesShort((data.totalDurationMs / 60000).toFixed(1))],
+    [t("modalTotalDwell"), formatMinutesShort((data.totalDwellMs / 60000).toFixed(1))],
+  ].map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(v)}</dd>`).join("");
+
+  // вкладка «Сейчас на линии»: где каждый поезд и когда он будет на следующей станции
+  const liveRows = onLine.map((o) => {
+    const next = o.trip.times[o.k + 1];
+    const where = o.atStation ? stName(o.k) : `${stName(o.k)} → ${stName(o.k + 1)}`;
+    return `<tr><td>#${o.idx + 1}</td><td class="nxc-tl">${escapeHtml(where)}</td><td class="nxc-tl">${escapeHtml(next ? stName(o.k + 1) : "—")}</td>` +
+      `<td>${next ? formatUtc(normalizeMs(next.arrivalMs - o.dev + o.delta)) : "—"}</td><td style="color:${devColor(o.dev)}" title="${escapeHtml(formatDeviation(o.dev))}">${devShort(o.dev)}</td></tr>`;
+  }).join("");
+  const liveHtml = onLine.length
+    ? `<div class="nxc-tbl"><table><thead><tr><th>${escapeHtml(t("nxcColTrip"))}</th><th class="nxc-tl">${escapeHtml(t("nxcColWhere"))}</th><th class="nxc-tl">${escapeHtml(t("nxcColNext"))}</th><th>${escapeHtml(t("nxcColArrival"))}</th><th>${escapeHtml(t("deviationLabel"))}</th></tr></thead><tbody>${liveRows}</tbody></table></div>`
+    : `<p class="nx-empty">${escapeHtml(t("nxcNoTrains"))}</p>`;
+
+  const tabBtn = (key, label, n, bad) =>
+    `<button type="button" class="nxc-tab${key === tab ? " on" : ""}" role="tab" aria-selected="${key === tab}" data-nxc-tab="${key}">${escapeHtml(label)}${n ? `<span class="n${bad ? " bad" : ""}">${n}</span>` : ""}</button>`;
+
+  return `<div class="nxc" data-tab="${escapeHtml(tab)}">
+    <header class="nxc-hd">
+      ${routeMarker(data.type, data.color, data.number, "lg")}
+      <div class="nxc-title">
+        <div class="nxc-title-row"><h2>${escapeHtml(data.name)}${data.isDraft ? " " + draftFlagHtml() : ""}</h2>${chips}</div>
+        ${nx.sub}
+        <div class="nxc-actions">
+          ${data.isDraft ? `<button class="secondary-btn" id="editDraftInModalBtn">${escapeHtml(t("draftEdit"))}</button><button class="secondary-btn danger-btn" id="deleteDraftInModalBtn">${escapeHtml(t("draftDelete"))}</button>` : ""}
+          <button class="secondary-btn" id="reverseRouteBtn">${escapeHtml(t("openReverseRoute"))}</button>
+          <button class="secondary-btn" id="openGraphForRouteBtn">${escapeHtml(t("nxcGraph"))}</button>
+          <button class="secondary-btn" id="createDraftFromRouteBtn">${escapeHtml(t("nxcCopyDraft"))}</button>
+          <span class="nxc-fill"></span>
+          ${!data.isDraft && hasAnyOverrideForRoute(data.id) ? `<button class="secondary-btn danger-btn" id="resetRouteEditsBtn">${escapeHtml(t("resetRouteEdits"))}</button>` : ""}
+        </div>
+      </div>
+      <button class="icon-btn" id="toggleFavoriteRouteBtn" title="">☆</button>
+    </header>
+    <div class="nxc-body">
+      <aside class="nxc-side">
+        ${nx.kpis}
+        <div class="nxc-block"><p class="nxc-cap">${escapeHtml(t("nxcTabLive"))}<span class="live">${onLine.length ? escapeHtml(t("nxcTrains", { n: onLine.length })) : ""}</span></p>${strip}</div>
+        <div class="nxc-block"${diagram ? "" : " hidden"}><p class="nxc-cap">${escapeHtml(t("nxcConsist"))}<span class="nxc-cars">${diagram ? escapeHtml(t("nxcCars", { n: cars.length })) : ""}</span></p><div id="nxcConsist">${diagram}</div></div>
+        <div class="nxc-block"><p class="nxc-cap">${escapeHtml(t("nxcPassport"))}</p><dl class="nxc-meta">${meta}</dl></div>
+      </aside>
+      <div class="nxc-main">
+        <nav class="nxc-tabs" role="tablist">
+          ${tabBtn("tt", t("nxcTabTimetable"), timetable ? timetable.trips.length : 0)}
+          ${tabBtn("stops", t("nxcTabStops"), data.stops.length)}
+          ${tabBtn("live", t("nxcTabLive"), onLine.length)}
+          ${tabBtn("conf", t("nxcTabConflicts"), nx.conflictCount, true)}
+        </nav>
+        <div class="nxc-pane" data-pane="tt">
+          <div class="nxc-tt-head"><span>${escapeHtml(t("nxcTtHint"))}</span>${tripNow.curIdx >= 0 ? `<button type="button" class="secondary-btn" data-nxc-now>${escapeHtml(t("nxcNow"))}</button>` : ""}</div>
+          ${stationTimetableHtml}
+          <div class="nxc-legend"${timetable && timetable.trips.length ? "" : " hidden"}>
+            <span><i class="sw conflict"></i>${escapeHtml(t("nextLgConflict"))}</span>
+            <span><i class="sw edited"></i>${escapeHtml(t("nextLgEdited"))}</span>
+            <span><i class="sw cur"></i>${escapeHtml(t("nxcLgCurrent"))}</span>
+            <span class="muted">${escapeHtml(t("nxcLgPassed"))}</span>
+          </div>
+          ${formulaHtml}
+        </div>
+        <div class="nxc-pane" data-pane="stops"><div class="nxc-tbl">${stopsTableHtml}</div></div>
+        <div class="nxc-pane" data-pane="live">${liveHtml}${buildLiveTripsSection(data.id, currentLang())}</div>
+        <div class="nxc-pane" data-pane="conf">${nx.conflicts}</div>
+      </div>
+    </div>
+  </div>`;
+}
+// Прокрутить таблицу расписания к текущему рейсу
+function nxcScrollToNow(smooth) {
+  const sc = document.querySelector("#routeModalBody .nxc .timetable-scroll");
+  const th = sc && sc.querySelector("thead th.tt-cur");
+  if (!th) return;
+  const first = sc.querySelector("thead th.station-col");
+  // offsetLeft тут считается от позиционированного предка окна, а не от таблицы — берём экранные координаты
+  const x = sc.scrollLeft + th.getBoundingClientRect().left - sc.getBoundingClientRect().left;
+  sc.scrollTo({ left: Math.max(0, x - (first ? first.offsetWidth : 0) - 8), behavior: smooth ? "smooth" : "auto" });
+}
+document.addEventListener("click", (e) => {
+  const tb = e.target.closest && e.target.closest("[data-nxc-tab]");
+  if (tb) {
+    state.nxCardTab = tb.dataset.nxcTab;
+    const root = tb.closest(".nxc");
+    if (!root) return;
+    root.dataset.tab = state.nxCardTab;
+    root.querySelectorAll("[data-nxc-tab]").forEach((b) => { b.classList.toggle("on", b === tb); b.setAttribute("aria-selected", String(b === tb)); });
+    if (state.nxCardTab === "tt") requestAnimationFrame(() => nxcScrollToNow(false));
+    return;
+  }
+  if (e.target.closest && e.target.closest("[data-nxc-now]")) nxcScrollToNow(true);
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-nx-goto]");
+  if (b) gotoStationSchedule(b.dataset.nxGoto);
+});
+
+// ---------- Задержки и проблемы ----------
+if (!state.nxProblemsScope) state.nxProblemsScope = "all";
+document.querySelectorAll("#nextProblemsScope [data-scope]").forEach((b) => b.addEventListener("click", () => {
+  state.nxProblemsScope = b.dataset.scope;
+  renderProblems();
+}));
+document.getElementById("nextProblemsRescan")?.addEventListener("click", () => {
+  _conflictScan.at = 0;
+  renderProblems();
+});
+function nextSyncProblemsScope() {
+  document.querySelectorAll("#nextProblemsScope [data-scope]").forEach((b) => b.classList.toggle("on", b.dataset.scope === state.nxProblemsScope));
+}
+// KPI над колонками: конфликты сейчас, опаздывают сейчас, среднее опоздание сети, доля в графике
+function nextProblemsKpis(stItems, liveDelayed) {
+  const conflicts = stItems.reduce((s, x) => s + (x.conflictCount || 0), 0);
+  const an = (state.lastAnalytics || []).filter((a) => a.sampleCount > 0 && state.routesById.has(a.routeId));
+  const samples = an.reduce((s, a) => s + a.sampleCount, 0);
+  const avg = samples ? an.reduce((s, a) => s + a.avgDeviationMs * a.sampleCount, 0) / samples : null;
+  const onTime = samples ? an.filter((a) => Math.abs(a.avgDeviationMs) <= 60000).reduce((s, a) => s + a.sampleCount, 0) / samples : null;
+  const kpi = (label, value, color, note) => `<div class="nx-pkpi"><div><span>${escapeHtml(label)}</span><b style="color:${color}">${escapeHtml(value)}</b></div><small>${note}</small></div>`;
+  return `<div class="next-only nx-pkpis">
+    ${kpi(t("nextKpiConflictsNow"), String(conflicts), "#FF97A6", escapeHtml(t("nextKpiOnStations", { n: stItems.length })))}
+    ${kpi(t("nextKpiLateNow"), String(liveDelayed.length), "#FFD08A", escapeHtml(t("nextKpiLateNote")))}
+    ${kpi(t("nextKpiNetAvg"), avg == null ? "—" : formatDeviation(avg), "var(--text)", escapeHtml(t("nextKpiSamples", { n: samples.toLocaleString(currentLang()) })))}
+    ${kpi(t("nextKpiOnTime"), onTime == null ? "—" : Math.round(onTime * 100) + "%", "#D6FFF6", escapeHtml(t("nextKpiOnTimeNote")).replace(/&lt;br&gt;/g, "<br>"))}
+  </div>`;
+}
+
+// ============================================================
+// Метки маршрутов (routeMarkers.js): форма и содержимое по типу транспорта
+// ============================================================
+// В новом виде тип без своей настройки рисуется параллелограммом с номером (мотив макетов)
+const NEXT_MARKER_DEFAULT = { shape: "parallelogram", content: "number" };
+function routeMarkerDefault() {
+  return document.documentElement.classList.contains("ui-next") ? NEXT_MARKER_DEFAULT : null;
+}
+function routeMarker(type, color, number, size, title) {
+  return window.RouteMarkers
+    ? RouteMarkers.html({ type, color, number, size, title, cfg: settings.routeMarkers, def: routeMarkerDefault() })
+    : `<span class="dot" style="background:${color}"></span>`;
+}
+// Номер уже нарисован внутри метки — рядом его не повторяем
+function routeMarkerShowsNumber(type) {
+  return !!window.RouteMarkers && RouteMarkers.configFor(settings.routeMarkers, type, routeMarkerDefault()).content === "number";
+}
+// Человеческое название типа MTR; неизвестный тип показываем кодом как есть
+function routeTypeName(type) {
+  const key = "rtype_" + type;
+  const s = t(key);
+  return s === key ? String(type || "") : s;
+}
+// Перерисовать всё, где стоят метки (после смены настройки)
+function rerenderRouteMarkers() {
+  try { renderDashboardFromCache(); } catch (e) {}
+  try { renderGraphFromCache(); } catch (e) {}
+  if (state.routes.length) { populateRouteTypeFilter(); applyRouteFilters(); }
+  if (state.lastRouteDetail && routeModalOverlay.style.display !== "none") {
+    renderRouteModal(state.lastRouteDetail, state.lastRouteTimetable, state.lastRouteRawDraft, state.lastRouteConflictedTrips);
+  }
+  if (document.getElementById("tab-problems")?.classList.contains("active")) renderProblems();
+}
+// Блок «Метки маршрутов» в настройках: по строке на тип (типы этого сервера, иначе стандартные MTR)
+function renderRouteMarkersSettings() {
+  const list = document.getElementById("routeMarkersList");
+  if (!list || !window.RouteMarkers) return;
+  const present = Array.from(new Set(state.routes.map((r) => r.type).filter(Boolean)));
+  const types = Array.from(new Set([...(present.length ? present : RouteMarkers.KNOWN_TYPES), ...Object.keys(settings.routeMarkers || {})]))
+    .sort((a, b) => {
+      const ia = RouteMarkers.KNOWN_TYPES.indexOf(a), ib = RouteMarkers.KNOWN_TYPES.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+  // пример маршрута этого типа — для превью (цвет и номер)
+  const sampleFor = (ty) => state.routes.find((r) => r.type === ty && r.color) || { color: "#ef4444", number: "1" };
+  const shapeOpts = (sel) => RouteMarkers.SHAPES.map((s) =>
+    `<option value="${s}" ${s === sel ? "selected" : ""}>${escapeHtml(t("rmShape_" + s))}</option>`).join("");
+  const contentOpts = (sel) => RouteMarkers.CONTENTS.map((c) =>
+    `<option value="${c}" ${c === sel ? "selected" : ""}>${escapeHtml(t("rmContent_" + c.replace(":", "_")))}</option>`).join("");
+  list.innerHTML = types.map((ty) => {
+    const c = RouteMarkers.configFor(settings.routeMarkers, ty, routeMarkerDefault());
+    const sm = sampleFor(ty);
+    return `<div class="rm-row" data-type="${escapeHtml(ty)}">
+      <span class="rm-name">${escapeHtml(routeTypeName(ty))}<span class="rm-code">${escapeHtml(ty)}</span></span>
+      <select data-rm="shape" aria-label="${escapeHtml(t("routeMarkerShape"))}">${shapeOpts(c.shape)}</select>
+      <select data-rm="content" aria-label="${escapeHtml(t("routeMarkerContent"))}">${contentOpts(c.content)}</select>
+      <span class="rm-preview">${routeMarker(ty, sm.color, sm.number || "1", "lg")}</span>
+    </div>`;
+  }).join("");
+  list.querySelectorAll(".rm-row select").forEach((sel) => {
+    sel.addEventListener("change", () => {
+      const row = sel.closest(".rm-row");
+      const ty = row.dataset.type;
+      settings.routeMarkers = { ...(settings.routeMarkers || {}) };
+      settings.routeMarkers[ty] = {
+        shape: row.querySelector('[data-rm="shape"]').value,
+        content: row.querySelector('[data-rm="content"]').value,
+      };
+      savePrefsToServer();
+      const sm = sampleFor(ty);
+      row.querySelector(".rm-preview").innerHTML = routeMarker(ty, sm.color, sm.number || "1", "lg");
+      rerenderRouteMarkers();
+    });
+  });
 }
 
 function switchToTab(tabName) {
@@ -2394,9 +3687,14 @@ async function refreshStatus() {
       badge.textContent = t("statusWaiting");
       badge.className = "status-badge";
     }
+    // короткая строка для полосы окна в новом виде: «MTR онлайн» (без счётчика секунд — он дёргался каждую секунду)
+    badge.dataset.next = hasErrors
+      ? (hasData ? t("nextStatusCached") : t("nextStatusOffline"))
+      : data.departures.fetchedAt ? t("nextStatusOnline") : t("statusWaiting");
   } catch {
     badge.textContent = t("statusNoLocalServer");
     badge.className = "status-badge error";
+    badge.dataset.next = t("statusNoLocalServer");
   }
 }
 
@@ -2737,7 +4035,7 @@ function renderRouteFilterList() {
   const items = [...uniq.values()].sort((a, b) =>
     String(a.routeNumber || a.routeName).localeCompare(String(b.routeNumber || b.routeName), "ru", { numeric: true }));
   container.innerHTML = items
-    .map((e) => `<label title="${escapeHtml(e.routeName || "")}"><input type="checkbox" data-route-id="${escapeHtml(e.routeId)}" ${state.routeFilter.has(e.routeId) ? "checked" : ""}> <span class="dot" style="background:${e.color}"></span> ${escapeHtml(e.routeNumber || e.routeName || "?")}</label>`)
+    .map((e) => `<label title="${escapeHtml(e.routeName || "")}"><input type="checkbox" data-route-id="${escapeHtml(e.routeId)}" ${state.routeFilter.has(e.routeId) ? "checked" : ""}> ${routeMarker(e.routeType, e.color, e.routeNumber, "sm")} ${escapeHtml(e.routeNumber || e.routeName || "?")}</label>`)
     .join("");
   container.querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.addEventListener("change", () => {
@@ -2775,7 +4073,7 @@ function renderDashTypeFilterList() {
     state.dashTypeFilterStationId = data.stationId;
   }
   container.innerHTML = types
-    .map((ty) => `<label><input type="checkbox" data-ty="${escapeHtml(ty)}" ${state.dashTypeFilter.has(ty) ? "checked" : ""}> ${escapeHtml(ty)}</label>`)
+    .map((ty) => `<label title="${escapeHtml(ty)}"><input type="checkbox" data-ty="${escapeHtml(ty)}" ${state.dashTypeFilter.has(ty) ? "checked" : ""}> ${routeMarker(ty, "#8b8f9a", "", "md")} ${escapeHtml(routeTypeName(ty))}</label>`)
     .join("");
   container.querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.addEventListener("change", () => {
@@ -3023,8 +4321,9 @@ function renderDashboard(data) {
   let platformsHtml = "";
   let rowsHtml = "";
   for (const p of visiblePlatforms) {
-    platformsHtml += `<div class="platform-label">${escapeHtml(p)}</div>`;
     const list = byPlatform.get(p) || [];
+    const pm = nextPlatformMeta(list);
+    platformsHtml += `<div class="platform-label"><span class="pl-name">${escapeHtml(p)}</span><span class="next-only pl-meta"><b>${escapeHtml(pm.kind)}</b><small>${pm.dest ? "→ " + escapeHtml(pm.dest) : ""}</small></span></div>`;
     const blocks = list
       .map((e) => {
         const idx = state.currentDashboardEntries.indexOf(e);
@@ -3084,6 +4383,8 @@ function renderDashboard(data) {
   dashboardGrid.classList.add("fade-update");
   positionNowLines();
   renderNearestTrains();
+  nextPositionNowFlag();
+  nextRenderBoardBar();
   // Прокручиваем к текущему времени только при первом рендере
   if (!state._dashboardScrolled) {
     state._dashboardScrolled = true;
@@ -3461,7 +4762,10 @@ document.addEventListener("mouseup", (e) => {
     dragState.groupEls.forEach((el) => { el.style.transform = ""; });
     if (wasClick) {
       if (dragState.ctrlAtStart) toggleChainHighlight(dragState.routeId, dragState.tripOriginMs);
-      else openRouteModal(dragState.routeId);
+      else if (isNextUi()) {
+        state._nxTrip = { routeId: dragState.routeId, t0: dragState.tripOriginMs };
+        nextShowTrip(state._nxTrip);
+      } else openRouteModal(dragState.routeId);
     } else {
       const TIMELINE_WIDTH = state.graphPxPerHour * 24;
       const deltaMs = (dx / TIMELINE_WIDTH) * MS_PER_DAY;
@@ -3659,7 +4963,7 @@ function renderGraphTypeFilterList(data) {
     state.graphTypeFilterKey = state.graphFilterKey;
   }
   container.innerHTML = types
-    .map((ty) => `<label><input type="checkbox" data-ty="${escapeHtml(ty)}" ${state.graphTypeFilter.has(ty) ? "checked" : ""}> ${escapeHtml(ty)}</label>`)
+    .map((ty) => `<label title="${escapeHtml(ty)}"><input type="checkbox" data-ty="${escapeHtml(ty)}" ${state.graphTypeFilter.has(ty) ? "checked" : ""}> ${routeMarker(ty, "#8b8f9a", "", "md")} ${escapeHtml(routeTypeName(ty))}</label>`)
     .join("");
   container.querySelectorAll("input[type=checkbox]").forEach((cb) => {
     cb.addEventListener("change", () => {
@@ -4040,13 +5344,20 @@ function renderGraph(data) {
     // Конфликты считаем всегда (нужны контекстному меню и тултипам),
     // а рисуем — только если включён фильтр «Показывать конфликты»
     state._graphConflicts = conflicts;
+    setTimeout(nextRenderGraphBar, 0);
     if (state.showGraphConflicts) {
       conflicts.forEach((c, ci) => {
         // Слабо-прозрачная пунктирная связь между линиями конфликтующих поездов
         if (c.kind === "station") {
           parts.push(`<line class="graph-conflict-link" x1="${c.x1}" y1="${c.y1}" x2="${c.x2}" y2="${c.y2}"></line>`);
         }
-        parts.push(`<circle class="graph-conflict-marker" data-cidx="${ci}" cx="${xScale(c.mx + daySnap(c.mx))}" cy="${c.my}" r="5"></circle>`);
+        const cx = xScale(c.mx + daySnap(c.mx));
+        // новый вид: обгон — жёлтый ромб, конфликт на станции — красный круг (как в макете)
+        if (c.kind === "overtake" && isNextUi()) {
+          parts.push(`<rect class="graph-conflict-marker overtake" data-cidx="${ci}" x="${cx - 5}" y="${c.my - 5}" width="10" height="10" transform="rotate(45 ${cx} ${c.my})"></rect>`);
+        } else {
+          parts.push(`<circle class="graph-conflict-marker ${c.kind}" data-cidx="${ci}" cx="${cx}" cy="${c.my}" r="5"></circle>`);
+        }
       });
     }
   }
@@ -4133,7 +5444,7 @@ function renderGraph(data) {
       const visible = isGraphRouteVisible(r);
       const inactive = r.tripCount === 0;
       return `<div class="graph-legend-item ${visible ? "" : "dim"} ${inactive ? "inactive" : ""}" data-route="${r.routeId}" data-dir="${r.direction}" title="${inactive ? escapeHtml(t("graphInactiveRoute")) : ""}">
-        <span class="dot" style="background:${r.color}"></span>
+        ${routeMarker(r.type, r.color, r.routeNumber, "sm")}
         ${escapeHtml(r.routeName)}${r.routeNumber ? " · " + escapeHtml(r.routeNumber) : ""}
         ${r.overlap === "partial" ? `<span class="dir-tag" title="${escapeHtml(t("graphPartialHint"))}">${escapeHtml(t("graphPartialShort"))}</span>` : ""}
         ${r.direction === "backward" ? `<span class="dir-tag">${escapeHtml(t("directionBackwardShort"))}</span>` : ""}
@@ -4228,6 +5539,7 @@ graphWrap.addEventListener("mousedown", (e) => {
   if (!ref) return;
   dragState.active = true;
   dragState.kind = "graph";
+  dragState.refIdx = refIdx;
   dragState.routeId = ref.route.routeId;
   dragState.tripOriginMs = ref.trip.tripOriginMs;
   dragState.startX = e.clientX;
@@ -4263,7 +5575,8 @@ function populateRouteTypeFilter() {
   const types = Array.from(new Set(state.routes.map((r) => r.type).filter(Boolean))).sort();
   select.innerHTML =
     `<option value="all">${escapeHtml(t("typeFilterAll"))}</option>` +
-    types.map((ty) => `<option value="${escapeHtml(ty)}">${escapeHtml(ty)}</option>`).join("");
+    types.map((ty) => `<option value="${escapeHtml(ty)}">${escapeHtml(routeTypeName(ty))}</option>`).join("");
+  renderRouteMarkersSettings(); // маршруты загружены — в настройках появляются типы этого сервера
   select.value = types.includes(prevValue) || prevValue === "all" ? prevValue : "all";
 }
 
@@ -4312,6 +5625,7 @@ function applyRouteFilters() {
 }
 
 function renderRouteList(routes) {
+  nextRenderRouteGroups(routes);
   const body = document.getElementById("routeListBody");
   if (routes.length === 0) { body.innerHTML = `<tr><td colspan="8" class="empty">${escapeHtml(t("analyticsEmptyNoMatch"))}</td></tr>`; return; }
   body.innerHTML = routes
@@ -4320,10 +5634,10 @@ function renderRouteList(routes) {
       const isFav = isFavoriteRoute(r.id);
       return `<tr class="clickable-row" data-route-id="${r.id}">
         <td>
-          <span class="route-pill"><span class="dot" style="background:${r.color}"></span>${isFav ? "<span style='color:#fbbf24;margin-right:3px;'>★</span>" : ""}${escapeHtml(r.name)}${r.isDraft ? " " + draftFlagHtml() : ""}</span>
+          <span class="route-pill">${routeMarker(r.type, r.color, r.number, "md")}${isFav ? "<span style='color:#fbbf24;margin-right:3px;'>★</span>" : ""}${escapeHtml(r.name)}${r.isDraft ? " " + draftFlagHtml() : ""}</span>
         </td>
         <td>${escapeHtml(r.number || t("notAvailableShort"))}</td>
-        <td>${escapeHtml(r.type || t("notAvailableShort"))}</td>
+        <td>${escapeHtml(r.type ? routeTypeName(r.type) : t("notAvailableShort"))}</td>
         <td>${r.stopCount}</td>
         <td class="col-sep">${a ? a.sampleCount : "—"}</td>
         <td class="col-sep ${a ? deviationClass(a.avgDeviationMs) : ""}">${a ? formatDeviation(a.avgDeviationMs) : "—"}</td>
@@ -4429,8 +5743,17 @@ async function openRouteModal(routeId) {
     if (detail?.stops?.length > 0) {
       const firstStId = detail.stops[0].stationId;
       loadArrivals(firstStId).then(() => {
-        const diagramWrap = document.querySelector(".train-diagram-wrap");
-        if (!diagramWrap) {
+        const diagramWrap = document.querySelector("#routeModalBody .train-diagram-wrap");
+        const slot = document.getElementById("nxcConsist");
+        if (!diagramWrap && slot) {
+          const cars2 = _carsCache.get(detail.number);
+          if (cars2 && cars2.length) {
+            slot.innerHTML = buildTrainDiagramSvg(detail.number || detail.name, detail.type, cars2.length, "#ffffff", cars2);
+            slot.closest(".nxc-block")?.removeAttribute("hidden");
+            const n = slot.closest(".nxc-block")?.querySelector(".nxc-cars");
+            if (n) n.textContent = t("nxcCars", { n: cars2.length });
+          }
+        } else if (!diagramWrap) {
           const cars2 = _carsCache.get(detail.number);
           const n = cars2 ? cars2.length : null;
           if (n) {
@@ -4450,6 +5773,8 @@ async function openRouteModal(routeId) {
     // серверный endpoint не знает о drag-сдвигах, поэтому считаем на фронтенде.
     // Для каждой станции маршрута загружаем её расписание и ищем конфликты.
     const conflictMap = new Map(); // tripOriginMs -> Set<stationId>
+    // Для кнопки «Сдвинуть» в новой карточке: наш рейс и его партнёры по каждому конфликту
+    const conflictPairs = new Map(); // "t0|stationId" -> { me, partners[] }
 
     if (detail && detail.stops && detail.stops.length > 0) {
       const minIntervalMs = state.minIntervalMin * 60000;
@@ -4475,7 +5800,7 @@ async function openRouteModal(routeId) {
           const entryKey = `${e.routeId}:${e.tripOriginMs}:${e.platformName}`;
           return { ...e, effArrival, effDeparture, delta, entryKey };
         });
-        const { conflictKeys } = computeConflicts(processed, minIntervalMs);
+        const { conflictKeys, details } = computeConflicts(processed, minIntervalMs);
         // Из найденных конфликтных ключей берём те, что относятся к нашему маршруту.
         // Ключ формата "routeId:tripOriginMs:platformName" — используем startsWith для фильтрации.
         for (const key of conflictKeys) {
@@ -4486,6 +5811,8 @@ async function openRouteModal(routeId) {
           if (isNaN(t0)) continue;
           if (!conflictMap.has(t0)) conflictMap.set(t0, new Set());
           conflictMap.get(t0).add(stationId);
+          const me = processed.find((e) => e.entryKey === key);
+          if (me) conflictPairs.set(`${t0}|${stationId}`, { me, partners: (details && details.get(key)) || [] });
         }
       }
     }
@@ -4503,6 +5830,7 @@ async function openRouteModal(routeId) {
     state.lastRouteTimetable = timetable;
     state.lastRouteRawDraft = rawDraft;
     state.lastRouteConflictedTrips = conflictedTrips;
+    state.lastRouteConflictPairs = conflictPairs;
     renderRouteModal(detail, timetable, rawDraft, conflictedTrips);
   } catch (err) {
     document.getElementById("routeModalBody").innerHTML = `<p>${escapeHtml(t("errLoading", { msg: err.message }))}</p>`;
@@ -4939,7 +6267,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
 
   const metaList = `
     <ul class="modal-meta-list">
-      <li><span class="meta-label">${t("modalType")}:</span> ${escapeHtml(data.type || "—")}</li>
+      <li><span class="meta-label">${t("modalType")}:</span> ${escapeHtml(data.type ? routeTypeName(data.type) : "—")}</li>
       <li><span class="meta-label">${t("modalDepots")}:</span> ${escapeHtml((data.depots || []).join(", ") || "—")}</li>
       <li><span class="meta-label">${t("modalActiveTrips")}:</span> ${data.activeTripCount}</li>
       ${(() => {
@@ -4962,6 +6290,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
   // ---- Объединённая таблица: отправление из депо (T0, шапка колонок +
   // строка отклонения) и расписание по каждой станции для каждого рейса ----
   let stationTimetableHtml = `<p class="hint small">${escapeHtml(t("modalNoActiveTrips"))}</p>`;
+  const tripNow = routeTripsNow(data, timetable);
   if (timetable && timetable.trips.length) {
     const headerCols = timetable.trips
       .map((trip, i) => {
@@ -4985,16 +6314,16 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
           ? normalizeMs(firstStop.arrivalMs - (firstStop.dwellTimeMs || 0) - 60000 - (trip.deviationMs || 0) + delta)
           : effMs;
         // В строке отправления из депо отклонение НЕ показываем (только плановое).
-        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}">${removeBtn}${tripLabel}<br>${formatUtc(depotDepartMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
+        return `<th class="${edited ? "timetable-cell-edited" : ""}${hasAnyConflict ? " tt-has-conflict" : ""}${i === tripNow.curIdx ? " tt-cur" : ""}">${removeBtn}${tripLabel}<br>${formatUtc(depotDepartMs, true)}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</th>`;
       })
       .join("");
     const addColHeader = data.isDraft
       ? `<th><button class="col-add-btn" id="addDepartureColBtn" title="${escapeHtml(t("addColumn"))}">+</button></th>`
       : "";
     const deviationRow = timetable.trips
-      .map((trip) => {
+      .map((trip, ti) => {
         const edited = getOverride(data.id, trip.tripOriginMs) !== 0;
-        return `<td class="${deviationClass(trip.deviationMs)} ${edited ? "timetable-cell-edited" : ""}">${formatDeviation(trip.deviationMs)}</td>`;
+        return `<td class="${deviationClass(trip.deviationMs)} ${edited ? "timetable-cell-edited" : ""}${ti === tripNow.curIdx ? " tt-cur" : ""}">${formatDeviation(trip.deviationMs)}</td>`;
       })
       .join("");
     // Сколько прошло с момента опроса MTR — на столько «уехали» относительные
@@ -5009,7 +6338,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     const bodyRows = timetable.stations
       .map((st, stIdx) => {
         const cells = timetable.trips
-          .map((trip) => {
+          .map((trip, ti) => {
             const delta = getOverride(data.id, trip.tripOriginMs);
             const edited = delta !== 0;
             const raw = trip.times[stIdx];
@@ -5034,7 +6363,8 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
             const cellIcon = cellHasConflict ? `<span class="tt-conflict-icon" title="${escapeHtml(t("conflictLabel"))}">!</span>` : "";
             const devParen = formatDeviationParen(devShown);
             const devSpan = devParen ? ` <span class="${deviationClass(devShown)} tt-dev">${devParen}</span>` : "";
-            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${actualMs}" style="cursor:pointer">${cellIcon}${formatUtc(plannedMs)}${devSpan}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
+            const curCls = (ti === tripNow.curIdx ? " tt-cur" : "") + (reached ? " tt-passed" : "");
+            return `<td class="${edited ? "timetable-cell-edited" : ""}${cellHasConflict ? " tt-has-conflict" : ""}${curCls}" data-goto-station="${escapeHtml(st.stationId)}" data-goto-time="${actualMs}" style="cursor:pointer">${cellIcon}${formatUtc(plannedMs)}${devSpan}${edited ? `<span class="cell-edited-label">${escapeHtml(t("editedLabel"))}</span>` : ""}</td>`;
           })
           .join("");
         return `<tr><td class="station-col" data-goto-station="${escapeHtml(st.stationId)}">${escapeHtml(st.stationName)}</td>${cells}</tr>`;
@@ -5064,8 +6394,19 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
     formulaHtml = renderFormulaLines(lines);
   }
 
-  document.getElementById("routeModalBody").innerHTML = `
-    <h2><span class="dot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:${data.color};"></span>${escapeHtml(data.name)} ${data.number ? "(" + escapeHtml(data.number) + ")" : ""}${data.isDraft ? " " + draftFlagHtml() : ""}</h2>
+  const nx = nextRouteCardExtras(data, timetable, conflictedTrips);
+  const stopsTableHtml = `<table>
+      <thead><tr><th>#</th><th>${t("colStation")}</th><th>${t("colPlatform")}</th><th>${t("colDwell")}</th><th>${t("colNext")}</th><th>${t("colCoords")}</th></tr></thead>
+      <tbody>${stopsRows}</tbody>
+    </table>`;
+  const routeModalBodyEl = document.getElementById("routeModalBody");
+  routeModalBodyEl.classList.toggle("nxc-on", isNextUi());
+  if (isNextUi()) {
+    routeModalBodyEl.innerHTML = nextRouteCardHtml({ data, timetable, nx, tripNow, stopsTableHtml, stationTimetableHtml, formulaHtml });
+    requestAnimationFrame(() => nxcScrollToNow(false));
+  } else routeModalBodyEl.innerHTML = `
+    <h2>${routeMarker(data.type, data.color, data.number, "lg")}${escapeHtml(data.name)} ${data.number ? "(" + escapeHtml(data.number) + ")" : ""}${data.isDraft ? " " + draftFlagHtml() : ""}</h2>
+    ${nx.sub}
     <div class="modal-toolbar">
       <div class="modal-toolbar-left">
         ${data.isDraft ? `
@@ -5087,6 +6428,7 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
         </div>
       </div>
     </div>
+    ${nx.kpis}
     ${metaList}
     ${buildLiveTripsSection(data.id, currentLang())}
     ${(() => {
@@ -5095,14 +6437,12 @@ function renderRouteModal(data, timetable, rawDraft, conflictedTrips) {
       return buildTrainDiagramSvg(data.number || data.name, data.type, n, "#ffffff", cars);
     })()}
     <h4 data-stops-header="1">${t("modalStops")}</h4>
-    <table>
-      <thead><tr><th>#</th><th>${t("colStation")}</th><th>${t("colPlatform")}</th><th>${t("colDwell")}</th><th>${t("colNext")}</th><th>${t("colCoords")}</th></tr></thead>
-      <tbody>${stopsRows}</tbody>
-    </table>
+    ${stopsTableHtml}
     <h4>${t("modalStationTimetable")}</h4>
     <p class="hint small">${escapeHtml(t("modalEditedHint"))}</p>
     ${stationTimetableHtml}
     ${formulaHtml}
+    ${nx.conflicts}
   `;
 
   // Переводим data-i18n элементы модалки СРАЗУ после вставки разметки —
@@ -5844,6 +7184,7 @@ function renderServerList() {
 }
 
 function initSettingsUI() {
+  renderRouteMarkersSettings();
   // ── Список серверов MTR ─────────────────────────────────────────────
   const serverListSelect = document.getElementById("serverListSelect");
   const serverUrlInput = document.getElementById("serverUrlInput");
@@ -6116,6 +7457,7 @@ function buildPrefsPayload() {
     delayThresholdMin: settings.delayThresholdMin,
     betaUpdates: settings.betaUpdates,
     experimentalUi: settings.experimentalUi,
+    routeMarkers: settings.routeMarkers,
     serverUrl: settings.serverUrl,
     serverList: settings.serverList || [],
     ...boardEditorPrefsFields(),
@@ -6411,6 +7753,7 @@ async function savePrefsToServer() {
         delayThresholdMin: settings.delayThresholdMin,
         betaUpdates: settings.betaUpdates,
         experimentalUi: settings.experimentalUi,
+        routeMarkers: settings.routeMarkers,
         ...boardEditorPrefsFields(),
         ...networkSchemePrefsFields(),
       }),
@@ -6440,6 +7783,7 @@ async function loadPrefsFromServer() {
     if (Number.isFinite(Number(p.delayThresholdMin))) settings.delayThresholdMin = Number(p.delayThresholdMin);
     if (typeof p.betaUpdates === "boolean") settings.betaUpdates = p.betaUpdates;
     if (typeof p.experimentalUi === "boolean") settings.experimentalUi = p.experimentalUi;
+    if (p.routeMarkers && typeof p.routeMarkers === "object" && !Array.isArray(p.routeMarkers)) settings.routeMarkers = p.routeMarkers;
     applyExperimentalUi();
     try {
       if (window.BoardEditor && typeof window.BoardEditor.applyPersistedState === "function") {
@@ -6468,16 +7812,26 @@ function saveFavorites() {
   savePrefsToServer();
 }
 
+// Избранное привязано к MTR-серверу (поле server): станции другого сервера
+// здесь не выбрать, а значит и не снять ☆. Старые записи без server
+// привязываются к текущему серверу, как только станция на нём нашлась.
+function currentServerKey() {
+  return settings.serverUrl || DEFAULT_SERVER;
+}
+function isFavOnThisServer(f) {
+  return !f.server || f.server === currentServerKey();
+}
+
 // ---- Станции ----
 function isFavorite(stationId) {
-  return favorites.some((f) => f.id === stationId);
+  return favorites.some((f) => f.id === stationId && isFavOnThisServer(f));
 }
 function toggleFavorite(stationId) {
   if (isFavorite(stationId)) {
-    favorites = favorites.filter((f) => f.id !== stationId);
+    favorites = favorites.filter((f) => !(f.id === stationId && isFavOnThisServer(f)));
   } else {
     const st = state.stations.find((s) => s.id === stationId);
-    if (st) favorites.push({ id: st.id, name: st.name });
+    if (st) favorites.push({ id: st.id, name: st.name, server: currentServerKey() });
   }
   saveFavorites();
   renderFavoritesBar();
@@ -6505,7 +7859,7 @@ function toggleFavoriteRoute(routeId) {
     for (const id of ids) {
       if (favoriteRoutes.some((r) => r.id === id)) continue;
       const route = state.routesById.get(id);
-      if (route) favoriteRoutes.push({ id: route.id, name: route.name, color: route.color, number: route.number });
+      if (route) favoriteRoutes.push({ id: route.id, name: route.name, color: route.color, number: route.number, server: currentServerKey() });
     }
   }
   saveFavorites();
@@ -6522,16 +7876,85 @@ function updateFavoriteBtn() {
   btn.style.display = state.currentStationId ? "" : "none";
 }
 
+function openFavoriteStation(stationId) {
+  const st = state.stations.find((s) => s.id === stationId);
+  if (!st) return;
+  scheduleAC.setSelected(st.id, st.name);
+  state.currentStationId = st.id;
+  renderFavoritesBar();
+  updateFavoriteBtn();
+  loadSchedule();
+  updateUrlHash();
+}
+
+// Избранные станции в боковом меню нового UI (там полоса избранного над расписанием скрыта)
+function renderNextFavorites() {
+  const box = document.getElementById("nextFavs");
+  if (!box) return;
+  // те же станции, что в полосе избранного: только этого сервера
+  const shown = favorites.filter(isFavOnThisServer);
+  const loaded = state.stations.length > 0;
+  const known = new Set(state.stations.map((s) => s.id));
+  box.classList.toggle("is-empty", shown.length === 0);
+  const xTitle = escapeHtml(t("removeFavorite"));
+  box.innerHTML =
+    `<div class="next-favs-cap">${escapeHtml(t("favoritesLabel").replace(/:\s*$/, ""))}</div>` +
+    shown.map((f) => {
+      // станции нет на этом сервере — открыть нельзя, только убрать (как .fav-missing в полосе)
+      const missing = loaded && !known.has(f.id);
+      const cls = `next-fav${f.id === state.currentStationId ? " active" : ""}${missing ? " missing" : ""}`;
+      const title = escapeHtml(missing ? t("favMissingHint") : f.name);
+      // стопка бейджей линий станции (две + «+N»), как в макете
+      const lines = missing ? [] : nxUniqBadges(nxRoutesAtStation(f.id));
+      const stack = lines.length
+        ? `<span class="nx-stack">${lines.slice(0, 2).map((r) => nxRouteBadge(r)).join("")}${lines.length > 2 ? nxMoreBadge(lines.length - 2) : ""}</span>`
+        : "";
+      return `<div class="${cls}" data-fav-id="${escapeHtml(f.id)}">` +
+        `<button class="next-fav-open" title="${title}"><span class="nx-fav-name">${escapeHtml(f.name)}</span>${stack}</button>` +
+        `<button class="next-fav-x" data-fav-remove title="${xTitle}" aria-label="${xTitle}">×</button></div>`;
+    }).join("");
+  box.querySelectorAll("[data-fav-id]").forEach((row) => {
+    const id = row.dataset.favId;
+    row.querySelector(".next-fav-open").addEventListener("click", () => {
+      if (row.classList.contains("missing")) return;
+      switchToTab("schedule");
+      openFavoriteStation(id);
+    });
+    row.querySelector("[data-fav-remove]").addEventListener("click", () => {
+      favorites = favorites.filter((f) => !(f.id === id && isFavOnThisServer(f)));
+      saveFavorites();
+      renderFavoritesBar();
+      updateFavoriteBtn();
+    });
+  });
+}
+
 function renderFavoritesBar() {
+  renderNextFavorites();
   const bar = document.getElementById("favoritesBar");
   if (!bar) return;
-  // В панели над расписанием показываем ТОЛЬКО станции
-  if (favorites.length === 0) { bar.style.display = "none"; return; }
+  // В панели над расписанием показываем ТОЛЬКО станции и только этого сервера
+  const loaded = state.stations.length > 0;
+  const known = new Set(state.stations.map((s) => s.id));
+  let adopted = false;
+  if (loaded) {
+    for (const f of favorites) {
+      if (!f.server && known.has(f.id)) { f.server = currentServerKey(); adopted = true; }
+    }
+    if (adopted) saveFavorites();
+  }
+  const shown = favorites.filter(isFavOnThisServer);
+  if (shown.length === 0) { bar.style.display = "none"; return; }
   bar.style.display = "flex";
 
-  const stationChips = favorites.map((f) => {
+  const xTitle = escapeHtml(t("removeFavorite"));
+  const stationChips = shown.map((f) => {
+    // нет на сервере: запись без привязки с другого сервера или удалённая станция
+    const missing = loaded && !known.has(f.id);
     const active = f.id === state.currentStationId;
-    return `<button class="fav-chip ${active ? "fav-active" : ""}" data-fav-id="${escapeHtml(f.id)}" title="${escapeHtml(t("favStationHint"))}">${escapeHtml(f.name)}</button>`;
+    const cls = `fav-chip${active ? " fav-active" : ""}${missing ? " fav-missing" : ""}`;
+    const title = escapeHtml(t(missing ? "favMissingHint" : "favStationHint"));
+    return `<button class="${cls}" data-fav-id="${escapeHtml(f.id)}" title="${title}">${escapeHtml(f.name)}<span class="fav-x" data-fav-remove title="${xTitle}">×</span></button>`;
   }).join("");
 
   // Крестик "очистить всё избранное" убран по запросу — отдельные станции
@@ -6541,7 +7964,15 @@ function renderFavoritesBar() {
     stationChips;
 
   bar.querySelectorAll("[data-fav-id]").forEach((btn) => {
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (e) => {
+      if (e.target.closest("[data-fav-remove]")) {
+        const id = btn.dataset.favId;
+        favorites = favorites.filter((f) => !(f.id === id && isFavOnThisServer(f)));
+        saveFavorites();
+        renderFavoritesBar();
+        updateFavoriteBtn();
+        return;
+      }
       const st = state.stations.find((s) => s.id === btn.dataset.favId);
       if (!st) return;
       scheduleAC.setSelected(st.id, st.name);
@@ -6610,7 +8041,7 @@ function renderNearestTrains() {
     const hasDelay = Math.abs(effectiveDev) > 60000;
     const delayHtml = hasDelay
       ? `<span class="${effectiveDev > 0 ? "dev-pos" : "dev-neg"}">${effectiveDev > 0 ? "+" : ""}${Math.round(effectiveDev / 60000)} ${t("nearestMin")}${isLive ? " 🔴" : ""}</span>`
-      : `<span class="nb-ontime">${isLive ? "🟢" : "●"}</span>`;
+      : `<span class="nb-ontime"><span class="nb-dot">${isLive ? "🟢" : "●"}</span><span class="next-only">${escapeHtml(t("nextOnTime"))}</span></span>`;
     // Конечная станция (последняя в маршруте из routesById)
     const route = state.routesById.get(e.routeId);
     const routeFull = state.routes?.find(r => r.id === e.routeId);
@@ -6628,7 +8059,7 @@ function renderNearestTrains() {
       ? formatLocal(normalizeMs(depData.departureMs - (depData.deviation || 0)))
       : (e.effDeparture !== null ? formatLocal(normalizeMs(e.effDeparture - (e.deviationMs || 0))) : `<span class="nb-muted">—</span>`);
     return `<tr class="nb-row" data-route-id="${escapeHtml(e.routeId)}">
-      <td><span class="dot nb-dot" style="background:${e.color}"></span><b>${escapeHtml(e.routeNumber || e.routeName)}</b></td>
+      <td>${routeMarker(e.routeType, e.color, e.routeNumber, "md")}${routeMarkerShowsNumber(e.routeType) && e.routeNumber ? "" : `<b>${escapeHtml(e.routeNumber || e.routeName)}</b>`}</td>
       <td class="nb-terminus">${escapeHtml(terminus)}</td>
       <td class="nb-platform">${escapeHtml(platformLabel)}</td>
       <td>${formatLocal(hasDelay ? actualMs : e.effArrival)}</td>

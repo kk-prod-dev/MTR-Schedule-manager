@@ -14,4 +14,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // Сохранить диагностический отчёт через нативный диалог «Сохранить как».
   // Возвращает { saved:true, path } | { canceled:true } | { error }.
   saveDiagnostic: (filename, content) => ipcRenderer.invoke("save-diagnostic", { filename, content }),
+  // Цвета своей панели заголовка окна { bg, fg, muted, accent } (#hex)
+  setTitlebarTheme: (theme) => ipcRenderer.send("set-titlebar-theme", theme),
 });

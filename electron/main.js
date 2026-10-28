@@ -1,7 +1,7 @@
 "use strict";
 
 const path = require("path");
-const { app, BrowserWindow, Menu, shell, dialog, ipcMain, session } = require("electron");
+const { app, BrowserWindow, WebContentsView, Menu, shell, dialog, ipcMain, session } = require("electron");
 const http = require("http");
 
 // ---------------------------------------------------------------------------
@@ -32,8 +32,21 @@ if (process.platform === "win32") {
 }
 
 let mainWindow = null;
+let appView = null; // WebContentsView с самим приложением (под панелью заголовка)
 let serverPort = null;
 let serverInstance = null;
+
+// Своя панель заголовка: окно без системной рамки, его собственная страница —
+// electron/titlebar.html (значок, название; кнопки «свернуть / развернуть /
+// закрыть» рисует система через titleBarOverlay в цветах приложения), а
+// приложение — в отдельном WebContentsView ниже. Отдельный view, а не полоса
+// внутри страницы: у страницы остаётся вся высота её окна, вёрстка на 100vh
+// не съезжает. Цвета присылает страница приложения (set-titlebar-theme).
+const TITLEBAR_H = 34;
+const TITLEBAR_H_NEXT = 40; // в новом интерфейсе (ui-next) полоса выше — как в макетах
+const isMac = process.platform === "darwin";
+let titlebarTheme = { bg: "#0f1115", fg: "#e5e7eb", muted: "#9ca3af", accent: "#6366f1", layout: "classic", status: null };
+let titlebarH = TITLEBAR_H;
 
 // ---------------------------------------------------------------------------
 // Один экземпляр приложения. Повторный запуск просто поднимает существующее окно.
@@ -73,6 +86,10 @@ function onReady() {
 }
 
 function createWindow() {
+  // вид (классический / новый) известен ещё до загрузки страницы — из prefs.json,
+  // чтобы полоса и заставка сразу были нужной высоты и в нужном стиле
+  const nextUi = readPrefFlag("experimentalUi");
+  if (nextUi) { titlebarTheme = { ...titlebarTheme, layout: "next" }; titlebarH = TITLEBAR_H_NEXT; }
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -82,31 +99,107 @@ function createWindow() {
     show: false,
     icon: resolveIcon(),
     title: "MTR Schedule Manager",
+    titleBarStyle: "hidden",
+    ...(isMac
+      ? { trafficLightPosition: { x: 12, y: 10 } }
+      : { titleBarOverlay: { color: titlebarTheme.bg, symbolColor: titlebarTheme.fg, height: titlebarH } }),
+    // страница самого окна — только панель заголовка, без preload
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+  });
+  mainWindow.loadFile(path.join(__dirname, "titlebar.html"), { query: { platform: process.platform, h: String(titlebarH), layout: titlebarTheme.layout } });
+  mainWindow.webContents.on("did-finish-load", applyTitlebarTheme);
+
+  appView = new WebContentsView({
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
     },
   });
+  appView.setBackgroundColor("#0f1115");
+  mainWindow.contentView.addChildView(appView);
+  layoutAppView();
+  for (const ev of ["resize", "maximize", "unmaximize", "enter-full-screen", "leave-full-screen"]) {
+    mainWindow.on(ev, layoutAppView);
+  }
+  // клавиатура — приложению, а не полосе заголовка
+  mainWindow.on("focus", () => { if (appView) appView.webContents.focus(); });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
-  mainWindow.webContents.on("before-input-event", (event, input) => {
-    if (input.key === "F12") mainWindow.webContents.openDevTools();
+  appView.webContents.on("before-input-event", (event, input) => {
+    if (input.key === "F12") appView.webContents.openDevTools();
   });
 
   // Пока сервер поднимается — показываем заставку.
-  mainWindow.loadFile(path.join(__dirname, "loading.html"));
+  appView.webContents.loadFile(path.join(__dirname, "loading.html"), { query: { layout: titlebarTheme.layout, v: app.getVersion() } });
 
   // Внешние ссылки открываем в системном браузере, а не внутри окна.
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+  appView.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
   });
 
+  // Закрытие окна само по себе не выгружает страницу во view — без этого не
+  // сработал бы её beforeunload (сохранение prefs при выходе). Сначала
+  // закрываем страницу приложения, потом окно.
+  let appClosed = false;
+  const finishClose = () => {
+    appClosed = true;
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+  };
+  mainWindow.on("close", (e) => {
+    if (appClosed || !appView || appView.webContents.isDestroyed()) return;
+    e.preventDefault();
+    appView.webContents.once("destroyed", finishClose);
+    setTimeout(finishClose, 3000); // страница зависла — не держим окно
+    appView.webContents.close({ waitForBeforeUnload: true });
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
+    appView = null;
   });
 }
+
+function layoutAppView() {
+  if (!mainWindow || mainWindow.isDestroyed() || !appView) return;
+  const { width, height } = mainWindow.getContentBounds();
+  const top = mainWindow.isFullScreen() ? 0 : titlebarH;
+  appView.setBounds({ x: 0, y: top, width, height: Math.max(0, height - top) });
+}
+
+function applyTitlebarTheme() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const t = titlebarTheme;
+  if (!isMac) {
+    try { mainWindow.setTitleBarOverlay({ color: t.bg, symbolColor: t.fg, height: titlebarH }); } catch {}
+  }
+  layoutAppView();
+  mainWindow.webContents.executeJavaScript(`window.applyTheme && applyTheme(${JSON.stringify({ ...t, h: titlebarH })})`).catch(() => {});
+}
+
+// IPC: страница приложения сообщает свои цвета (классический / новый вид)
+ipcMain.on("set-titlebar-theme", (_evt, theme) => {
+  const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+  let changed = false;
+  for (const k of ["bg", "fg", "muted", "accent"]) {
+    const v = theme && typeof theme[k] === "string" ? theme[k].trim() : "";
+    if (HEX.test(v) && v !== titlebarTheme[k]) { titlebarTheme = { ...titlebarTheme, [k]: v }; changed = true; }
+  }
+  // новый интерфейс: полоса 40px, название по центру, справа статус MTR (текст — только textContent)
+  const layout = theme && theme.layout === "next" ? "next" : "classic";
+  if (layout !== titlebarTheme.layout) {
+    titlebarTheme = { ...titlebarTheme, layout };
+    titlebarH = layout === "next" ? TITLEBAR_H_NEXT : TITLEBAR_H;
+    changed = true;
+  }
+  const st = theme && theme.status;
+  const status = st && typeof st.text === "string"
+    ? { text: st.text.slice(0, 120), state: ["ok", "warn", "error"].includes(st.state) ? st.state : "" }
+    : null;
+  if (JSON.stringify(status) !== JSON.stringify(titlebarTheme.status)) { titlebarTheme = { ...titlebarTheme, status }; changed = true; }
+  if (changed) applyTitlebarTheme();
+});
 
 // Поднимаем Express-сервер прямо внутри процесса Electron (Node встроен).
 function startServer() {
@@ -134,7 +227,7 @@ function startServer() {
 }
 
 async function loadApp() {
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!mainWindow || mainWindow.isDestroyed() || !appView) return;
   const url = `http://127.0.0.1:${serverPort}/`;
   // Ждём реального ответа от сервера (до 10 сек) вместо слепой задержки.
   // Так страница открывается только когда Express точно готов отдавать данные.
@@ -156,10 +249,10 @@ async function loadApp() {
     };
     check();
   });
-  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!mainWindow || mainWindow.isDestroyed() || !appView) return;
   // Минимальная пауза чтобы пользователь увидел заставку
   if (ready) await new Promise((r) => setTimeout(r, 200));
-  mainWindow.loadURL(url);
+  appView.webContents.loadURL(url);
 }
 
 // ---------------------------------------------------------------------------
@@ -210,11 +303,14 @@ ipcMain.handle("save-diagnostic", async (event, { filename, content }) => {
 // Читает betaUpdates из prefs.json (его пишет renderer через /api/prefs).
 // Отдельная функция, а не кеш: галочку могли поменять в прошлом запуске.
 function readBetaUpdatesPref() {
+  return readPrefFlag("betaUpdates");
+}
+function readPrefFlag(key) {
   try {
     const fs = require("fs");
     const prefsFile = path.join(dataDir, "prefs.json");
     if (!fs.existsSync(prefsFile)) return false;
-    return !!JSON.parse(fs.readFileSync(prefsFile, "utf8")).betaUpdates;
+    return JSON.parse(fs.readFileSync(prefsFile, "utf8"))[key] === true;
   } catch {
     return false;
   }
@@ -305,7 +401,7 @@ function initAutoUpdate() {
       mainWindow.once("ready-to-show", () => {
         setTimeout(() => {
           // Отправляем в renderer для показа in-app модального окна
-          mainWindow.webContents.send("show-changelog", { version: currentVersion, notes: pendingNotes });
+          if (appView) appView.webContents.send("show-changelog", { version: currentVersion, notes: pendingNotes });
         }, 2000);
       });
     }

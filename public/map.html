@@ -5,12 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5">
 <title>Network map — MTR Schedule Manager</title>
 <!--
-  Просмотр схемы сети, опубликованной из MTR Schedule Manager
-  (вкладка «Редактор» → «Схема сети» → «Опубликовать ссылкой»).
-  Вся схема лежит в адресе: #m=<lz-string(JSON)>. Ничего не загружается
-  с серверов — страница статическая (GitHub Pages / локальный сервер
-  приложения). Данные из адреса недоверенные: SchemeCore.fromPublished
-  нормализует их, отрисовка идёт только через DOM-API.
+  Просмотр схемы сети из MTR Schedule Manager (вкладка «Редактор» →
+  «Схема сети» → «Поделиться»). Источники схемы:
+   - <script id="mapData"> — автономный HTML-файл: редактор вписывает сюда
+     данные и schemeCore.js целиком, файл открывается без сети и приложения;
+   - #v=<id> — открыто из приложения: схема берётся с его локального сервера
+     (/api/scheme-view/<id>) и обновляется после каждой правки;
+   - #m=<lz-string(JSON)> — старые ссылки со схемой в адресе.
+  Данные недоверенные: SchemeCore.fromPublished нормализует их, отрисовка
+  идёт только через DOM-API.
 -->
 <style>
   :root { --bar: #171a21; --text: #e5e7eb; --muted: #9ca3af; --accent: #6366f1; }
@@ -54,38 +57,63 @@
   "use strict";
   var ru = /^ru\b/i.test(navigator.language || "");
   var T = ru
-    ? { fit: "Вписать", png: "Скачать PNG", untitled: "Схема сети", bad: "Ссылка на схему повреждена или неполная. Попросите автора опубликовать её заново." }
-    : { fit: "Fit", png: "Download PNG", untitled: "Network map", bad: "The map link is damaged or incomplete. Ask the author to publish it again." };
+    ? { fit: "Вписать", png: "Скачать PNG", untitled: "Схема сети", bad: "Схема повреждена или неполная. Попросите автора поделиться ей заново.",
+        gone: "Схема не открыта в приложении. Откройте её снова кнопкой «Открыть в браузере».", offline: "приложение закрыто — показана последняя версия" }
+    : { fit: "Fit", png: "Download PNG", untitled: "Network map", bad: "The map is damaged or incomplete. Ask the author to share it again.",
+        gone: "This map is not open in the app. Open it again with “Open in browser”.", offline: "app closed — showing the last version" };
   document.documentElement.lang = ru ? "ru" : "en";
   document.getElementById("fitBtn").textContent = T.fit;
   document.getElementById("pngBtn").textContent = T.png;
 
   var svg = document.getElementById("map");
   var world = document.getElementById("world");
-  function fail() {
+  function fail(msg) {
     var err = document.getElementById("error");
-    err.textContent = T.bad;
+    err.textContent = typeof msg === "string" ? msg : T.bad;
     err.style.display = "flex";
     document.getElementById("title").textContent = T.untitled;
   }
-  // #m=… — схема целиком в адресе; #b=<id> — «живая» запись в JSON-хранилище
-  // (jsonblob.com): автор обновляет её, ссылка остаётся той же
-  var project, live = null;
+  var project, started = false;
+  var embedded = document.getElementById("mapData");
   var hm = /[#&]m=([^&]+)/.exec(location.hash);
-  var hb = /[#&]b=([A-Za-z0-9-]{8,64})(?:&|$)/.exec(location.hash);
-  if (hm) {
+  var hv = /[#&]v=([A-Za-z0-9_-]{1,64})(?:&|$)/.exec(location.hash);
+  if (embedded) {
+    try { project = SchemeCore.fromPublished(JSON.parse(embedded.textContent)); }
+    catch (e) { fail(); return; }
+    start();
+  } else if (hm && typeof LZString !== "undefined") {
     try {
       var json = LZString.decompressFromEncodedURIComponent(hm[1]);
       if (!json) throw new Error("decompress failed");
       project = SchemeCore.fromPublished(JSON.parse(json));
     } catch (e) { fail(); return; }
     start();
-  } else if (hb) {
+  } else if (hv) {
     document.getElementById("title").textContent = "…";
-    fetch("https://jsonblob.com/api/jsonBlob/" + hb[1], { headers: { Accept: "application/json" }, cache: "no-store" })
-      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (data) { project = SchemeCore.fromPublished(data); start(); })
-      .catch(fail);
+    var rev = null, by = document.querySelector("header .by"), byText = by.textContent;
+    var poll = function () {
+      fetch("/api/scheme-view/" + hv[1] + (rev === null ? "" : "?rev=" + rev), { cache: "no-store" })
+        .then(function (r) {
+          if (r.status === 204) return null;
+          if (r.status === 404) throw new Error("gone");
+          if (!r.ok) throw new Error(r.status);
+          return r.json();
+        })
+        .then(function (v) {
+          by.textContent = byText;
+          if (!v) return;
+          document.getElementById("error").style.display = "none";
+          rev = v.rev;
+          project = SchemeCore.fromPublished(v.data);
+          start();
+        })
+        .catch(function (e) {
+          if (!started) { fail(T.gone); return; }
+          by.textContent = T.offline;
+        })
+        .then(function () { setTimeout(poll, 1500); });
+    };
+    poll();
   } else { fail(); }
 
   function start() {
@@ -95,6 +123,8 @@
   document.title = title;
   document.body.style.background = project.style.bg;
   SchemeCore.render(world, project);
+  if (started) return; // обновление схемы: вид и обработчики уже есть
+  started = true;
 
   var view = { x: 0, y: 0, z: 1 };
   function apply() { world.setAttribute("transform", "translate(" + view.x + " " + view.y + ") scale(" + view.z + ")"); }
