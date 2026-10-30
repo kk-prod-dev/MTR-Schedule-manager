@@ -44,7 +44,10 @@ const NetworkScheme = (function () {
   const C = () => window.SchemeCore;
   let project = null;
   // alignTol — допуск выравнивания перегонов при построении, градусы (0 = выкл)
-  let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, minGap: 0 };
+  let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, minGap: 0, customIcons: [] };
+  // что ставит инструмент «Значок»: категория, вариант, плашка, цвет или свой рисунок
+  const iconPick = { icon: "park", variant: 0, plate: "circle", plateColor: "", fill: "#16a34a", img: "" };
+  const ICON_PX = 512, ICON_LIB_MAX = 30;
   let schemeData = null;
   let initialized = false;
   const el = {};
@@ -1392,7 +1395,7 @@ const NetworkScheme = (function () {
   function render() {
     if (!el.svg) return;
     el.svg.style.background = project.style.bg;
-    lastDrawn = C().render(el.scene, project, { live: ui.live ? liveData : null });
+    lastDrawn = C().render(el.scene, project, { live: ui.live ? liveData : null, highlight: highlightSet() });
     applyView();
     renderOverlay();
   }
@@ -1406,7 +1409,7 @@ const NetworkScheme = (function () {
     return { x: c.x + dx * ca - dy * sa, y: c.y + dx * sa + dy * ca };
   }
 
-  const SHAPE_TOOLS = { rect: "rect", ellipse: "ellipse", shapeline: "line", text: "text" };
+  const SHAPE_TOOLS = { rect: "rect", ellipse: "ellipse", shapeline: "line", text: "text", icon: "icon" };
 
   // Рамка, ручки изменения размера и ручка поворота выбранной фигуры
   function drawShapeHandles(g, sh) {
@@ -1443,6 +1446,14 @@ const NetworkScheme = (function () {
   function markPos(st) {
     const geo = lastDrawn && lastDrawn.geos && lastDrawn.geos.get(st.id);
     return geo ? geo.c : st;
+  }
+
+  // выделенная линия вместе с объединёнными с ней — для подсветки
+  function highlightSet() {
+    if (!sel || sel.kind !== "line") return null;
+    const ln = project.lines.find((l) => l.id === sel.id);
+    if (!ln) return null;
+    return new Set(project.lines.filter((l) => l === ln || (ln.group && l.group === ln.group)).map((l) => l.id));
   }
 
   function renderOverlay() {
@@ -1756,6 +1767,10 @@ const NetworkScheme = (function () {
     const base = { id: "sh-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), type, x, y };
     if (type === "rect" || type === "ellipse") return C().normalizeShape(Object.assign(base, { w: 2, h: 2, fill: "#dbeafe", stroke: "#2563eb", strokeW: 2 }));
     if (type === "line") return C().normalizeShape(Object.assign(base, { w: 0, h: 0, stroke: "#111827", strokeW: 3, fill: "none" }));
+    if (type === "icon") {
+      const size = project.grid * 2;
+      return C().normalizeShape(Object.assign(base, { x: x - size / 2, y: y - size / 2, w: size, h: size, layer: "front" }, iconPick));
+    }
     return C().normalizeShape(Object.assign(base, { text: tt("schemeNewText"), fill: "#111827", stroke: "none", fontSize: 18 }));
   }
 
@@ -1769,6 +1784,11 @@ const NetworkScheme = (function () {
     project.shapes.push(sh);
     clearSelection();
     sel = { kind: "shape", id: sh.id };
+    if (type === "icon") {
+      setTool("select");
+      changed();
+      return;
+    }
     if (type === "text") {
       setTool("select");
       changed();
@@ -2248,6 +2268,46 @@ const NetworkScheme = (function () {
     st.y = to.y;
   }
 
+  // Выстроить выделенные станции по прямой между двумя крайними: остальные
+  // проецируются на неё, а точки излома линий между такими станциями удаляются
+  function alignGroupInLine() {
+    if (!group || group.stations.size < 2) return;
+    const sts = [...group.stations].map((id) => project.stations.find((s) => s.id === id)).filter(Boolean);
+    if (sts.length < 2) return;
+    let A = sts[0], B = sts[1], best = -1;
+    for (let i = 0; i < sts.length; i++) {
+      for (let j = i + 1; j < sts.length; j++) {
+        const d = Math.hypot(sts[i].x - sts[j].x, sts[i].y - sts[j].y);
+        if (d > best) { best = d; A = sts[i]; B = sts[j]; }
+      }
+    }
+    if (best <= 0) return;
+    pushHistory();
+    const dx = B.x - A.x, dy = B.y - A.y, l2 = dx * dx + dy * dy;
+    const ax = A.x, ay = A.y;
+    for (const s of sts) {
+      if (s === A || s === B) continue;
+      const t = ((s.x - ax) * dx + (s.y - ay) * dy) / l2;
+      const to = { x: Math.round((ax + dx * t) * 100) / 100, y: Math.round((ay + dy * t) * 100) / 100 };
+      moveStation(s.id, { x: s.x, y: s.y }, to);
+    }
+    // линии: между вершинами выделенных станций убираем все вершины, не являющиеся станциями
+    const anyStation = new Set(project.stations.map((s) => pkey(s)));
+    const selPos = new Set(sts.map((s) => pkey(s)));
+    for (const l of project.lines) {
+      const idx = [];
+      l.points.forEach((q, i) => { if (selPos.has(pkey(q))) idx.push(i); });
+      for (let k = idx.length - 1; k >= 1; k--) {
+        for (let m = idx[k] - 1; m > idx[k - 1]; m--) {
+          if (!anyStation.has(pkey(l.points[m]))) removePoint(l, m);
+        }
+      }
+    }
+    relayoutLanes();
+    changed();
+    setStatus(tt("schemeAlignDone", { n: sts.length }));
+  }
+
   // Точка на отрезке, кратная шагу сетки (для октилинейных отрезков — на сетке)
   function snapOnSegment(a, b, w) {
     const steps = Math.max(1, Math.round(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / project.grid));
@@ -2419,6 +2479,7 @@ const NetworkScheme = (function () {
     el.svg.dataset.tool = name;
     el.toolHint.textContent = tt("schemeToolHint_" + name);
     renderOverlay();
+    renderProps();
   }
 
   function fitView() {
@@ -2578,9 +2639,122 @@ const NetworkScheme = (function () {
     return rows;
   }
 
+  // ---- Значки: выбор рисунка, плашки, импорт своих картинок ----
+  function iconName(it) { return it[typeof currentLang === "function" ? currentLang() : "en"] || it.en; }
+  function iconThumb(id, variant, color, plate, px) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("width", px); svg.setAttribute("height", px); svg.setAttribute("viewBox", `0 0 ${px} ${px}`);
+    window.MapIcons.draw(svg, id, variant, px / 2, px / 2, px - 2, { color, plate, plateColor: color, bg: "#ffffff" });
+    return svg;
+  }
+  function imgThumb(src, px) {
+    return h("img", { src, width: px, height: px, class: "scheme-icon-img", alt: "" });
+  }
+  // target — значок на схеме (применить сразу) или iconPick (для следующего)
+  function iconFields(target, isPick) {
+    const MI = window.MapIcons;
+    const sync = () => { if (!isPick) Object.assign(iconPick, { icon: target.icon, variant: target.variant, plate: target.plate, plateColor: target.plateColor, img: target.img, fill: target.fill }); };
+    const commit = (fn) => {
+      pushHistory();
+      fn();
+      sync();
+      if (isPick) renderProps(); else changed();
+      scheduleSave();
+    };
+    const rows = [];
+    if (!MI) return rows;
+    const isImg = !!target.img;
+    rows.push(field("schemeFieldIconCategory", selectInput(isImg ? "" : target.icon, [...(isImg ? [["", tt("schemeIconCustom")]] : []), ...MI.CATALOG.map((it) => [it.id, iconName(it)])], (v) => {
+      if (!v) return;
+      target.icon = v; target.img = "";
+      sync();
+      renderProps();
+    })));
+    const col = target.fill && target.fill !== "none" ? target.fill : "#334155";
+    if (!isImg) {
+      const vr = h("div", { class: "scheme-icon-variants" });
+      for (let v = 0; v < MI.VARIANTS; v++) {
+        vr.append(h("button", {
+          type: "button", class: "scheme-icon-btn" + (target.variant === v ? " active" : ""), title: tt("schemeFieldIconVariant") + " " + (v + 1),
+          onclick: () => commit(() => { target.variant = v; }),
+        }, [iconThumb(target.icon, v, col, "none", 34)]));
+      }
+      rows.push(field("schemeFieldIconVariant", vr));
+    }
+    rows.push(field("schemeFieldPlate", selectInput(target.plate, MI.PLATES.map((p) => [p, tt("schemePlate_" + p)]), (v) => { target.plate = v; sync(); renderProps(); })));
+    if (!isImg || target.plate !== "none") rows.push(field("schemeFieldColor", colorInput(col, (v) => { target.fill = v; sync(); })));
+    if (target.plate !== "none") rows.push(field("schemeFieldPlateColor", optColor(target.plateColor, col, (v) => { target.plateColor = v; sync(); })));
+    if (!isPick) {
+      rows.push(field("schemeFieldIconSize", numInput(Math.round(Math.min(target.w, target.h)), 8, 800, (v) => {
+        const size = Math.max(8, Math.min(800, Number(v) || 48)), cx = target.x + target.w / 2, cy = target.y + target.h / 2;
+        target.w = target.h = size; target.x = cx - size / 2; target.y = cy - size / 2;
+      })));
+    }
+    // импорт своих картинок
+    const file = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg", style: "display:none" });
+    file.addEventListener("change", () => {
+      const f = file.files && file.files[0];
+      file.value = "";
+      if (f) importIconFile(f, (img) => commit(() => { target.img = img; target.icon = "img"; }));
+    });
+    rows.push(h("div", { class: "scheme-btn-row" }, [h("button", { type: "button", class: "secondary-btn", text: tt("schemeIconImport"), onclick: () => file.click() }), file]));
+    if (ui.customIcons.length) {
+      const lib = h("div", { class: "scheme-icon-lib" });
+      ui.customIcons.forEach((it) => {
+        lib.append(h("span", { class: "scheme-icon-libitem" }, [
+          h("button", { type: "button", class: "scheme-icon-btn" + (target.img === it.img ? " active" : ""), title: it.name, onclick: () => commit(() => { target.img = it.img; target.icon = "img"; }) }, [imgThumb(it.img, 34)]),
+          h("button", { type: "button", class: "icon-btn scheme-icon-del", text: "×", title: tt("schemeIconDelete"), onclick: () => { ui.customIcons = ui.customIcons.filter((x) => x !== it); renderProps(); scheduleSave(); } }),
+        ]));
+      });
+      rows.push(h("div", { class: "scheme-props-title", text: tt("schemeIconLibrary") }), lib);
+    }
+    return rows;
+  }
+
+  // Файл (PNG/JPG/GIF/WebP/SVG) → data-URL: растр уменьшается до ICON_PX по большей стороне,
+  // SVG кладётся как есть (в <image> скрипты не выполняются); результат ≤ лимита schemeCore
+  function importIconFile(file, done) {
+    const isSvg = file.type === "image/svg+xml" || /\.svg$/i.test(file.name);
+    if (!isSvg && !/^image\/(png|jpeg|gif|webp)$/.test(file.type)) { setStatus(tt("schemeIconBadType")); return; }
+    if (file.size > 8 * 1024 * 1024) { setStatus(tt("schemeIconTooBig")); return; }
+    const name = file.name.replace(/\.[^.]+$/, "").slice(0, 40) || "icon";
+    const finish = (img) => {
+      if (!img || img.length > 600000) { setStatus(tt("schemeIconTooBig")); return; }
+      if (!ui.customIcons.some((x) => x.img === img)) ui.customIcons = [{ id: uid(), name, img }, ...ui.customIcons].slice(0, ICON_LIB_MAX);
+      setStatus(tt("schemeIconImported", { name }));
+      done(img);
+    };
+    const reader = new FileReader();
+    if (isSvg) {
+      reader.onload = () => {
+        const text = String(reader.result || "");
+        if (!/<svg[\s>]/i.test(text)) { setStatus(tt("schemeIconBadType")); return; }
+        finish("data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(text))));
+      };
+      reader.readAsText(file);
+    } else {
+      reader.onload = () => {
+        const im = new Image();
+        im.onload = () => {
+          const k = Math.min(1, ICON_PX / Math.max(im.naturalWidth, im.naturalHeight));
+          const cv = document.createElement("canvas");
+          cv.width = Math.max(1, Math.round(im.naturalWidth * k)); cv.height = Math.max(1, Math.round(im.naturalHeight * k));
+          cv.getContext("2d").drawImage(im, 0, 0, cv.width, cv.height);
+          finish(cv.toDataURL("image/png"));
+        };
+        im.onerror = () => setStatus(tt("schemeIconBadType"));
+        im.src = String(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
   function shapeFields(sh) {
     const rows = [];
-    if (sh.type === "text") {
+    if (sh.type === "icon") {
+      rows.push(...iconFields(sh, false));
+    } else if (sh.type === "text") {
       const ta = bindEdit(h("textarea", { rows: "3" }), (v) => { sh.text = v; });
       ta.value = sh.text;
       rows.push(field("schemeFieldText", ta));
@@ -2716,6 +2890,7 @@ const NetworkScheme = (function () {
           field("schemeFieldLabelPos", selectInput(proxy.label.pos, C().LABEL_POS.map((s) => [s, tt("schemeLabelPos_" + s)]), applyAll((s, v) => { s.label.pos = v; }))),
         );
       }
+      if (n >= 2) box.append(button("schemeAlignLine", alignGroupInLine), h("p", { class: "hint small", text: tt("schemeAlignHint") }));
       box.append(h("p", { class: "hint small", text: tt("schemeGroupHint") }), styleButtons(), button("schemeDeleteGroup", deleteSelection, "secondary-btn danger"));
       return;
     }
@@ -2734,6 +2909,10 @@ const NetworkScheme = (function () {
       }
       if (st.mtrStationId) box.append(button("schemeOpenSchedule", () => openStation(st.mtrStationId)));
       box.append(button("schemeDelete", deleteSelection, "secondary-btn danger"));
+      return;
+    }
+    if (tool === "icon" && !sel && !group) {
+      box.append(title("schemePropShape_icon"), h("p", { class: "hint small", text: tt("schemeToolHint_icon") }), ...iconFields(iconPick, true));
       return;
     }
     if (sel && sel.kind === "shape") {
@@ -2920,6 +3099,63 @@ const NetworkScheme = (function () {
     el.typesCount.textContent = `(${ui.types.length})`;
   }
 
+  // Что изменит пересборка из MTR: объекты MTR (по префиксу id) добавятся,
+  // исчезнут или будут переименованы (имя MTR изменилось, а вручную не правилось)
+  function diffProjects(oldP, newP) {
+    const cmp = (olds, news, prefix) => {
+      const o = new Map(olds.filter((x) => isMtr(x.id, prefix)).map((x) => [x.id, x]));
+      const n = new Map(news.filter((x) => isMtr(x.id, prefix)).map((x) => [x.id, x]));
+      const r = { added: [], removed: [], renamed: [] };
+      for (const [id, x] of n) {
+        if (!o.has(id)) r.added.push(x.name);
+        else if ((o.get(id).name || "") !== (x.name || "")) r.renamed.push(`${o.get(id).name || "—"} → ${x.name || "—"}`);
+      }
+      for (const [id, x] of o) if (!n.has(id)) r.removed.push(x.name);
+      return r;
+    };
+    const lines = cmp(oldP.lines, newP.lines, P_LINE);
+    const stations = cmp(oldP.stations, newP.stations, P_ST);
+    const trOld = new Set(oldP.transfers.filter((t) => isMtr(t.id, P_TR)).map((t) => t.id));
+    const trNew = new Set(newP.transfers.filter((t) => isMtr(t.id, P_TR)).map((t) => t.id));
+    const transfers = { added: [...trNew].filter((id) => !trOld.has(id)).length, removed: [...trOld].filter((id) => !trNew.has(id)).length };
+    const cnt = (r) => r.added.length + r.removed.length + r.renamed.length;
+    return { lines, stations, transfers, total: cnt(lines) + cnt(stations) + transfers.added + transfers.removed };
+  }
+
+  function confirmRebuild(diff) {
+    return new Promise((resolve) => {
+      if (askBox) askBox.remove();
+      const MAX = 14;
+      const section = (titleKey, r) => {
+        const nodes = [];
+        const part = (cls, labelKey, arr) => {
+          if (!arr.length) return;
+          nodes.push(h("div", { class: "scheme-diff-head " + cls, text: tt(labelKey, { n: arr.length }) }));
+          const ul = h("ul", { class: "scheme-diff-list " + cls });
+          arr.slice(0, MAX).forEach((x) => ul.append(h("li", { text: x || "—" })));
+          if (arr.length > MAX) ul.append(h("li", { class: "more", text: tt("schemeRebuildMore", { n: arr.length - MAX }) }));
+          nodes.push(ul);
+        };
+        part("add", "schemeRebuildAdded", r.added);
+        part("del", "schemeRebuildRemoved", r.removed);
+        part("ren", "schemeRebuildRenamed", r.renamed);
+        return nodes.length ? [h("div", { class: "scheme-diff-title", text: tt(titleKey) }), ...nodes] : [];
+      };
+      const done = (v) => { if (askBox) { askBox.remove(); askBox = null; } resolve(v); };
+      const trLine = diff.transfers.added || diff.transfers.removed
+        ? [h("div", { class: "scheme-diff-title", text: tt("schemeRebuildTransfers", { a: diff.transfers.added, r: diff.transfers.removed }) })] : [];
+      askBox = h("div", { class: "scheme-ask scheme-diff" }, [
+        h("div", { class: "scheme-ask-label", text: tt("schemeRebuildTitle", { n: diff.total }) }),
+        h("div", { class: "scheme-diff-body" }, [...section("schemeListLines", diff.lines), ...section("schemeListStations", diff.stations), ...trLine]),
+        h("div", { class: "scheme-ask-btns" }, [
+          h("button", { type: "button", text: tt("schemeRebuildApply"), onclick: () => done(true) }),
+          h("button", { type: "button", class: "secondary-btn", text: tt("schemeAskCancel"), onclick: () => done(false) }),
+        ]),
+      ]);
+      el.canvasBox.appendChild(askBox);
+    });
+  }
+
   async function generate() {
     try {
       setStatus(tt("schemeGenerating"));
@@ -2927,8 +3163,13 @@ const NetworkScheme = (function () {
       renderTypes();
       const types = new Set(ui.types || []);
       if (!types.size) { setStatus(tt("schemeNoTypes")); return; }
-      pushHistory();
       const res = buildFromMtr(data, types, project, { alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap });
+      // пересборка уже построенной схемы: сначала показываем, что изменится
+      if (res.stats.hadMtr) {
+        const diff = diffProjects(project, res.project);
+        if (diff.total && !(await confirmRebuild(diff))) { setStatus(tt("schemeRebuildCancelled")); return; }
+      }
+      pushHistory();
       project = res.project;
       sel = null; group = null;
       changed();
@@ -2986,16 +3227,18 @@ const NetworkScheme = (function () {
       if (!r.ok) throw new Error(`${u}: ${r.status}`);
       return r.text();
     };
-    const [page, core] = await Promise.all([get("map.html"), get("schemeCore.js")]);
+    const [page, core, icons] = await Promise.all([get("map.html"), get("schemeCore.js"), get("mapIcons.js")]);
+    const ICON_TAG = '<script src="mapIcons.js"></script>';
     const LZ_TAG = '<script src="vendor/lz-string.min.js"></script>';
     const CORE_TAG = '<script src="schemeCore.js"></script>';
     if (!page.includes(LZ_TAG) || !page.includes(CORE_TAG)) throw new Error("map.html");
     // JSON внутри <script>: «<» экранируем, чтобы данные не закрыли тег
     const data = JSON.stringify(C().toPublished(project)).replace(/</g, "\\u003c");
-    const code = core.replace(/<\/script/gi, "<\\/script");
+    const code = (icons + "\n" + core).replace(/<\/script/gi, "<\\/script");
     // функции-замены: в коде и данных могут встретиться «$&» и т.п.
     return page
       .replace(LZ_TAG, () => "")
+      .replace(ICON_TAG, () => "")
       .replace(CORE_TAG, () => `<script type="application/json" id="mapData">${data}</script>\n<script>\n${code}\n</script>`);
   }
   async function saveHtml() {
@@ -3330,7 +3573,7 @@ const NetworkScheme = (function () {
       clearSelection(); transferFirst = null; setTool("select"); renderOverlay(); renderProps(); return;
     }
     if (k === "enter" && drawing) { finishLine(); return; }
-    const tools = { v: "select", l: "line", s: "station", t: "transfer", r: "rect", o: "ellipse", d: "shapeline", a: "text" };
+    const tools = { v: "select", l: "line", s: "station", t: "transfer", r: "rect", o: "ellipse", d: "shapeline", a: "text", i: "icon" };
     if (tools[k]) setTool(tools[k]);
   }
 
@@ -3440,7 +3683,7 @@ const NetworkScheme = (function () {
     syncActive();
     return {
       project,
-      ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap },
+      ui: { mode: ui.mode, types: ui.types, live: ui.live, alignTol: ui.alignTol, compress: ui.compress, minGap: ui.minGap, customIcons: ui.customIcons },
       schemes: schemes.map((e) => ({ id: e.id, name: e.name, project: e.project, types: e.types })),
       activeId,
     };
@@ -3468,6 +3711,12 @@ const NetworkScheme = (function () {
       if ([0, 10, 15, 20].includes(s.ui.alignTol)) ui.alignTol = s.ui.alignTol;
       if ([0, 3, 5, 8].includes(s.ui.compress)) ui.compress = s.ui.compress;
       if (MIN_GAPS.includes(s.ui.minGap)) ui.minGap = s.ui.minGap;
+      if (Array.isArray(s.ui.customIcons)) {
+        ui.customIcons = s.ui.customIcons.slice(0, ICON_LIB_MAX).map((it) => ({
+          id: String((it && it.id) || uid()).slice(0, 40), name: String((it && it.name) || "icon").slice(0, 40),
+          img: window.SchemeCore.normalizeShape({ type: "icon", img: it && it.img }).img,
+        })).filter((it) => it.img);
+      }
     }
     ensureSchemes();
     // типы маршрутов — свойство схемы: у активной они перекрывают общие

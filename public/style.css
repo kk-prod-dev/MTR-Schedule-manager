@@ -1446,3 +1446,22 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .rm-row select { width: 100%; padding: 6px 8px; font-size: 12.5px; }
 .rm-row .rm-preview { display: flex; justify-content: center; }
 @media (max-width: 700px) { .rm-row { grid-template-columns: minmax(0, 1fr) 1fr 1fr 56px; } }
+
+/* Предпросмотр пересборки схемы из MTR */
+.scheme-diff { width: min(440px, 92%); max-height: 78%; }
+.scheme-diff-body { overflow-y: auto; max-height: 52vh; display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.scheme-diff-title { margin-top: 6px; font-weight: 600; }
+.scheme-diff-head { margin-top: 4px; font-size: 11px; color: var(--muted); }
+.scheme-diff-head.add { color: #16a34a; }
+.scheme-diff-head.del { color: #dc2626; }
+.scheme-diff-head.ren { color: #d97706; }
+.scheme-diff-list { margin: 0; padding-left: 18px; }
+.scheme-diff-list li.more { list-style: none; color: var(--muted); }
+
+/* Значки на схеме */
+.scheme-icon-variants, .scheme-icon-lib { display: flex; flex-wrap: wrap; gap: 6px; }
+.scheme-icon-btn { padding: 2px; border: 1px solid var(--border); border-radius: 6px; background: #fff; cursor: pointer; line-height: 0; }
+.scheme-icon-btn.active { outline: 2px solid var(--accent); }
+.scheme-icon-img { object-fit: contain; }
+.scheme-icon-libitem { position: relative; display: inline-block; }
+.scheme-icon-del { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; padding: 0; font-size: 12px; line-height: 14px; border-radius: 50%; }
