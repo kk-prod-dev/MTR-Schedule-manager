@@ -1465,3 +1465,29 @@ td.tt-has-conflict { background: rgba(245,158,11,0.1) !important; white-space: n
 .scheme-icon-img { object-fit: contain; }
 .scheme-icon-libitem { position: relative; display: inline-block; }
 .scheme-icon-del { position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; padding: 0; font-size: 12px; line-height: 14px; border-radius: 50%; }
+
+/* Палитра значков рядом с кнопкой инструмента */
+.scheme-icon-pal {
+  position: fixed; z-index: 1000; width: min(560px, 92vw); overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 8px;
+  background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.scheme-icon-pal-head, .scheme-icon-pal-foot { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.scheme-icon-pal-head .active { outline: 2px solid var(--accent); }
+.scheme-icon-pal-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 10px; }
+.scheme-icon-pal-name { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+.scheme-icon-pal-row { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* Значки: ровная сетка, белый фон и подсветка при наведении (общий стиль button тёмный) */
+.scheme-icon-pal { width: fit-content; max-width: 94vw; }
+.scheme-icon-pal-grid { grid-template-columns: repeat(3, 138px); gap: 10px 18px; justify-content: space-between; }
+.scheme-icon-pal-row { flex-wrap: nowrap; gap: 6px; }
+.scheme-icon-btn, .scheme-icon-btn:hover, .scheme-icon-btn:focus {
+  background: #fff; color: inherit; padding: 2px; min-width: 0; width: auto; height: auto; line-height: 0;
+  border: 1px solid var(--border); border-radius: 8px; transition: box-shadow .12s, border-color .12s, transform .12s;
+}
+.scheme-icon-btn:hover {
+  border-color: var(--accent); transform: translateY(-1px);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.45), 0 3px 10px rgba(99, 102, 241, 0.35);
+}
+.scheme-icon-btn.active { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); outline: none; }

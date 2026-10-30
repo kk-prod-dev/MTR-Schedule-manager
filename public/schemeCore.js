@@ -40,9 +40,9 @@ const SchemeCore = (function () {
   // свой значок: только растр/SVG в data-URL (в <image> скрипты не выполняются)
   const IMG_RE = /^data:image\/(png|jpeg|gif|webp|svg\+xml);base64,[A-Za-z0-9+/=]+$/;
   const IMG_MAX = 600000;
-  const TRANSFER_STYLES = ["bar", "capsule", "dumbbell", "curve", "dashed", "none", "london", "moscow", "square", "hub"];
+  const TRANSFER_STYLES = ["bar", "capsule", "dumbbell", "dumbbell2", "curve", "dashed", "none", "london", "moscow", "square", "hub"];
   // стили, где значки станций пересадки рисует сама пересадка
-  const OWN_MARKER_TRANSFERS = ["capsule", "dumbbell", "london", "moscow", "square", "hub"];
+  const OWN_MARKER_TRANSFERS = ["capsule", "hub"];
   const STATION_STYLES = ["auto", "tick", "circle", "pill", "square", "diamond", "stump"];
   const LABEL_POS = ["auto", "n", "ne", "e", "se", "s", "sw", "w", "nw"];
   const LABEL_ANGLES = [0, -45, 45, -90, 90];
@@ -281,7 +281,10 @@ const SchemeCore = (function () {
    * схемах. Такие отрезки выкидываются (соседи стыкуются напрямую), пока
    * вывернутых не останется.
    */
-  function offsetPolylineVar(ptsIn, offsIn, R) {
+  // steep — Set ключей «x,y» вершин, где смена полосы на прямой должна быть
+  // крутой (станции: значок-«пилюля» прикрывает её целиком, а пологая
+  // ступенька торчала из-под него «микро-зигзагом»); steepLen — её длина
+  function offsetPolylineVar(ptsIn, offsIn, R, steep, steepLen) {
     if (R == null) R = CORNER_R;
     // нулевые отрезки выкидываем вместе с их смещениями
     const pts = [], offs = [];
@@ -306,8 +309,9 @@ const SchemeCore = (function () {
         if (dot > 0) {
           const gap = Math.abs(cross(sub(u.q, s.q), s.d));
           if (gap < 0.01) return { one: true, t1: (u.q.x - s.q.x) * s.d.x + (u.q.y - s.q.y) * s.d.y, t0: 0, c: 0 };
-          // смена полосы на прямой — косой переход
-          const tt = Math.min(gap, s.L / 2, u.L / 2);
+          // смена полосы на прямой — косой переход (в станции — крутой, под значком)
+          const atSt = steep && steep.has(s.b.x + "," + s.b.y);
+          const tt = Math.min(atSt ? Math.min(gap, steepLen || gap) : gap, s.L / 2, u.L / 2);
           return { one: false, t1: s.L - tt, t0: tt };
         }
         return { one: false, t1: s.L, t0: 0 }; // разворот
@@ -500,83 +504,110 @@ const SchemeCore = (function () {
   const SMOOTH_LEN = 20;
   function smoothLanes(p) {
     const out = new Map();
-    const pk = (q) => q.x + "," + q.y;
-    const occ = new Map(); // ключ отрезка → Map(полоса в каноническом кадре → Set(кому принадлежит))
     const own = (l) => (l.group ? "g:" + l.group : l.id);
-    const segInfo = (l, i) => {
-      const a = l.points[i], b = l.points[i + 1];
-      const fwd = a.x < b.x || (a.x === b.x && a.y < b.y);
-      return { key: (fwd ? pk(a) + ">" + pk(b) : pk(b) + ">" + pk(a)), sign: fwd ? 1 : -1 };
-    };
+    const R2 = (v) => Math.round(v * 100) / 100;
     const lanesMap = new Map();
+    // Работаем над линиями без отрезков нулевой длины (повторная вершина в
+    // одной точке — бывает в станции после правок): такой отрезок рвал цепочки
+    // соседних отрезков, и ступенька смены полосы в этой точке не
+    // исправлялась. В конце полосы разворачиваются обратно на исходные индексы
+    const lines = [], keep = new Map();
     for (const l of p.lines) {
-      if (!l.lanes || l.lanes.length !== l.points.length - 1 || l.points.length < 3) continue;
+      const ix = [];
+      for (let i = 0; i + 1 < l.points.length; i++) if (l.points[i].x !== l.points[i + 1].x || l.points[i].y !== l.points[i + 1].y) ix.push(i);
+      keep.set(l.id, ix);
+      const points = ix.length ? [l.points[ix[0]], ...ix.map((i) => l.points[i + 1])] : l.points.slice(0, 1);
+      const okLanes = l.lanes && l.lanes.length === l.points.length - 1;
+      lines.push({ id: l.id, group: l.group, points, lanes: okLanes ? ix.map((i) => l.lanes[i]) : null });
+    }
+    for (const l of lines) {
+      if (!l.lanes || l.points.length < 3) continue;
       lanesMap.set(l.id, l.lanes.slice());
     }
     if (!lanesMap.size) return out;
-    const R2 = (v) => Math.round(v * 100) / 100;
-    for (const l of p.lines) {
-      const ln = lanesMap.get(l.id);
-      if (!ln) continue;
-      for (let i = 0; i < ln.length; i++) {
-        const { key, sign } = segInfo(l, i);
-        if (!occ.has(key)) occ.set(key, new Map());
-        const m = occ.get(key), c = R2(ln[i] * sign);
-        if (!m.has(c)) m.set(c, new Set());
-        m.get(c).add(own(l));
-      }
-    }
-    // линии без lanes тоже занимают полосу 0 (плюс offset) — учтём как занятое
-    for (const l of p.lines) {
-      if (lanesMap.has(l.id) || l.points.length < 2) continue;
+    // Пучки — геометрически: отрезки всех линий раскладываются по «коридорам»
+    // (общая опорная прямая), у каждого — интервал вдоль неё и полоса в общем
+    // (каноническом) кадре. Сравнивать отрезки по одинаковым концам нельзя:
+    // если у соседки на том же участке лишняя вершина, её отрезок «не виден»,
+    // и линию ставило на полполосы поверх неё
+    const corr = new Map(), recsOf = new Map();
+    for (const l of lines) {
+      const ln = lanesMap.get(l.id) || l.lanes || [];
+      const recs = [];
       for (let i = 0; i + 1 < l.points.length; i++) {
-        const { key, sign } = segInfo(l, i);
-        if (!occ.has(key)) occ.set(key, new Map());
-        const m = occ.get(key), c = R2(((l.lanes && l.lanes[i]) || 0) * sign);
-        if (!m.has(c)) m.set(c, new Set());
-        m.get(c).add(own(l));
+        const a = l.points[i], b = l.points[i + 1];
+        const fwd = a.x < b.x || (a.x === b.x && a.y < b.y);
+        const A = fwd ? a : b, B = fwd ? b : a;
+        const L = len(sub(B, A));
+        if (!L) { recs.push(null); continue; }
+        const u = { x: (B.x - A.x) / L, y: (B.y - A.y) / L };
+        const key = Math.round(u.x * 1000) + "," + Math.round(u.y * 1000) + "|" + Math.round((A.x * -u.y + A.y * u.x) * 10) / 10;
+        const rec = { key, u, sign: fwd ? 1 : -1, t0: A.x * u.x + A.y * u.y, t1: B.x * u.x + B.y * u.y, c: R2((ln[i] || 0) * (fwd ? 1 : -1)), o: own(l) };
+        if (!corr.has(key)) corr.set(key, []);
+        corr.get(key).push(rec);
+        recs.push(rec);
       }
+      recsOf.set(l.id, recs);
     }
+    // Можно ли поставить отрезок на полосу target: ни одна чужая линия на
+    // перекрывающемся куске коридора не ближе целой полосы (иначе наложение),
+    // и пучок там остаётся сплошным (без дыры между линиями)
+    function laneOk(rec, target) {
+      if (!rec) return true;
+      const tc = R2(target * rec.sign);
+      const near = corr.get(rec.key).filter((r) => r !== rec && r.t1 > rec.t0 + 0.5 && r.t0 < rec.t1 - 0.5);
+      // объединённая линия (та же группа) рядом должна остаться в той же полосе
+      // или не ближе целой — иначе члены группы расходятся на полполосы
+      if (near.some((r) => r.o === rec.o && r.c !== tc && Math.abs(r.c - tc) < 0.99)) return false;
+      const others = near.filter((r) => r.o !== rec.o);
+      if (!others.length) return true;
+      const cuts = [...new Set([rec.t0, rec.t1, ...others.flatMap((r) => [r.t0, r.t1]).filter((t) => t > rec.t0 && t < rec.t1)])].sort((x, y) => x - y);
+      for (let j = 0; j + 1 < cuts.length; j++) {
+        if (cuts[j + 1] - cuts[j] < 0.5) continue;
+        const m = (cuts[j] + cuts[j + 1]) / 2;
+        const here = others.filter((r) => r.t0 <= m && m <= r.t1).map((r) => r.c);
+        if (here.some((c) => Math.abs(c - tc) < 0.99)) return false;
+        const v = [...new Set([...here, tc])].sort((x, y) => x - y);
+        for (let t = 1; t < v.length; t++) if (v[t] - v[t - 1] > 1.01) return false;
+      }
+      return true;
+    }
+    const runOk = (l, from, to, target) => {
+      const recs = recsOf.get(l.id);
+      for (let k = from; k <= to; k++) if (!laneOk(recs[k], target)) return false;
+      return true;
+    };
+    const setRun = (l, ln, from, to, target) => {
+      const recs = recsOf.get(l.id);
+      for (let k = from; k <= to; k++) {
+        ln[k] = target;
+        if (recs[k]) recs[k].c = R2(target * recs[k].sign);
+      }
+    };
     const pitch = pitchOf(p);
     const maxLen = SMOOTH_LEN * pitch;
     let changed = false;
+    // 1) Короткие «горбы» (0 → 0.5 → 0) и ступеньки (a → b → c) — на полосу соседа
     for (let pass = 0; pass < 4; pass++) {
       let any = false;
-      for (const l of p.lines) {
+      for (const l of lines) {
         const ln = lanesMap.get(l.id);
         if (!ln) continue;
         const n = ln.length;
         const segLen = (i) => len(sub(l.points[i + 1], l.points[i]));
         let i = 1;
         while (i < n - 1) {
-          // кусок [i..j] с полосой, отличной от соседей
           if (ln[i] === ln[i - 1]) { i++; continue; }
           let j = i, run = segLen(i);
           while (j + 1 < n - 1 && ln[j + 1] === ln[i] && run < maxLen) { j++; run += segLen(j); }
           if (j + 1 >= n) break;
           const before = ln[i - 1], after = ln[j + 1];
           const between = ln[i] > Math.min(before, after) && ln[i] < Math.max(before, after);
-          // зигзаг: вернулись на ту же полосу (bump) или пошли ступеньками (a → b → c)
           if (run < maxLen && (before === after || between) && ln[j + 1] !== ln[i]) {
-            // кандидаты: полоса до куска или после него
             const cands = before === after ? [before] : [after, before];
             for (const target of cands) {
-              let ok = true;
-              for (let k = i; k <= j && ok; k++) {
-                const { key, sign } = segInfo(l, k);
-                const m = occ.get(key), set = m && m.get(R2(target * sign));
-                if (set && [...set].some((o) => o !== own(l))) ok = false;
-              }
-              if (!ok) continue;
-              for (let k = i; k <= j; k++) {
-                const { key, sign } = segInfo(l, k);
-                const m = occ.get(key);
-                const was = m.get(R2(ln[k] * sign));
-                if (was) { was.delete(own(l)); if (!was.size) m.delete(R2(ln[k] * sign)); }
-                if (!m.has(R2(target * sign))) m.set(R2(target * sign), new Set());
-                m.get(R2(target * sign)).add(own(l));
-                ln[k] = target;
-              }
+              if (!runOk(l, i, j, target)) continue;
+              setRun(l, ln, i, j, target);
               any = changed = true;
               break;
             }
@@ -586,7 +617,158 @@ const SchemeCore = (function () {
       }
       if (!any) break;
     }
-    if (changed) for (const [id, ln] of lanesMap) out.set(id, ln);
+    // 2) Смена полосы на ПРЯМОМ участке (обычно в станции, где соседи ушли)
+    // рисуется маленькой ступенькой-«микро-зигзагом». Лучше свернуть на нужную
+    // полосу сразу на ближайшем повороте: там смещённые линии просто
+    // пересекаются. Переносим смену на поворот (назад или вперёд — что ближе),
+    // если на этом пути полоса свободна и пучок не рвётся
+    const bendAt = (l, v) => {
+      const a = sub(l.points[v], l.points[v - 1]), b = sub(l.points[v + 1], l.points[v]);
+      return Math.abs(cross(unit(a), unit(b))) > 0.02 || a.x * b.x + a.y * b.y < 0;
+    };
+    for (let pass = 0; pass < 4; pass++) {
+      let any = false;
+      for (const l of lines) {
+        const ln = lanesMap.get(l.id);
+        if (!ln) continue;
+        const n = ln.length;
+        const runLen = (a, b) => { let t = 0; for (let k = a; k <= b; k++) t += len(sub(l.points[k + 1], l.points[k])); return t; };
+        for (let v = 1; v < n; v++) {
+          if (ln[v - 1] === ln[v] || bendAt(l, v)) continue;
+          let f = v + 1;
+          while (f < n && !bendAt(l, f)) f++;
+          let fwd = null, back = null;
+          if (f < n) {
+            let ok = true;
+            for (let k = v; k < f && ok; k++) if (ln[k] !== ln[v]) ok = false;
+            if (ok && runOk(l, v, f - 1, ln[v - 1])) fwd = { a: v, b: f - 1, to: ln[v - 1], d: runLen(v, f - 1) };
+          }
+          let b = v - 1;
+          while (b >= 1 && !bendAt(l, b)) b--;
+          if (b >= 1) {
+            let ok = true;
+            for (let k = b; k < v && ok; k++) if (ln[k] !== ln[v - 1]) ok = false;
+            if (ok && runOk(l, b, v - 1, ln[v])) back = { a: b, b: v - 1, to: ln[v], d: runLen(b, v - 1) };
+          }
+          const pick = fwd && back ? (fwd.d <= back.d ? fwd : back) : fwd || back;
+          if (pick) { setRun(l, ln, pick.a, pick.b, pick.to); any = changed = true; }
+        }
+      }
+      if (!any) break;
+    }
+    // 3) Пучок перецентровывается в станции на прямой (одна линия ушла или
+    // пришла — остальные сдвигаются на полполосы), и по одной линии это не
+    // исправить: мешают соседки. Сдвигаем ВЕСЬ пучок по одну сторону от точки
+    // (все линии коридора до их ближайшего поворота, включая примкнувшие) на
+    // величину ступеньки; итог проверяем и откатываем, если появились
+    // наложения или дыры
+    const ptKey = (q) => q.x + "," + q.y;
+    const jogsAt = new Map();
+    for (const l of lines) {
+      const ln = lanesMap.get(l.id);
+      if (!ln) continue;
+      for (let v = 1; v < ln.length; v++) {
+        if (ln[v - 1] === ln[v] || bendAt(l, v)) continue;
+        const k = ptKey(l.points[v]);
+        if (!jogsAt.has(k)) jogsAt.set(k, []);
+        jogsAt.get(k).push({ l, v });
+      }
+    }
+    // В вершине v меняется состав пучка (на этом коридоре какая-то линия
+    // начинается или кончается): сдвиг пучка дальше неё задел бы соседей,
+    // поэтому пробег до поворота останавливается и здесь
+    const compAt = (l, v, key) => {
+      const Q = l.points[v], list = corr.get(key);
+      if (!list) return false;
+      const u = list[0].u, tQ = Q.x * u.x + Q.y * u.y;
+      const at = (t) => [...new Set(list.filter((r) => r.t0 <= t && t <= r.t1).map((r) => r.o))].sort().join("|");
+      return at(tQ - 0.5) !== at(tQ + 0.5);
+    };
+    const straightJogs = (l) => {
+      const ln = lanesMap.get(l.id);
+      let c = 0;
+      for (let v = 1; v < ln.length; v++) if (ln[v - 1] !== ln[v] && !bendAt(l, v)) c++;
+      return c;
+    };
+    for (const list of jogsAt.values()) {
+      const P = list[0].l.points[list[0].v];
+      // все ступеньки в точке — на одной прямой и одной величины (в общем кадре)
+      const r0 = recsOf.get(list[0].l.id)[list[0].v];
+      if (!r0) continue;
+      const tP = P.x * r0.u.x + P.y * r0.u.y;
+      const afterSign = Math.sign((r0.t0 + r0.t1) / 2 - tP);
+      // ступенька = полоса «после» − «до», где «после» — сторона r0 (линии
+      // могут идти через точку в разные стороны, порядок индексов разный)
+      const deltas = list.map(({ l, v }) => {
+        const recs = recsOf.get(l.id), ra = recs[v], rb = recs[v - 1];
+        if (!ra || !rb || ra.key !== r0.key || rb.key !== r0.key) return null;
+        const aAfter = Math.sign((ra.t0 + ra.t1) / 2 - tP) === afterSign;
+        return R2(aAfter ? ra.c - rb.c : rb.c - ra.c);
+      });
+      if (deltas.some((d) => d == null || d !== deltas[0])) continue;
+      const delta = deltas[0];
+      for (const side of [1, -1]) {
+        // side = 1: отрезки «после» ступеньки получают полосы «до» (c − delta);
+        // side = −1: отрезки «до» получают полосы «после» (c + delta)
+        const want = afterSign * side, d = side > 0 ? -delta : delta;
+        const plan = [];
+        let bad = false;
+        for (const l of lines) {
+          const ln = lanesMap.get(l.id);
+          if (!ln || bad) continue;
+          const recs = recsOf.get(l.id);
+          for (let w = 0; w < l.points.length && !bad; w++) {
+            if (l.points[w].x !== P.x || l.points[w].y !== P.y) continue;
+            for (const [k, step] of [[w, 1], [w - 1, -1]]) {
+              const rec = recs[k];
+              if (!rec || rec.key !== r0.key || Math.sign((rec.t0 + rec.t1) / 2 - tP) !== want) continue;
+              // пробег до ближайшего поворота линии, в сторону от P
+              let a = k, b = k;
+              // пробег до поворота (через другие ступеньки тоже — они сдвигаются
+              // вместе и остаются, но принимаем сдвиг, только если ступенек
+              // в итоге стало меньше)
+              if (step > 0) {
+                let f = k + 1;
+                while (f < ln.length && !bendAt(l, f) && !compAt(l, f, r0.key)) f++;
+                if (f >= ln.length) { bad = true; break; }
+                b = f - 1;
+              } else {
+                let g = k;
+                while (g >= 1 && !bendAt(l, g) && !compAt(l, g, r0.key)) g--;
+                if (g < 1) { bad = true; break; }
+                a = g;
+              }
+              plan.push({ l, ln, a, b, vals: ln.slice(a, b + 1) });
+            }
+          }
+        }
+        if (bad || !plan.length) continue;
+        const touched = [...new Set(plan.map((x) => x.l))];
+        const before = touched.reduce((t, l) => t + straightJogs(l), 0);
+        for (const x of plan) {
+          const recs = recsOf.get(x.l.id);
+          for (let k = x.a; k <= x.b; k++) if (recs[k]) setRun(x.l, x.ln, k, k, R2((recs[k].c + d) * recs[k].sign));
+        }
+        const ok = plan.every((x) => {
+          const recs = recsOf.get(x.l.id);
+          for (let k = x.a; k <= x.b; k++) if (!laneOk(recs[k], x.ln[k])) return false;
+          return true;
+        });
+        if (ok && touched.reduce((t, l) => t + straightJogs(l), 0) < before) { changed = true; break; }
+        for (const x of plan) x.vals.forEach((val, t) => setRun(x.l, x.ln, x.a + t, x.a + t, val));
+      }
+    }
+    if (changed) {
+      for (const l of p.lines) {
+        const ln = lanesMap.get(l.id);
+        if (!ln) continue;
+        // отрезок нулевой длины берёт полосу предыдущего настоящего
+        const full = l.lanes.slice(), ix = keep.get(l.id);
+        ix.forEach((i, j) => { full[i] = ln[j]; });
+        for (let i = 0, last = null; i < full.length; i++) { if (ix.includes(i)) last = full[i]; else if (last != null) full[i] = last; }
+        out.set(l.id, full);
+      }
+    }
     return out;
   }
   const lineOffsets = (p, l) => l.points.slice(1).map((_, i) => segOffset(p, l, i));
@@ -741,10 +923,15 @@ const SchemeCore = (function () {
       const segs = k >= 0 ? [k - 1, k].filter((s) => s >= 0 && s < pts.length - 1) : [it.near.seg];
       const sh = cornerShift(pts, k, p.style.cornerRadius);
       const base = { x: here.x + sh.x, y: here.y + sh.y };
+      // линия меняет полосу прямо в станции — значок должен прикрыть ступеньку
+      it.jog = k > 0 && k < pts.length - 1 && !!it.lanes && (it.lanes[k - 1] || 0) !== (it.lanes[k] || 0);
       it.pts = segs.map((s) => {
         const n = leftNormal(unit(sub(pts[s + 1], pts[s])));
         const o = segOffset(p, it.line, s);
-        return { x: base.x + n.x * o, y: base.y + n.y * o, w, n };
+        // arm — куда уходит линия от станции по этому отрезку (null, если
+        // станция не вершина линии и сторону не определить)
+        const arm = k >= 0 ? unit(sub(s === k - 1 ? pts[k - 1] : pts[s + 1], pts[k])) : null;
+        return { x: base.x + n.x * o, y: base.y + n.y * o, w, n, arm };
       });
       // плюс точка там, где линия реально нарисована (смещённая полилиния):
       // конец конечной линии стоит на своей полосе, а не в центре станции,
@@ -778,20 +965,33 @@ const SchemeCore = (function () {
   // пучка (размер зависит только от числа линий с каждой стороны, см. pillMetrics).
   // Обычная станция, где все линии идут вместе (одни и те же соседи по обе
   // стороны), — «пеньки»: у каждой линии свой, они накладываются друг на друга
-  function resolveStyle(st, geo, seq, minRun, mode) {
+  // Значок станции для каждого вида пересадки — и на одиночном узле (несколько
+  // линий в одной станции), и на станциях объекта-пересадки (там к нему
+  // добавляется переход, см. drawTransfer). Раньше несколько видов сводились
+  // к одному значку (кольца / узел = круг, квадраты = капсула), и смена вида
+  // почти ничего не меняла
+  const NODE_STYLES = { capsule: "pill2", dumbbell: "ring", dumbbell2: "ring2", curve: "circ", dashed: "pilld", london: "ringw", moscow: "ringm", square: "ringq", hub: "hub", none: "stump" };
+  function resolveStyle(st, geo, seq, minRun, mode, trMode) {
+    // станция объекта-пересадки (capsule / hub рисуют её сами — "bare")
+    if (trMode && st.style === "auto" && geo && geo.items.length && !OWN_MARKER_TRANSFERS.includes(trMode)) {
+      const s = NODE_STYLES[trMode];
+      return s && s !== "stump" ? s : "pill";
+    }
     const r = resolveBase(st, geo, seq, minRun);
     // пересадочный узел из нескольких линий в ОДНОЙ станции: вид задаёт style.transferStyle
-    if (r === "pill" && st.style === "auto" && geo && geo.items.length >= 2 && !geo.inTransfer) {
-      // у каждого вида пересадки есть свой вид и на одиночном узле
-      if (mode === "capsule") return "pill2";
-      if (mode === "dumbbell") return "ring";
-      if (mode === "curve" || mode === "london" || mode === "hub") return "circ";
-      if (mode === "moscow") return "ring";
-      if (mode === "square") return "pill2";
-      if (mode === "dashed") return "pilld";
-      if (mode === "none") return "stump";
+    if (r === "pill" && st.style === "auto" && geo && geo.items.length >= 2 && !geo.inTransfer && NODE_STYLES[mode]) {
+      // пеньки — только на параллельном пучке: на развилке они торчат
+      // обломками в разные стороны
+      if (mode === "none" && !parallelBundle(geo)) return r;
+      return NODE_STYLES[mode];
     }
     return r;
+  }
+  // все линии станции идут по одной оси (без поворотов и примыканий)
+  function parallelBundle(geo) {
+    const key = (q) => { const m = q.n || geo.nrm; return Math.round(((Math.atan2(m.y, m.x) * 180 / Math.PI) % 180 + 180) % 180); };
+    const keys = new Set(geo.items.flatMap((it) => it.pts.map(key)).map((a) => a % 180));
+    return keys.size <= 1;
   }
   function resolveBase(st, geo, seq, minRun) {
     if (st.style !== "auto") return st.style;
@@ -903,7 +1103,8 @@ const SchemeCore = (function () {
           u0 = Math.min(u0, pu - h); u1 = Math.max(u1, pu + h);
           v0 = Math.min(v0, pv - h); v1 = Math.max(v1, pv + h);
         }
-        const du = u1 - u0 + 2 * pad, dv = Math.max(thin, v1 - v0 + 2 * pad);
+        const minS = geo.items.some((it) => it.jog) ? geo.maxW * 1.4 * k : 0;
+        const du = Math.max(minS, u1 - u0 + 2 * pad), dv = Math.max(thin, minS, v1 - v0 + 2 * pad);
         const score = du * dv * (a % 90 === 0 ? 1 : 1.15);
         if (!best || score < best.score) best = { a, u, v, u0, u1, v0, v1, du, dv, score };
       }
@@ -917,50 +1118,90 @@ const SchemeCore = (function () {
     const m = canon(n), main = pts;
     const mainE = ext(main);
     const half = (mainE.hi - mainE.lo) / 2 + pad;
-    const thick = thin;
+    // ступенька смены полосы в станции крутая, но с толщиной линии торчит на
+    // ~0.65 толщины в обе стороны — такой значок делаем чуть толще
+    const thick = geo.items.some((it) => it.jog) ? Math.max(thin, geo.maxW * 1.4 * k) : thin;
     const tMid = (mainE.lo + mainE.hi) / 2;
     const mid = { x: c.x + m.x * tMid, y: c.y + m.y * tMid };
     const rx = Math.min(thick / 2, half, Math.max(geo.maxW * 0.45 * k, Math.min(thick, half * 2) * 0.28));
     return { mid, half, thick, rx, rot: Math.atan2(m.y, m.x) * 180 / Math.PI, reach: len(sub(mid, c)) + Math.max(half, thick / 2) };
   }
 
-  // «Гантель» для узла из нескольких линий в одной станции: по кружку НА КАЖДОЙ
-  // линии (цветом линии), чуть сдвинутому вдоль неё, чтобы кружки не слипались,
-  // и мостик, соединяющий их в «восьмёрку»
-  function ringMetrics(p, st, geo) {
+  // Узел из кружков (гантель / кольца / квадраты): по кружку на каждую ВИДИМУЮ
+  // линию станции, в порядке линий поперёк пучка. Кружок один на маршрут:
+  // оба направления и ветки одного номера (line.group), а также линии,
+  // нарисованные на одной полосе друг поверх друга, — один кружок (раньше
+  // их сравнивали только по соседству после сортировки, и у линии, которая
+  // в станции поворачивает, получалось два кружка).
+  // Фигура всегда симметричная: кружки на равном шаге вокруг середины
+  // пучка; если полосы стоят ровно и достаточно широко — каждый кружок точно
+  // над своей линией. Если ряд кружков сильно вылезает за пучок, берётся
+  // компактная раскладка: 3 — треугольник 2+1, 4 — квадрат 2×2, больше —
+  // два ряда («соты» при нечётном числе, сетка при чётном). hull — контур
+  // мостика под кружками.
+  // small («гантель на линиях», ring2) — мелкие кружки размером с шаг полос,
+  // всегда в один ряд и точно над своими линиями; разводятся на равный шаг,
+  // только если линии сходятся в одну точку
+  function ringMetrics(p, st, geo, small) {
     const k = stScale(p, st);
     const pm = pillMetrics(p, st, geo);
     const ra = pm.rot * Math.PI / 180, axis = { x: Math.cos(ra), y: Math.sin(ra) }, along = { x: -axis.y, y: axis.x };
-    // кружки — по ПРЯМОЙ вдоль оси значка, строго над своими линиями
-    const lane = geo.items.map((it) => {
-      const q = it.pts && it.pts[0] ? it.pts[0] : geo.c;
-      return { color: it.line.color, t: q.x * axis.x + q.y * axis.y, q };
-    }).sort((u, v) => u.t - v.t);
-    const n0 = lane.length || 1;
-    // Много линий: кружки в шахматном порядке в 2–3 ряда вдоль линий (каждый
-    // остаётся над своей линией, но крупнее и не слипается с соседями) —
-    // фигура получается компактной «сотой», а не длинной палкой
-    const rows = n0 <= 3 ? 1 : n0 <= 8 ? 2 : 3;
-    // цветной кружок накрывает полосу своей линии: диаметр = шаг полос
-    // (толщина + расстояние между линиями), поэтому он меняется вместе с настройками
-    const rc = Math.max(1.5, pitchOf(p) * (rows > 1 ? 0.8 : 0.5)) * k;
+    const c = pm.mid, pitch = pitchOf(p);
+    const proj = (q) => (q.x - c.x) * axis.x + (q.y - c.y) * axis.y;
+    const groups = new Map();
+    for (const it of geo.items) {
+      const pts = it.pts && it.pts.length ? it.pts : [geo.c];
+      const key = it.line.group || it.line.id;
+      if (!groups.has(key)) groups.set(key, { color: it.line.color, pts: [] });
+      groups.get(key).pts.push(...pts);
+    }
+    // одна и та же линия, нарисованная дважды (тот же цвет на той же полосе
+    // того же плеча) — один кружок; на развилке точки разных линий тоже
+    // бывают рядом (на противоположных плечах одной оси) — это разные линии
+    const ents = [...groups.values()];
+    const sameArm = (q, w) => q.arm && w.arm && q.arm.x * w.arm.x + q.arm.y * w.arm.y > 0.9;
+    const close = (u, v) => u.color === v.color && u.pts.some((q) => v.pts.some((w) => sameArm(q, w) && Math.hypot(q.x - w.x, q.y - w.y) < pitch * 0.45));
+    for (let i = 0; i < ents.length; i++) {
+      for (let j = i + 1; j < ents.length; j++) {
+        if (!close(ents[i], ents[j])) continue;
+        ents[i].pts.push(...ents[j].pts);
+        ents.splice(j, 1);
+        j = i;
+      }
+    }
+    const lanes = ents.map((e) => ({ color: e.color, t: e.pts.reduce((a, q) => a + proj(q), 0) / e.pts.length })).sort((u, v) => u.t - v.t);
+    if (!lanes.length) lanes.push({ color: p.style.stationStroke, t: 0 });
+    const n = lanes.length;
     const ring = Math.max(1.8, geo.maxW * 0.4 * k);
-    const r = rc + ring;
-    const bx = lane.reduce((a, q) => a + q.q.x, 0) / n0, by = lane.reduce((a, q) => a + q.q.y, 0) / n0;
-    const tm = lane.reduce((a, q) => a + q.t, 0) / n0;
-    // если полосы почти совпадают (линии пересекаются в одной точке), разводим кружки
-    const minGap = lane.reduce((m, q, i) => (i ? Math.min(m, q.t - lane[i - 1].t) : m), Infinity);
-    const spread = n0 > 1 && minGap < rc * 1.2 && rows === 1;
-    const rowStep = r * 1.55;
-    const dots = lane.map((q, i) => {
-      const off = spread ? (i - (n0 - 1) / 2) * rc * 1.8 : q.t - tm;
-      const ro = rows > 1 ? ((i % rows) - (rows - 1) / 2) * rowStep : 0;
-      return { x: bx + axis.x * off + along.x * ro, y: by + axis.y * off + along.y * ro, color: q.color };
+    const rc = Math.max(1.5, pitch * 0.5) * k;
+    const r = small ? rc + ring : geo.maxW * 0.6 * k + ring; // радиус кружка вместе с обводкой
+    const t0 = lanes[0].t, t1 = lanes[n - 1].t, tc = (t0 + t1) / 2;
+    const natural = n > 1 ? (t1 - t0) / (n - 1) : 0;
+    const step = Math.max(natural, 2 * r + ring * 0.6);
+    const even = n > 1 && lanes.every((q, i) => Math.abs(q.t - (t0 + i * natural)) < natural * 0.2);
+    // ряд вылезает за пучок больше чем на ~0.6 радиуса с каждой стороны —
+    // компактнее (треугольник / квадрат / два ряда)
+    const overhang = ((n - 1) * step - (t1 - t0) + 2 * r - geo.maxW) / 2;
+    const rows = small || n <= 2 || (n <= 4 && overhang <= r * 0.6) ? 1 : 2;
+    const minGap = lanes.reduce((m, q, i) => (i ? Math.min(m, q.t - lanes[i - 1].t) : m), Infinity);
+    const loc = lanes.map((q, i) => {
+      if (small) return { u: minGap >= rc * 1.2 ? q.t : tc + (i - (n - 1) / 2) * rc * 1.8, v: 0 };
+      if (rows === 1) return { u: even && natural >= step ? q.t : tc + (i - (n - 1) / 2) * step, v: 0 };
+      if (n % 2) return { u: tc + (i - (n - 1) / 2) * step / 2, v: (i % 2 ? 0.5 : -0.5) * step * 0.866 };
+      return { u: tc + (Math.floor(i / 2) - (n / 2 - 1) / 2) * step, v: (i % 2 ? 0.5 : -0.5) * step };
     });
-    const cx = bx, cy = by;
-    let hw = r, hh = r + (rows - 1) / 2 * rowStep;
-    for (const q of dots) hw = Math.max(hw, Math.abs((q.x - cx) * axis.x + (q.y - cy) * axis.y) + r);
-    return { dots, r, ring, bw: r * 0.8, rot: pm.rot, cx, cy, hw, hh, rows };
+    const at = (o) => ({ x: c.x + axis.x * o.u + along.x * o.v, y: c.y + axis.y * o.u + along.y * o.v });
+    const dots = loc.map((o, i) => Object.assign(at(o), { color: lanes[i].color }));
+    let hull;
+    if (rows === 1) hull = n > 1 ? [loc[0], loc[n - 1]] : [];
+    else {
+      const top = loc.filter((o) => o.v < 0), bot = loc.filter((o) => o.v > 0);
+      hull = [top[0], top[top.length - 1], bot[bot.length - 1], bot[0]];
+    }
+    const cc = at({ u: tc, v: 0 });
+    const hw = Math.max(...loc.map((o) => Math.abs(o.u - tc))) + r;
+    const hh = Math.max(...loc.map((o) => Math.abs(o.v))) + r;
+    return { dots, hull: hull.map(at), r, ring, bw: r * 0.8, rot: pm.rot, cx: cc.x, cy: cc.y, hw, hh, rows };
   }
 
   // Круг, накрывающий весь пучок линий станции
@@ -980,11 +1221,11 @@ const SchemeCore = (function () {
   function markerBox(p, st, geo, style) {
     const c = geo.c, n = geo.nrm, k = stScale(p, st);
     let box;
-    if (style === "circ") {
+    if (style === "circ" || style === "hub") {
       const cm = circMetrics(p, st, geo);
       box = { cx: cm.cx, cy: cm.cy, ca: 1, sa: 0, hw: cm.r, hh: cm.r, rx: cm.r };
-    } else if (style === "ring") {
-      const rg = ringMetrics(p, st, geo);
+    } else if (RING_STYLES.includes(style)) {
+      const rg = ringMetrics(p, st, geo, style === "ring2");
       const ra = rg.rot * Math.PI / 180;
       box = { cx: rg.cx, cy: rg.cy, ca: Math.cos(ra), sa: Math.sin(ra), hw: rg.hw, hh: rg.hh, rx: rg.r };
     } else if (style === "pill" || style === "pill2" || style === "pilld") {
@@ -1007,20 +1248,73 @@ const SchemeCore = (function () {
     return { box, reach, maxReach: len({ x: box.cx - c.x, y: box.cy - c.y }) + Math.hypot(box.hw, box.hh) };
   }
 
-  // «Гантель»: кружки цвета линий + мостик, соединяющий их в одну фигуру
-  function drawRingDots(g, p, rg, ring) {
-    const stroke = p.style.stationStroke, fill = p.style.stationFill;
-    const path = rg.dots.map((q, i) => `${i ? "L" : "M"}${q.x} ${q.y}`).join(" ");
-    // тёмный контур: мостик и круги, поверх — заливка мостика и круги цветом линий
-    if (rg.dots.length > 1) {
-      el("path", { d: path, fill: "none", stroke, "stroke-width": rg.bw + ring * 2, "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+  // Узел из кружков, раскладка — ringMetrics. kind:
+  // ring  — «гантель»: кружки цвета линий в тёмной обводке, светлый мостик;
+  // ring2 — «гантель на линиях»: то же мелкими кружками точно над линиями;
+  // ringw — «белые кольца»: белые кружки с тёмным кольцом, тёмная перемычка;
+  // ringm — «цветные кольца»: белые кружки с кольцом цвета линии, светлый мостик;
+  // ringq — «квадраты»: как белые кольца, но скруглёнными квадратами
+  function drawRingDots(g, p, rg, kind, ringW, fill, stroke) {
+    fill = fill || p.style.stationFill;
+    stroke = stroke || p.style.stationStroke;
+    const ring = ringW != null ? ringW : rg.ring;
+    const closed = rg.hull.length > 2;
+    const d = rg.hull.length > 1 ? rg.hull.map((q, i) => `${i ? "L" : "M"}${q.x} ${q.y}`).join(" ") + (closed ? " Z" : "") : null;
+    // plate = false: только перемычки по контуру (кольца / квадраты), без
+    // сплошной тёмной заливки между рядами
+    const bridge = (color, w, plate = true) => {
+      if (d) el("path", { d, fill: closed && plate ? color : "none", stroke: color, "stroke-width": w, "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+    };
+    if (kind === "ring" || kind === "ring2" || kind === "ringm") {
+      // тёмный контур мостика, поверх — светлая заливка
+      bridge(stroke, rg.bw + ring * 2);
+      bridge(fill, rg.bw);
+    } else {
+      bridge(stroke, rg.bw * 0.75, false);
     }
-    for (const q of rg.dots) el("circle", { cx: q.x, cy: q.y, r: rg.r, fill: stroke }, g);
-    if (rg.dots.length > 1) {
-      el("path", { d: path, fill: "none", stroke: fill, "stroke-width": rg.bw, "stroke-linecap": "round", "stroke-linejoin": "round" }, g);
+    if (kind === "ring2") {
+      // мелкие кружки соприкасаются: сначала все тёмные подложки, потом все
+      // цветные — иначе обводка следующего кружка резала предыдущий
+      for (const q of rg.dots) el("circle", { cx: q.x, cy: q.y, r: rg.r, fill: stroke }, g);
+      for (const q of rg.dots) el("circle", { cx: q.x, cy: q.y, r: Math.max(1, rg.r - ring), fill: q.color }, g);
+      return;
     }
-    for (const q of rg.dots) el("circle", { cx: q.x, cy: q.y, r: Math.max(1, rg.r - ring), fill: q.color }, g);
+    for (const q of rg.dots) {
+      if (kind === "ring") {
+        el("circle", { cx: q.x, cy: q.y, r: rg.r, fill: stroke }, g);
+        el("circle", { cx: q.x, cy: q.y, r: Math.max(1, rg.r - ring), fill: q.color }, g);
+      } else if (kind === "ringm") {
+        el("circle", { cx: q.x, cy: q.y, r: Math.max(1, rg.r - ring * 0.65), fill, stroke: q.color, "stroke-width": ring * 1.3 }, g);
+      } else if (kind === "ringq") {
+        const side = 2 * (rg.r - ring / 2) * 0.92;
+        el("rect", {
+          x: -side / 2, y: -side / 2, width: side, height: side, rx: side * 0.18, fill, stroke, "stroke-width": ring,
+          transform: `translate(${q.x} ${q.y}) rotate(${rg.rot})`,
+        }, g);
+      } else {
+        el("circle", { cx: q.x, cy: q.y, r: Math.max(1, rg.r - ring / 2), fill, stroke, "stroke-width": ring }, g);
+      }
+    }
   }
+
+  // «Узел»: круг, разделённый на сектора цветов линий, с белой серединой
+  function drawHub(g, cx, cy, R, colors, ring, fill, stroke) {
+    el("circle", { cx, cy, r: R + ring / 2, fill: stroke }, g);
+    if (colors.length <= 1) {
+      el("circle", { cx, cy, r: R - ring / 2, fill: colors[0] || fill }, g);
+    } else {
+      colors.forEach((col, i) => {
+        const a0 = -Math.PI / 2 + (i * 2 * Math.PI) / colors.length, a1 = -Math.PI / 2 + ((i + 1) * 2 * Math.PI) / colors.length;
+        const rr = R - ring / 2, f2 = (v) => Math.round(v * 100) / 100;
+        el("path", {
+          d: `M${f2(cx)} ${f2(cy)} L${f2(cx + rr * Math.cos(a0))} ${f2(cy + rr * Math.sin(a0))} A${f2(rr)} ${f2(rr)} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${f2(cx + rr * Math.cos(a1))} ${f2(cy + rr * Math.sin(a1))} Z`,
+          fill: col, stroke: fill, "stroke-width": Math.max(0.8, ring * 0.35), "stroke-linejoin": "round",
+        }, g);
+      });
+    }
+    el("circle", { cx, cy, r: R * 0.36, fill, stroke, "stroke-width": ring * 0.7 }, g);
+  }
+  const RING_STYLES = ["ring", "ring2", "ringw", "ringm", "ringq"];
 
   function drawMarker(gMarks, p, st, geo, style, ld) {
     const c = geo.c;
@@ -1042,9 +1336,14 @@ const SchemeCore = (function () {
       const cm = circMetrics(p, st, geo);
       el("circle", { cx: cm.cx, cy: cm.cy, r: cm.r, fill, stroke, "stroke-width": sw != null ? sw : Math.max(2, geo.maxW * 0.4 * k) }, g);
       reach = Math.hypot(cm.cx - c.x, cm.cy - c.y) + cm.r;
-    } else if (style === "ring") {
-      const rg = ringMetrics(p, st, geo);
-      drawRingDots(g, p, rg, sw != null ? sw : rg.ring);
+    } else if (style === "hub") {
+      const cm = circMetrics(p, st, geo);
+      const colors = [...new Set(geo.items.map((it) => it.line.color))];
+      drawHub(g, cm.cx, cm.cy, cm.r, colors, sw != null ? sw : Math.max(2, geo.maxW * 0.4 * k), fill, stroke);
+      reach = Math.hypot(cm.cx - c.x, cm.cy - c.y) + cm.r;
+    } else if (RING_STYLES.includes(style)) {
+      const rg = ringMetrics(p, st, geo, style === "ring2");
+      drawRingDots(g, p, rg, style, sw, st.fill, st.stroke);
       reach = Math.hypot(rg.cx - c.x, rg.cy - c.y) + Math.max(rg.hw, rg.hh);
     } else if (style === "pill" || style === "pill2" || style === "pilld") {
       const pm = pillMetrics(p, st, geo);
@@ -1071,13 +1370,16 @@ const SchemeCore = (function () {
       reach = Math.abs(pos) + r * (style === "circle" ? 1 : style === "square" ? 1.05 : 1.3);
     } else if (style === "stump") {
       // пенёк у каждой линии: от её полосы наружу, в сторону подписи; все пеньки
-      // кончаются на одном краю и накладываются, крайняя линия — сверху
+      // кончаются на одном краю и накладываются, дальняя от подписи линия — сверху
       const side = ld[0] * n.x + ld[1] * n.y >= 0 ? 1 : -1;
       const edge = side > 0 ? geo.hi : -geo.lo;
-      const tick = geo.maxW * 0.85 * k;
-      const items = geo.items.slice().sort((a, b) => side * (a.pos - b.pos));
-      for (const it of items) {
-        // высота пенька = ширина самой линии, и он целиком накрывает линию
+      const tick = geo.maxW * 0.92 * k; // вылет за край линии ≈ её толщина
+      const items = geo.items.slice().sort((a, b) => side * (b.pos - a.pos));
+      // Сначала места всех пеньков, потом длины: пенёк кончается на середине
+      // между своей осью и осью соседней линии в сторону подписи — полоски
+      // получаются одной толщины, и средняя линия не кажется тоньше крайних;
+      // у самой ближней к подписи пенёк вылетает за край на ≈ толщину линии
+      const placed = items.map((it) => {
         const th = lineWidthOf(p, it.line);
         // пенёк стоит там, где линия реально нарисована (на её смещённой полилинии),
         // а не на «идеальной» полосе: у границ изломов и ступенек они расходятся
@@ -1085,17 +1387,34 @@ const SchemeCore = (function () {
         const op = geo.offsetPts && geo.offsetPts.get(it.line.id);
         const near = op && op.length > 1 ? nearestOnPolyline(op, guess) : null;
         const q = near && near.dist <= th * 2 ? near.point : guess;
-        const d0 = side * ((q.x - c.x) * n.x + (q.y - c.y) * n.y);
-        // от оси линии наружу: край пенька не совпадает с дальним краем линии
-        // (там два сглаженных края давали светлый шов), и никуда не выпирает
-        const from = 0;
+        return { it, th, q, d0: side * ((q.x - c.x) * n.x + (q.y - c.y) * n.y) };
+      });
+      // порядок — по реальному положению нарисованных линий (а не по расчётной
+      // полосе pos): на ступеньках и изломах они расходятся, и тогда пенёк
+      // «не находил соседа» и вылезал на всю длину поверх средней линии
+      placed.sort((u, v) => v.d0 - u.d0);
+      const lens = [];
+      placed.forEach((pl, i) => {
+        const cap = pl.th / 2 + pl.th * 0.92 * k;
+        let tip = edge + tick, len = Math.min(tip - pl.d0, cap);
+        const nxt = placed[i - 1];
+        if (nxt) {
+          const gap = nxt.d0 - pl.d0;
+          if (gap <= 0.01) { len = lens[i - 1] + (nxt.d0 - pl.d0); }
+          // соседняя линия рядом — пенёк перекрывает её ровно на её толщину
+          // (до дальнего края); далеко (между ними проходит другая линия) —
+          // не лезем через неё, только свою полосу и немного сверху
+          else if (gap <= pitchOf(p) * 1.5) len = gap + nxt.th / 2;
+          else len = pl.th / 2 + Math.min(pl.th * 0.5, gap / 2);
+        }
+        lens.push(len);
         el("rect", {
-          x: from, y: -th / 2, width: Math.max(th / 2 + 0.5, Math.min(edge + tick - d0 - from, th / 2 + Math.min(tick, th))), height: th,
-          fill: st.fill || it.line.color,
-          transform: `translate(${q.x} ${q.y}) rotate(${side > 0 ? ang : ang + 180})`,
+          x: 0, y: -pl.th / 2, width: Math.max(pl.th / 2 + 0.5, len), height: pl.th,
+          fill: st.fill || pl.it.line.color,
+          transform: `translate(${pl.q.x} ${pl.q.y}) rotate(${side > 0 ? ang : ang + 180})`,
         }, g);
-      }
-      reach = edge + Math.min(tick, geo.maxW);
+      });
+      reach = edge + tick;
     } else {
       // засечка наружу, в сторону подписи
       const side = ld[0] * n.x + ld[1] * n.y >= 0 ? 1 : -1;
@@ -1444,104 +1763,64 @@ const SchemeCore = (function () {
     t.textContent = label;
   }
 
-  // Пересадка: способ обозначения (style.transferStyle или свой у каждой):
-  // bar — белая перемычка; capsule — толстая капсула с обводкой (как в Пекине);
-  // dumbbell — два кружка цветом линии, соединённые мостиком («восьмёрка»);
-  // curve — тонкий изогнутый переход; dashed — пунктирный переход; none — без соединения
+  // Пересадка: способ обозначения (style.transferStyle или свой у каждой).
+  // Значки станций рисуют сами станции (NODE_STYLES в resolveStyle), здесь —
+  // только переход между ними, под значками:
+  // bar — белая перемычка; capsule — толстая капсула с обводкой через все
+  // станции (значки — сама капсула); dumbbell / moscow — светлый мостик в
+  // тёмной обводке; london / square — тёмная перемычка; hub — один круг с
+  // секторами цветов на всю пересадку; curve — тонкий изогнутый переход;
+  // dashed — пунктирный переход; none — без соединения
   const transferStyleOf = (p, tr) => tr.style || p.style.transferStyle;
-  function drawTransfer(g, p, tr, stById, linesById, geos) {
+  function drawTransfer(g, p, tr, stById, anchors, geos) {
     const sts = tr.stationIds.map((id) => stById.get(id)).filter(Boolean);
     if (sts.length < 2) return;
     const mode = transferStyleOf(p, tr);
     if (mode === "none") return;
-    // соединяем цепочкой ближайших соседей
+    // соединяем цепочкой ближайших соседей; точка станции — середина её значка
+    const at = (s) => (anchors && anchors.get(s.id)) || s;
     const chain = [sts[0]];
     const rest = sts.slice(1);
     while (rest.length) {
-      const lastSt = chain[chain.length - 1];
+      const lastSt = at(chain[chain.length - 1]);
       let bi = 0, bd = Infinity;
-      rest.forEach((s, i) => { const d = Math.hypot(s.x - lastSt.x, s.y - lastSt.y); if (d < bd) { bd = d; bi = i; } });
+      rest.forEach((s, i) => { const q = at(s); const d = Math.hypot(q.x - lastSt.x, q.y - lastSt.y); if (d < bd) { bd = d; bi = i; } });
       chain.push(rest.splice(bi, 1)[0]);
     }
     const k = p.style.transferScale, lw = p.style.lineWidth;
     const stroke = p.style.stationStroke, fill = p.style.stationFill;
     const tg = el("g", { "data-kind": "transfer", "data-id": tr.id, class: "sc-transfer" }, g);
-    const straight = chain.map((s, i) => `${i ? "L" : "M"}${s.x} ${s.y}`).join(" ");
+    const pts = chain.map(at);
+    const straight = pts.map((q, i) => `${i ? "L" : "M"}${q.x} ${q.y}`).join(" ");
+    const link = (color, w) => el("path", { d: straight, fill: "none", stroke: color, "stroke-width": w, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
     if (mode === "capsule") {
       const w = lw * 2.4 * k, ring = Math.max(2, lw * 0.5);
-      el("path", { d: straight, fill: "none", stroke, "stroke-width": w, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
-      el("path", { d: straight, fill: "none", stroke: fill, "stroke-width": Math.max(1, w - ring * 2), "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
-    } else if (mode === "dumbbell") {
-      const ring = Math.max(1.8, lw * 0.4);
-      el("path", { d: straight, fill: "none", stroke, "stroke-width": lw * 0.9 * k + ring, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
-      for (const s of chain) {
-        const geo = geos && geos.get(s.id);
-        if (geo && geo.items.length) {
-          // на каждой линии станции — свой кружок цвета линии
-          drawRingDots(tg, p, ringMetrics(p, s, geo), ring);
-        } else {
-          el("circle", { cx: s.x, cy: s.y, r: lw * 1.25 * k, fill: fill, stroke, "stroke-width": ring }, tg);
-        }
-      }
-    } else if (mode === "london" || mode === "square" || mode === "moscow") {
-      // «Лондон»: белое кольцо с тёмной обводкой и тёмный переход; «Вена»:
-      // то же квадратом; «Москва»: кольцо с цветными точками на линиях и
-      // светлый мостик
-      const ring = Math.max(2, lw * 0.4 * k);
-      const linkW = lw * (mode === "moscow" ? 1.1 : 0.8) * k;
-      if (mode === "moscow") {
-        el("path", { d: straight, fill: "none", stroke, "stroke-width": linkW + ring * 1.4, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
-        el("path", { d: straight, fill: "none", stroke: fill, "stroke-width": linkW, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
-      } else {
-        el("path", { d: straight, fill: "none", stroke, "stroke-width": linkW, "stroke-linecap": "round", "stroke-linejoin": "round" }, tg);
-      }
-      for (const s of chain) {
-        const geo = geos && geos.get(s.id);
-        if (!geo) { el("circle", { cx: s.x, cy: s.y, r: lw * 1.3 * k, fill, stroke, "stroke-width": ring }, tg); continue; }
-        const cm = circMetrics(p, s, geo);
-        if (mode === "square") {
-          const side = cm.r * 1.85, ang = Math.atan2(geo.nrm.y, geo.nrm.x) * 180 / Math.PI;
-          el("rect", { x: -side / 2, y: -side / 2, width: side, height: side, rx: side * 0.08, fill, stroke, "stroke-width": ring, transform: `translate(${cm.cx} ${cm.cy}) rotate(${ang})` }, tg);
-        } else if (mode === "london") {
-          el("circle", { cx: cm.cx, cy: cm.cy, r: cm.r, fill, stroke, "stroke-width": ring }, tg);
-        } else {
-          const prim = geo.items[0];
-          el("circle", { cx: cm.cx, cy: cm.cy, r: cm.r, fill, stroke: prim ? prim.line.color : stroke, "stroke-width": ring * 1.3 }, tg);
-          for (const it of geo.items) {
-            const q = it.pts && it.pts[0] ? it.pts[0] : geo.c;
-            el("circle", { cx: q.x, cy: q.y, r: Math.max(1.5, lw * 0.42 * k), fill: it.line.color }, tg);
-          }
-        }
-      }
+      link(stroke, w);
+      link(fill, Math.max(1, w - ring * 2));
+    } else if (mode === "dumbbell" || mode === "dumbbell2" || mode === "moscow") {
+      // ширина как у мостика внутри узла (ringMetrics: bw = 0.8 радиуса)
+      const ring = Math.max(1.8, lw * 0.4 * k), bw = (lw * 0.6 * k + ring) * 0.8;
+      link(stroke, bw + ring * 2);
+      link(fill, bw);
+    } else if (mode === "london" || mode === "square") {
+      const ring = Math.max(1.8, lw * 0.4 * k);
+      link(stroke, (lw * 0.6 * k + ring) * 0.8 * 0.75);
     } else if (mode === "hub") {
       // «Узел»: один круг на всю пересадку, разделённый на сектора цветов линий
       const geoList = chain.map((s) => geos && geos.get(s.id)).filter(Boolean);
-      const cx = chain.reduce((a, s) => a + s.x, 0) / chain.length, cy = chain.reduce((a, s) => a + s.y, 0) / chain.length;
+      const cx = pts.reduce((a, q) => a + q.x, 0) / pts.length, cy = pts.reduce((a, q) => a + q.y, 0) / pts.length;
       const colors = [...new Set(geoList.flatMap((geo) => geo.items.map((it) => it.line.color)))];
       const ring = Math.max(2, lw * 0.4 * k);
       const R = Math.max(lw * 2.2 * k, ...geoList.map((geo) => Math.hypot(geo.c.x - cx, geo.c.y - cy) * 0.5 + lw * 1.2 * k));
-      for (const s of chain) {
-        el("path", { d: `M${s.x} ${s.y} L${cx} ${cy}`, fill: "none", stroke, "stroke-width": lw * 0.5 * k + ring, "stroke-linecap": "round" }, tg);
+      for (const q of pts) {
+        el("path", { d: `M${q.x} ${q.y} L${cx} ${cy}`, fill: "none", stroke, "stroke-width": lw * 0.5 * k + ring, "stroke-linecap": "round" }, tg);
       }
-      el("circle", { cx, cy, r: R + ring / 2, fill: stroke }, tg);
-      if (colors.length <= 1) {
-        el("circle", { cx, cy, r: R - ring / 2, fill: colors[0] || fill }, tg);
-      } else {
-        colors.forEach((col, i) => {
-          const a0 = -Math.PI / 2 + (i * 2 * Math.PI) / colors.length, a1 = -Math.PI / 2 + ((i + 1) * 2 * Math.PI) / colors.length;
-          const rr = R - ring / 2, f2 = (v) => Math.round(v * 100) / 100;
-          el("path", {
-            d: `M${f2(cx)} ${f2(cy)} L${f2(cx + rr * Math.cos(a0))} ${f2(cy + rr * Math.sin(a0))} A${f2(rr)} ${f2(rr)} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${f2(cx + rr * Math.cos(a1))} ${f2(cy + rr * Math.sin(a1))} Z`,
-            fill: col, stroke: fill, "stroke-width": Math.max(0.8, ring * 0.35), "stroke-linejoin": "round",
-          }, tg);
-        });
-      }
-      el("circle", { cx, cy, r: R * 0.36, fill, stroke, "stroke-width": ring * 0.7 }, tg);
-      for (const s of chain) el("circle", { cx: s.x, cy: s.y, r: Math.max(2, lw * 0.6 * k), fill, stroke, "stroke-width": Math.max(1.2, ring * 0.6) }, tg);
+      drawHub(tg, cx, cy, R, colors, ring, fill, stroke);
+      for (const q of pts) el("circle", { cx: q.x, cy: q.y, r: Math.max(2, lw * 0.6 * k), fill, stroke, "stroke-width": Math.max(1.2, ring * 0.6) }, tg);
     } else if (mode === "curve" || mode === "dashed") {
       let d = straight;
-      if (mode === "curve" && chain.length === 2) {
-        const a = chain[0], b = chain[1];
+      if (mode === "curve" && pts.length === 2) {
+        const a = pts[0], b = pts[1];
         const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2, dx = b.x - a.x, dy = b.y - a.y;
         d = `M${a.x} ${a.y} Q${mx - dy * 0.22} ${my + dx * 0.22} ${b.x} ${b.y}`;
       }
@@ -1721,6 +2000,9 @@ const SchemeCore = (function () {
     const stById = new Map(p.stations.map((s) => [s.id, s]));
     const transferStations = new Set(p.transfers.flatMap((t) => t.stationIds));
     const bareStations = new Set(p.transfers.filter((t) => OWN_MARKER_TRANSFERS.includes(transferStyleOf(p, t))).flatMap((t) => t.stationIds));
+    // вид пересадки, в которую входит станция (её значок зависит от него)
+    const trModeOf = new Map();
+    for (const t of p.transfers) if (t.stationIds.length > 1) for (const id of t.stationIds) trModeOf.set(id, transferStyleOf(p, t));
 
     const gShapesBack = el("g", { class: "sc-shapes-back" }, root);
     const gLive = el("g", { class: "sc-live" }, root);
@@ -1738,8 +2020,9 @@ const SchemeCore = (function () {
 
     const live = opts.live || null;
     const offsetPts = new Map();
+    const stKeys = new Set(p.stations.map((st) => st.x + "," + st.y));
     for (const line of p.lines) {
-      if (line.points.length >= 2) offsetPts.set(line.id, offsetPolylineVar(line.points, lineOffsets(p, line), p.style.cornerRadius));
+      if (line.points.length >= 2) offsetPts.set(line.id, offsetPolylineVar(line.points, lineOffsets(p, line), p.style.cornerRadius, stKeys, p.style.lineWidth * 0.15));
     }
     shareCornerRadii([...offsetPts.values()], p.style.cornerRadius, Math.max(p.style.lineWidth, p.style.cornerRadius * 0.35));
     const drawnPaths = new Set();
@@ -1781,7 +2064,7 @@ const SchemeCore = (function () {
     for (const st of p.stations) {
       const geo = stationGeometry(p, st, linesById, drawn);
       geos.set(st.id, geo);
-      const style = resolveStyle(st, geo, seqs, p.style.cornerRadius * 1.3, st.transferStyle || p.style.transferStyle);
+      const style = resolveStyle(st, geo, seqs, p.style.cornerRadius * 1.3, st.transferStyle || p.style.transferStyle, trModeOf.get(st.id));
       entries.push({ st, geo, style, mk: markerBox(p, st, geo, style) });
     }
     const badges = new Map();
@@ -1820,7 +2103,8 @@ const SchemeCore = (function () {
         el("title", null, cg).textContent = `⚠ ${live.conflictStations.get(st.mtrStationId)}`;
       }
     });
-    for (const tr of p.transfers) drawTransfer(gTransfers, p, tr, stById, linesById, geos);
+    const anchors = new Map(entries.map((e) => [e.st.id, { x: e.mk.box.cx, y: e.mk.box.cy }]));
+    for (const tr of p.transfers) drawTransfer(gTransfers, p, tr, stById, anchors, geos);
     drawLegend(gLegend, p);
     return { geos, offsetPts, labels };
   }

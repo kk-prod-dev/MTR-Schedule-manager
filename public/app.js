@@ -438,6 +438,8 @@ const I18N = {
     'instr_body_schedule_formula': '<p>При редактировании маршрута в карточке появляется блок «Формула расписания». Он показывает паттерн отправлений на основе ваших ручных правок: интервал между рейсами и смещение первого рейса от полуночи UTC.</p><p>Формула автоматически обновляется при каждом изменении расписания и помогает убедиться что правки образуют равномерный интервал. Скопируйте формулу кнопкой ⧉ чтобы передать расписание другому игроку.</p>',
     'instr_title_settings': 'Настройки',
     'instr_body_settings': '<p>Язык и часовой пояс определяются автоматически. Языки: RU, EN, DE, FR, PL, PT, CS.</p><p><b>Серверы MTR</b> — список серверов; выберите активный из выпадающего, + добавляет URL, − удаляет; при смене данные перезагружаются; localhost:8888 доступен всегда.</p><p><b>Часовой пояс</b> — только на время поездов; таблицы и графики всегда UTC 00:00–24:00.</p><p>Настройки сохраняются автоматически. Внизу — версия и кнопка обновлений.</p>',
+    instr_title_notifications: "Уведомления",
+    instr_body_notifications: "<p>В настройках можно включить уведомления браузера о новых конфликтах на платформах и/или больших опозданиях (порог в минутах настраивается). Переключатель «Только избранное» ограничивает уведомления избранными маршрутами.</p>",
     'instr_title_board-editor': 'Редактор (бумажное расписание)',
     'instr_body_board-editor': '<p>Вкладка <b>Редактор</b> — холст для вёрстки бумажного расписания станции (Aushangfahrplan): свободно расставляйте элементы, а живое расписание вставляйте кнопкой.</p><p><b>Вставка</b> — отдельные кнопки со значками: текст, квадрат, круг, треугольник, линия, картинка, схема станции. Каждый объект добавляется на холст и редактируется вручную.</p><p><b>Объект</b> — цвет, выравнивание, порядок слоёв, группировка (<code>Ctrl+G</code>), дублирование (<code>Ctrl+D</code>), удаление, цвет и толщина границы, а также выпадающий список <b>видов линии</b> — сплошная, пунктир, точки, штрих-пунктир, волнистая, зигзаг — с наглядными рисунками-примерами прямо в списке.</p><p>Объекты можно вращать за угловой маркер; с зажатым <code>Shift</code> поворот идёт шагом 45°.</p><p><b>Текст</b> — комбобокс шрифтов с поиском и избранным (★), кнопка «Шрифты с ПК», размер, жирность, выравнивание.</p><p>Нижняя панель: <b>Столбцы</b> (прибытие, отправление, линия, цвет маршрута, направление, платформа) → «Вставить столбцы»; <b>Фильтры</b>; число секций; шрифт расписания; «Холст под расписание»; пробел между часами; язык холста; поиск станции → «Вставить расписание станции».</p><p>Готовый холст можно сохранить в PNG, скопировать в буфер, сохранить как пресет или обменяться кодом (Экспорт/Импорт). Масштаб — <code>Ctrl</code>+колесо или кнопки +/−.</p>',
     tabBoard: "Редактор",
@@ -675,12 +677,14 @@ const I18N = {
     schemeTrStyle_bar: "Перемычка",
     schemeTrStyle_capsule: "Капсула",
     schemeTrStyle_dumbbell: "Гантель",
+
+    schemeTrStyle_dumbbell2: "Гантель на линиях (мелкие кружки)",
     schemeTrStyle_curve: "Кривой переход",
     schemeTrStyle_dashed: "Пунктирный переход",
     schemeTrStyle_none: "Без соединения",
-    schemeTrStyle_london: "Лондон (кольца)",
-    schemeTrStyle_moscow: "Москва (кольца и мостик)",
-    schemeTrStyle_square: "Вена (квадраты)",
+    schemeTrStyle_london: "Белые кольца",
+    schemeTrStyle_moscow: "Цветные кольца с мостиком",
+    schemeTrStyle_square: "Квадраты",
     schemeTrStyle_hub: "Узел (сектора цветов)",
     schemeToolIcon: "Значок (I)",
     schemeToolHint_icon: "Клик по холсту — поставить значок; категорию, плашку и свою картинку выберите справа",
@@ -1447,12 +1451,14 @@ const I18N = {
     schemeTrStyle_bar: "Bar",
     schemeTrStyle_capsule: "Capsule",
     schemeTrStyle_dumbbell: "Dumbbell",
+
+    schemeTrStyle_dumbbell2: "Dumbbell on lines (small dots)",
     schemeTrStyle_curve: "Curved link",
     schemeTrStyle_dashed: "Dashed link",
     schemeTrStyle_none: "No connector",
-    schemeTrStyle_london: "London (rings)",
-    schemeTrStyle_moscow: "Moscow (rings + bridge)",
-    schemeTrStyle_square: "Vienna (squares)",
+    schemeTrStyle_london: "White rings",
+    schemeTrStyle_moscow: "Coloured rings + bridge",
+    schemeTrStyle_square: "Squares",
     schemeTrStyle_hub: "Hub (colour sectors)",
     schemeToolIcon: "Icon (I)",
     schemeToolHint_icon: "Click the canvas to place an icon; pick the category, plate and your own image on the right",
@@ -1694,7 +1700,9 @@ function applyI18n() {
   });
   document.querySelectorAll("[data-i18n-title]").forEach((el) => {
     // data-hotkey — подсказка горячей клавиши, не переводится
-    el.title = t(el.dataset.i18nTitle) + (el.dataset.hotkey ? ` (${el.dataset.hotkey})` : "");
+    const base = t(el.dataset.i18nTitle), hk = el.dataset.hotkey;
+    // в самом переводе буква может уже стоять в скобках — не дублируем
+    el.title = base + (hk && !base.includes(`(${hk})`) ? ` (${hk})` : "");
   });
   try { window.NetworkScheme && window.NetworkScheme.onLanguageChange(); } catch (e) {}
   updateNextPageTitle();

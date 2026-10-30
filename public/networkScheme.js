@@ -46,7 +46,7 @@ const NetworkScheme = (function () {
   // alignTol — допуск выравнивания перегонов при построении, градусы (0 = выкл)
   let ui = { mode: "timetable", types: null, live: false, alignTol: 15, compress: 5, minGap: 0, customIcons: [] };
   // что ставит инструмент «Значок»: категория, вариант, плашка, цвет или свой рисунок
-  const iconPick = { icon: "park", variant: 0, plate: "circle", plateColor: "", fill: "#16a34a", img: "" };
+  const iconPick = { icon: "park", variant: 0, plate: "circle", plateColor: "", fill: "", img: "" };
   const ICON_PX = 512, ICON_LIB_MAX = 30;
   let schemeData = null;
   let initialized = false;
@@ -1395,7 +1395,9 @@ const NetworkScheme = (function () {
   function render() {
     if (!el.svg) return;
     el.svg.style.background = project.style.bg;
-    lastDrawn = C().render(el.scene, project, { live: ui.live ? liveData : null, highlight: highlightSet() });
+    const hl = highlightSet();
+    hlKey = hl ? [...hl].sort().join("|") : "";
+    lastDrawn = C().render(el.scene, project, { live: ui.live ? liveData : null, highlight: hl });
     applyView();
     renderOverlay();
   }
@@ -1456,7 +1458,12 @@ const NetworkScheme = (function () {
     return new Set(project.lines.filter((l) => l === ln || (ln.group && l.group === ln.group)).map((l) => l.id));
   }
 
+  // ключ подсветки, с которым нарисована сцена: выделение меняется без render()
+  // (только renderOverlay), и подсветка то не появлялась, то «залипала»
+  let hlKey = "";
   function renderOverlay() {
+    const hl = highlightSet();
+    if ((hl ? [...hl].sort().join("|") : "") !== hlKey && el.svg) { render(); return; }
     const g = el.overlay;
     while (g.firstChild) g.removeChild(g.firstChild);
     const mk = C().el;
@@ -1769,7 +1776,8 @@ const NetworkScheme = (function () {
     if (type === "line") return C().normalizeShape(Object.assign(base, { w: 0, h: 0, stroke: "#111827", strokeW: 3, fill: "none" }));
     if (type === "icon") {
       const size = project.grid * 2;
-      return C().normalizeShape(Object.assign(base, { x: x - size / 2, y: y - size / 2, w: size, h: size, layer: "front" }, iconPick));
+      const dflt = iconPick.img ? "#334155" : (window.MapIcons ? window.MapIcons.colorOf(iconPick.icon) : "#334155");
+      return C().normalizeShape(Object.assign(base, { x: x - size / 2, y: y - size / 2, w: size, h: size, layer: "front" }, iconPick, { fill: iconPick.fill || dflt }));
     }
     return C().normalizeShape(Object.assign(base, { text: tt("schemeNewText"), fill: "#111827", stroke: "none", fontSize: 18 }));
   }
@@ -2480,6 +2488,7 @@ const NetworkScheme = (function () {
     el.toolHint.textContent = tt("schemeToolHint_" + name);
     renderOverlay();
     renderProps();
+    if (name === "icon") openIconPalette(); else closeIconPalette();
   }
 
   function fitView() {
@@ -2639,6 +2648,83 @@ const NetworkScheme = (function () {
     return rows;
   }
 
+  // ---- Палитра значков: всё сразу, рядом с кнопкой инструмента ----
+  let iconPal = null, iconPalOff = null;
+  function closeIconPalette() {
+    if (iconPal) { iconPal.remove(); iconPal = null; }
+    if (iconPalOff) { iconPalOff(); iconPalOff = null; }
+  }
+  function openIconPalette() {
+    const MI = window.MapIcons;
+    const btn = el.toolBtns.find((b) => b.dataset.tool === "icon");
+    if (!MI || !btn || !el.canvasBox) return;
+    closeIconPalette();
+    const colOf = (id) => iconPick.fill || MI.colorOf(id);
+    const col = () => (iconPick.img ? iconPick.fill || "#334155" : colOf(iconPick.icon));
+    const pal = h("div", { class: "scheme-icon-pal" });
+    const build = () => {
+      pal.replaceChildren();
+      const head = h("div", { class: "scheme-icon-pal-head" });
+      MI.PLATES.forEach((p) => head.append(h("button", {
+        type: "button", class: "secondary-btn" + (iconPick.plate === p ? " active" : ""), text: tt("schemePlate_" + p),
+        onclick: () => { iconPick.plate = p; build(); renderProps(); },
+      })));
+      const colorInp = h("input", { type: "color", value: col(), title: tt("schemeFieldColor") });
+      colorInp.addEventListener("input", () => { iconPick.fill = colorInp.value; });
+      colorInp.addEventListener("change", () => { iconPick.fill = colorInp.value; build(); renderProps(); });
+      head.append(colorInp, h("button", {
+        type: "button", class: "secondary-btn", text: "∅", title: tt("schemeReset"),
+        onclick: () => { iconPick.fill = ""; build(); renderProps(); },
+      }));
+      pal.append(head);
+      const grid = h("div", { class: "scheme-icon-pal-grid" });
+      MI.CATALOG.forEach((it) => {
+        const cell = h("div", { class: "scheme-icon-pal-cell" }, [h("div", { class: "scheme-icon-pal-name", text: iconName(it) })]);
+        const row = h("div", { class: "scheme-icon-pal-row" });
+        for (let v = 0; v < MI.VARIANTS; v++) {
+          const on = !iconPick.img && iconPick.icon === it.id && iconPick.variant === v;
+          row.append(h("button", {
+            type: "button", class: "scheme-icon-btn" + (on ? " active" : ""), title: iconName(it) + " " + (v + 1),
+            onclick: () => { Object.assign(iconPick, { icon: it.id, variant: v, img: "" }); renderProps(); closeIconPalette(); },
+          }, [iconThumb(it.id, v, colOf(it.id), iconPick.plate, 36)]));
+        }
+        cell.append(row);
+        grid.append(cell);
+      });
+      pal.append(grid);
+      // свои картинки
+      const file = h("input", { type: "file", accept: "image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg", style: "display:none" });
+      file.addEventListener("change", () => {
+        const f = file.files && file.files[0];
+        file.value = "";
+        if (f) importIconFile(f, (img) => { Object.assign(iconPick, { img, icon: "img" }); renderProps(); closeIconPalette(); });
+      });
+      const lib = h("div", { class: "scheme-icon-pal-row" });
+      ui.customIcons.forEach((it) => lib.append(h("button", {
+        type: "button", class: "scheme-icon-btn" + (iconPick.img === it.img ? " active" : ""), title: it.name,
+        onclick: () => { Object.assign(iconPick, { img: it.img, icon: "img" }); renderProps(); closeIconPalette(); },
+      }, [imgThumb(it.img, 36)])));
+      pal.append(h("div", { class: "scheme-icon-pal-foot" }, [
+        h("button", { type: "button", class: "secondary-btn", text: tt("schemeIconImport"), onclick: () => file.click() }), file, lib,
+      ]));
+    };
+    build();
+    // справа от кнопки; fixed + подгонка под высоту окна, чтобы палитра всегда была видна целиком
+    const bb = btn.getBoundingClientRect();
+    pal.style.left = Math.max(4, bb.right + 6) + "px";
+    pal.style.visibility = "hidden";
+    document.body.appendChild(pal);
+    const top = Math.max(8, Math.min(bb.top - 4, window.innerHeight - pal.offsetHeight - 8));
+    pal.style.top = top + "px";
+    pal.style.maxHeight = (window.innerHeight - 16) + "px";
+    pal.style.visibility = "";
+    iconPal = pal;
+    const away = (e) => { if (!pal.contains(e.target) && !btn.contains(e.target)) closeIconPalette(); };
+    const esc = (e) => { if (e.key === "Escape") closeIconPalette(); };
+    setTimeout(() => { document.addEventListener("mousedown", away, true); document.addEventListener("keydown", esc, true); }, 0);
+    iconPalOff = () => { document.removeEventListener("mousedown", away, true); document.removeEventListener("keydown", esc, true); };
+  }
+
   // ---- Значки: выбор рисунка, плашки, импорт своих картинок ----
   function iconName(it) { return it[typeof currentLang === "function" ? currentLang() : "en"] || it.en; }
   function iconThumb(id, variant, color, plate, px) {
@@ -2654,7 +2740,8 @@ const NetworkScheme = (function () {
   // target — значок на схеме (применить сразу) или iconPick (для следующего)
   function iconFields(target, isPick) {
     const MI = window.MapIcons;
-    const sync = () => { if (!isPick) Object.assign(iconPick, { icon: target.icon, variant: target.variant, plate: target.plate, plateColor: target.plateColor, img: target.img, fill: target.fill }); };
+    // цвет категории по умолчанию в iconPick хранится пустым — следующий значок получит цвет своей категории
+    const sync = () => { if (!isPick) Object.assign(iconPick, { icon: target.icon, variant: target.variant, plate: target.plate, plateColor: target.plateColor, img: target.img, fill: !target.img && target.fill === MI.colorOf(target.icon) ? "" : target.fill }); };
     const commit = (fn) => {
       pushHistory();
       fn();
@@ -2667,11 +2754,14 @@ const NetworkScheme = (function () {
     const isImg = !!target.img;
     rows.push(field("schemeFieldIconCategory", selectInput(isImg ? "" : target.icon, [...(isImg ? [["", tt("schemeIconCustom")]] : []), ...MI.CATALOG.map((it) => [it.id, iconName(it)])], (v) => {
       if (!v) return;
+      // цвет по умолчанию переезжает вместе с категорией; выбранный вручную остаётся
+      const wasDefault = !target.fill || target.img || target.fill === MI.colorOf(target.icon);
       target.icon = v; target.img = "";
+      if (wasDefault) target.fill = isPick ? "" : MI.colorOf(v);
       sync();
       renderProps();
     })));
-    const col = target.fill && target.fill !== "none" ? target.fill : "#334155";
+    const col = target.fill && target.fill !== "none" ? target.fill : (isImg ? "#334155" : MI.colorOf(target.icon));
     if (!isImg) {
       const vr = h("div", { class: "scheme-icon-variants" });
       for (let v = 0; v < MI.VARIANTS; v++) {
@@ -3085,18 +3175,21 @@ const NetworkScheme = (function () {
       ui.types = def.length ? def : all;
     }
     const selTypes = new Set(ui.types);
+    // в ui.types могут остаться типы, которых на этом сервере нет (другой
+    // сервер, старая схема) — считаем только те, что есть в списке
+    const showCount = () => { el.typesCount.textContent = `(${ui.types.filter((x) => counts.has(x)).length})`; };
     el.typesPanel.replaceChildren(...all.map((type) => {
       const cb = h("input", { type: "checkbox", checked: selTypes.has(type) });
       cb.addEventListener("change", () => {
         const s = new Set(ui.types);
         if (cb.checked) s.add(type); else s.delete(type);
         ui.types = [...s];
-        el.typesCount.textContent = `(${ui.types.length})`;
+        showCount();
         scheduleSave();
       });
       return h("label", null, [cb, h("span", { text: " " + typeLabel(type) + " " }), h("span", { class: "hint small", text: `(${counts.get(type)})` })]);
     }));
-    el.typesCount.textContent = `(${ui.types.length})`;
+    showCount();
   }
 
   // Что изменит пересборка из MTR: объекты MTR (по префиксу id) добавятся,

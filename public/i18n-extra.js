@@ -578,13 +578,209 @@
       schemeTrStyle_bar: "Balken",
       schemeTrStyle_capsule: "Kapsel",
       schemeTrStyle_dumbbell: "Hantel",
+
+      schemeTrStyle_dumbbell2: "Hantel auf den Linien (kleine Punkte)",
       schemeTrStyle_curve: "Gebogener Weg",
       schemeTrStyle_dashed: "Gestrichelter Weg",
       schemeTrStyle_none: "Ohne Verbindung",
-      schemeTrStyle_london: "London (Ringe)",
-      schemeTrStyle_moscow: "Moskau (Ringe + Brücke)",
-      schemeTrStyle_square: "Wien (Quadrate)",
+      schemeTrStyle_london: "Weiße Ringe",
+      schemeTrStyle_moscow: "Farbige Ringe + Brücke",
+      schemeTrStyle_square: "Quadrate",
       schemeTrStyle_hub: "Knoten (Farbsektoren)",
+
+      rtype_train_sbahn: "S-Bahn",
+
+      rtype_train_intercity: "InterCity",
+
+      rtype_train_regional: "Regionalzug",
+
+      schemeNewText: "Text",
+
+      schemeAskText: "Beschriftungstext",
+
+      schemeAskOk: "OK",
+
+      schemeAskCancel: "Abbrechen",
+
+      schemeAskStation: "Name der Station",
+
+      schemeAskLine: "Name der Linie",
+
+      schemeStyleCopied: "Stil kopiert — wählen Sie ein anderes Objekt und drücken Sie „Stil einfügen“",
+
+      schemeStyleNoTarget: "Nichts zu ändern: Wählen Sie ein Objekt derselben Art",
+
+      schemeStylePasted: "Stil angewendet: {n}",
+
+      schemeReset: "Auf Standard zurücksetzen",
+
+      schemeNone: "Keine",
+
+      schemeAlign_start: "Links",
+
+      schemeAlign_middle: "Mitte",
+
+      schemeAlign_end: "Rechts",
+
+      schemeLayer_back: "Unter den Linien",
+
+      schemeLayer_front: "Über den Linien",
+
+      schemeListLines: "Linien (Namen)",
+
+      schemeSelectLine: "Linie auswählen",
+
+      schemeListStations: "Stationen (Namen)",
+
+      schemeSearchStations: "Station suchen…",
+
+      schemeFindStation: "Auf dem Plan zeigen",
+
+      schemeGroupInfo: "Stationen: {s}, Formen: {f}, Ecken: {n}",
+
+      schemeGroupHint: "Ziehen Sie eine beliebige ausgewählte Station, um die ganze Gruppe zu verschieben. Umschalt+Klick fügt ein Objekt hinzu / entfernt es.",
+
+      schemePassInfo: "Linien ohne Halt: {n}",
+
+      schemeDefaultName: "Plan {n}",
+
+      schemeAskNewScheme: "Name des neuen Plans",
+
+      schemeAskRenameScheme: "Name des Plans",
+
+      schemeDeleteConfirm: "Plan „{name}“ löschen? Das kann nicht rückgängig gemacht werden.",
+
+      schemeSwitchTitle: "Mehrere Pläne: U-Bahn, Straßenbahn, ganzes Netz…",
+
+      schemeSwitchLabel: "Plan",
+
+      schemeNewTitle: "Plan hinzufügen",
+
+      schemeRenameTitle: "Plan umbenennen",
+
+      schemeDupTitle: "Plan duplizieren",
+
+      schemeDelTitle: "Plan löschen",
+
+      schemeCompressTitle: "Lange Abschnitte ohne Stationen (zwischen Städten) werden auf so viele Zellen verkürzt — gilt beim Erstellen für neue Stationen",
+
+      schemeCompressLabel: "Lücken verdichten",
+
+      schemeToBoard: "In den Aushang",
+
+      schemeToBoardTitle: "Plan als Bild in den Aushang einfügen",
+
+      schemeToBoardDone: "Plan in den Aushang eingefügt",
+
+      schemeToBoardFail: "Der Aushang ist noch nicht bereit — öffnen Sie „Aushang“ und versuchen Sie es erneut",
+
+      schemeToolRect: "Rechteck (R)",
+
+      schemeToolEllipse: "Ellipse (O)",
+
+      schemeToolShapeLine: "Strecke (D)",
+
+      schemeToolText: "Text (A)",
+
+      schemeToolHint_rect: "Auf der Leinwand ziehen — Rechteck (Umschalt — Quadrat). Klick — Standardgröße",
+
+      schemeToolHint_ellipse: "Auf der Leinwand ziehen — Ellipse (Umschalt — Kreis). Klick — Standardgröße",
+
+      schemeToolHint_shapeline: "Ziehen — Strecke (Umschalt — in 45°-Schritten). Klick — Standardlänge",
+
+      schemeToolHint_text: "Auf die Leinwand klicken — Beschriftung hinzufügen",
+
+      schemeStaticPubTitle: "Statischer Link (ganzer Plan in der Adresse)",
+
+      schemeStStyle_square: "Quadrat",
+
+      schemeCompressSkipped: "Lückenverdichtung nicht angewendet: Dieser Plan wurde ohne sie erstellt. Zum Verdichten „Neuer leerer Plan“ drücken und neu erstellen.",
+
+      schemeToggleLine: "Linie zeigen / ausblenden",
+
+      schemeToggleType: "Alle Linien dieses Typs zeigen / ausblenden",
+
+      schemeMergePick: "Zum Zusammenführen markieren",
+
+      schemeMergeBtn: "Markierte zusammenführen",
+
+      schemeUnmergeBtn: "Markierte trennen",
+
+      schemeMergeHint: "Markieren Sie mehrere Linien, um daraus eine Linie zu machen: gemeinsame Farbe (automatisch gewählt), Stil und Breite, eine Spur im Bündel, eine Legendenzeile. Nummer und Name bleiben bei jeder Linie.",
+
+      schemeMergeNeed: "Markieren Sie mindestens zwei Linien",
+
+      schemeMerged: "Linien zusammengeführt: {n}",
+
+      schemeUnmerged: "Linien getrennt: {n}",
+
+      schemeMergedInfo: "Mit anderen Linien zusammengeführt: {n} in der Gruppe",
+
+      schemeUnmergeOne: "Aus der Zusammenführung lösen",
+
+      schemeStStyle_diamond: "Raute",
+
+      schemeFieldFill: "Füllung",
+
+      schemeFieldStroke: "Kontur",
+
+      schemeFieldStrokeW: "Konturbreite",
+
+      schemeFieldSize: "Symbolgröße",
+
+      schemeFieldText: "Text",
+
+      schemeFieldFontSize: "Schriftgröße",
+
+      schemeFieldBold: "Fett",
+
+      schemeFieldAlign: "Ausrichtung",
+
+      schemeFieldRadius: "Eckenrundung",
+
+      schemeFieldOpacity: "Deckkraft",
+
+      schemeFieldRotation: "Drehung, °",
+
+      schemeFieldLayer: "Ebene",
+
+      schemeFieldLaneGap: "Abstand zwischen Linien",
+
+      schemeFieldCorner: "Kurvenradius",
+
+      schemeFieldStationScale: "Stationsgröße",
+
+      schemeFieldTransferScale: "Breite der Umstiege",
+
+      schemeFieldStationFill: "Füllung der Stationen",
+
+      schemeFieldStationStroke: "Kontur der Stationen",
+
+      schemeFieldLabelAuto: "Beschriftungen ohne Überlappung (auto)",
+
+      schemePropGroup: "Mehrere ausgewählt",
+
+      schemePropLook: "Aussehen",
+
+      schemePropShape_rect: "Rechteck",
+
+      schemePropShape_ellipse: "Ellipse",
+
+      schemePropShape_line: "Strecke",
+
+      schemePropShape_text: "Text",
+
+      schemeCopyStyle: "Stil kopieren",
+
+      schemePasteStyle: "Stil einfügen",
+
+      schemeDeleteGroup: "Auswahl löschen",
+
+      schemeToFront: "Nach vorne",
+
+      schemeToBack: "Nach hinten",
+
+      schemeDuplicate: "Duplizieren",
       schemeToolIcon: "Symbol (I)",
       schemeToolHint_icon: "Klick auf die Fläche setzt ein Symbol; Kategorie, Plakette und eigenes Bild rechts wählen",
       schemePropShape_icon: "Symbol",
@@ -1279,13 +1475,209 @@
       schemeTrStyle_bar: "Barre",
       schemeTrStyle_capsule: "Capsule",
       schemeTrStyle_dumbbell: "Haltère",
+
+      schemeTrStyle_dumbbell2: "Haltère sur les lignes (petits points)",
       schemeTrStyle_curve: "Lien courbe",
       schemeTrStyle_dashed: "Lien en pointillés",
       schemeTrStyle_none: "Sans liaison",
-      schemeTrStyle_london: "Londres (anneaux)",
-      schemeTrStyle_moscow: "Moscou (anneaux + pont)",
-      schemeTrStyle_square: "Vienne (carrés)",
+      schemeTrStyle_london: "Anneaux blancs",
+      schemeTrStyle_moscow: "Anneaux colorés + pont",
+      schemeTrStyle_square: "Carrés",
       schemeTrStyle_hub: "Nœud (secteurs de couleur)",
+
+      rtype_train_sbahn: "S-Bahn",
+
+      rtype_train_intercity: "InterCity",
+
+      rtype_train_regional: "Train régional",
+
+      schemeNewText: "Texte",
+
+      schemeAskText: "Texte de l’étiquette",
+
+      schemeAskOk: "OK",
+
+      schemeAskCancel: "Annuler",
+
+      schemeAskStation: "Nom de la station",
+
+      schemeAskLine: "Nom de la ligne",
+
+      schemeStyleCopied: "Style copié — sélectionnez un autre objet et cliquez sur « Coller le style »",
+
+      schemeStyleNoTarget: "Rien à modifier : sélectionnez un objet du même type",
+
+      schemeStylePasted: "Style appliqué : {n}",
+
+      schemeReset: "Rétablir par défaut",
+
+      schemeNone: "Aucun",
+
+      schemeAlign_start: "Gauche",
+
+      schemeAlign_middle: "Centre",
+
+      schemeAlign_end: "Droite",
+
+      schemeLayer_back: "Sous les lignes",
+
+      schemeLayer_front: "Au-dessus des lignes",
+
+      schemeListLines: "Lignes (noms)",
+
+      schemeSelectLine: "Sélectionner la ligne",
+
+      schemeListStations: "Stations (noms)",
+
+      schemeSearchStations: "Trouver une station…",
+
+      schemeFindStation: "Afficher sur le plan",
+
+      schemeGroupInfo: "Stations : {s}, formes : {f}, angles : {n}",
+
+      schemeGroupHint: "Faites glisser une station sélectionnée pour déplacer tout le groupe. Maj+clic ajoute / retire un objet.",
+
+      schemePassInfo: "Lignes passant sans arrêt : {n}",
+
+      schemeDefaultName: "Plan {n}",
+
+      schemeAskNewScheme: "Nom du nouveau plan",
+
+      schemeAskRenameScheme: "Nom du plan",
+
+      schemeDeleteConfirm: "Supprimer le plan « {name} » ? Cette action est irréversible.",
+
+      schemeSwitchTitle: "Plusieurs plans : métro, tramways, réseau entier…",
+
+      schemeSwitchLabel: "Plan",
+
+      schemeNewTitle: "Ajouter un plan",
+
+      schemeRenameTitle: "Renommer le plan",
+
+      schemeDupTitle: "Dupliquer le plan",
+
+      schemeDelTitle: "Supprimer le plan",
+
+      schemeCompressTitle: "Les longs tronçons sans station (entre les villes) sont raccourcis à ce nombre de cases — s’applique aux nouvelles stations lors de la génération",
+
+      schemeCompressLabel: "Compresser les vides",
+
+      schemeToBoard: "Vers l’affiche",
+
+      schemeToBoardTitle: "Insérer le plan comme image dans l’affiche horaire",
+
+      schemeToBoardDone: "Plan inséré dans l’affiche horaire",
+
+      schemeToBoardFail: "L’affiche horaire n’est pas prête — ouvrez « Affiche horaire » et réessayez",
+
+      schemeToolRect: "Rectangle (R)",
+
+      schemeToolEllipse: "Ellipse (O)",
+
+      schemeToolShapeLine: "Segment (D)",
+
+      schemeToolText: "Texte (A)",
+
+      schemeToolHint_rect: "Faites glisser sur le canevas pour un rectangle (Maj — carré). Clic — taille par défaut",
+
+      schemeToolHint_ellipse: "Faites glisser sur le canevas pour une ellipse (Maj — cercle). Clic — taille par défaut",
+
+      schemeToolHint_shapeline: "Faites glisser pour un segment (Maj — par pas de 45°). Clic — longueur par défaut",
+
+      schemeToolHint_text: "Cliquez sur le canevas pour ajouter une étiquette",
+
+      schemeStaticPubTitle: "Lien statique (plan entier dans l’adresse)",
+
+      schemeStStyle_square: "Carré",
+
+      schemeCompressSkipped: "Compression des vides non appliquée : ce plan a été généré sans elle. Pour compresser, cliquez sur « Nouveau plan vide » et générez à nouveau.",
+
+      schemeToggleLine: "Afficher / masquer la ligne",
+
+      schemeToggleType: "Afficher / masquer toutes les lignes de ce type",
+
+      schemeMergePick: "Cocher pour fusionner",
+
+      schemeMergeBtn: "Fusionner les cochées",
+
+      schemeUnmergeBtn: "Séparer les cochées",
+
+      schemeMergeHint: "Cochez plusieurs lignes pour en faire une seule : couleur commune (choisie automatiquement), style et épaisseur, une seule voie dans le faisceau, une ligne de légende. Chaque ligne garde son numéro et son nom.",
+
+      schemeMergeNeed: "Cochez au moins deux lignes",
+
+      schemeMerged: "Lignes fusionnées : {n}",
+
+      schemeUnmerged: "Lignes séparées : {n}",
+
+      schemeMergedInfo: "Fusionnée avec d’autres lignes : {n} dans le groupe",
+
+      schemeUnmergeOne: "Quitter la fusion",
+
+      schemeStStyle_diamond: "Losange",
+
+      schemeFieldFill: "Remplissage",
+
+      schemeFieldStroke: "Contour",
+
+      schemeFieldStrokeW: "Épaisseur du contour",
+
+      schemeFieldSize: "Taille du symbole",
+
+      schemeFieldText: "Texte",
+
+      schemeFieldFontSize: "Taille de police",
+
+      schemeFieldBold: "Gras",
+
+      schemeFieldAlign: "Alignement",
+
+      schemeFieldRadius: "Arrondi",
+
+      schemeFieldOpacity: "Opacité",
+
+      schemeFieldRotation: "Rotation, °",
+
+      schemeFieldLayer: "Calque",
+
+      schemeFieldLaneGap: "Écart entre les lignes",
+
+      schemeFieldCorner: "Rayon des courbes",
+
+      schemeFieldStationScale: "Taille des stations",
+
+      schemeFieldTransferScale: "Épaisseur des correspondances",
+
+      schemeFieldStationFill: "Remplissage des stations",
+
+      schemeFieldStationStroke: "Contour des stations",
+
+      schemeFieldLabelAuto: "Étiquettes sans chevauchement (auto)",
+
+      schemePropGroup: "Sélection multiple",
+
+      schemePropLook: "Apparence",
+
+      schemePropShape_rect: "Rectangle",
+
+      schemePropShape_ellipse: "Ellipse",
+
+      schemePropShape_line: "Segment",
+
+      schemePropShape_text: "Texte",
+
+      schemeCopyStyle: "Copier le style",
+
+      schemePasteStyle: "Coller le style",
+
+      schemeDeleteGroup: "Supprimer la sélection",
+
+      schemeToFront: "Au premier plan",
+
+      schemeToBack: "À l’arrière-plan",
+
+      schemeDuplicate: "Dupliquer",
       schemeToolIcon: "Icône (I)",
       schemeToolHint_icon: "Clic sur le canevas pour placer une icône ; choisissez catégorie, pastille et image personnelle à droite",
       schemePropShape_icon: "Icône",
@@ -1980,13 +2372,209 @@
       schemeTrStyle_bar: "Belka",
       schemeTrStyle_capsule: "Kapsuła",
       schemeTrStyle_dumbbell: "Hantla",
+
+      schemeTrStyle_dumbbell2: "Hantla na liniach (małe kropki)",
       schemeTrStyle_curve: "Łącznik łukowy",
       schemeTrStyle_dashed: "Łącznik przerywany",
       schemeTrStyle_none: "Bez połączenia",
-      schemeTrStyle_london: "Londyn (pierścienie)",
-      schemeTrStyle_moscow: "Moskwa (pierścienie + mostek)",
-      schemeTrStyle_square: "Wiedeń (kwadraty)",
+      schemeTrStyle_london: "Białe pierścienie",
+      schemeTrStyle_moscow: "Kolorowe pierścienie + mostek",
+      schemeTrStyle_square: "Kwadraty",
       schemeTrStyle_hub: "Węzeł (sektory kolorów)",
+
+      rtype_train_sbahn: "S-Bahn",
+
+      rtype_train_intercity: "InterCity",
+
+      rtype_train_regional: "Pociąg regionalny",
+
+      schemeNewText: "Tekst",
+
+      schemeAskText: "Tekst napisu",
+
+      schemeAskOk: "OK",
+
+      schemeAskCancel: "Anuluj",
+
+      schemeAskStation: "Nazwa stacji",
+
+      schemeAskLine: "Nazwa linii",
+
+      schemeStyleCopied: "Styl skopiowany — zaznacz inny obiekt i naciśnij „Wklej styl”",
+
+      schemeStyleNoTarget: "Nie ma czego zmienić: zaznacz obiekt tego samego rodzaju",
+
+      schemeStylePasted: "Zastosowano styl: {n}",
+
+      schemeReset: "Przywróć domyślne",
+
+      schemeNone: "Brak",
+
+      schemeAlign_start: "Do lewej",
+
+      schemeAlign_middle: "Do środka",
+
+      schemeAlign_end: "Do prawej",
+
+      schemeLayer_back: "Pod liniami",
+
+      schemeLayer_front: "Nad liniami",
+
+      schemeListLines: "Linie (nazwy)",
+
+      schemeSelectLine: "Zaznacz linię",
+
+      schemeListStations: "Stacje (nazwy)",
+
+      schemeSearchStations: "Znajdź stację…",
+
+      schemeFindStation: "Pokaż na schemacie",
+
+      schemeGroupInfo: "Stacje: {s}, kształty: {f}, narożniki: {n}",
+
+      schemeGroupHint: "Przeciągnij dowolną zaznaczoną stację, aby przesunąć całą grupę. Shift+klik dodaje / usuwa obiekt.",
+
+      schemePassInfo: "Linie przejeżdżające bez zatrzymania: {n}",
+
+      schemeDefaultName: "Schemat {n}",
+
+      schemeAskNewScheme: "Nazwa nowego schematu",
+
+      schemeAskRenameScheme: "Nazwa schematu",
+
+      schemeDeleteConfirm: "Usunąć schemat „{name}”? Tego nie można cofnąć.",
+
+      schemeSwitchTitle: "Kilka schematów: metro, tramwaje, cała sieć…",
+
+      schemeSwitchLabel: "Schemat",
+
+      schemeNewTitle: "Dodaj schemat",
+
+      schemeRenameTitle: "Zmień nazwę schematu",
+
+      schemeDupTitle: "Duplikuj schemat",
+
+      schemeDelTitle: "Usuń schemat",
+
+      schemeCompressTitle: "Długie odcinki bez stacji (między miastami) są skracane do tylu kratek — dotyczy nowych stacji przy budowaniu",
+
+      schemeCompressLabel: "Kompresja pustek",
+
+      schemeToBoard: "Do rozkładu",
+
+      schemeToBoardTitle: "Wstaw schemat jako obraz do rozkładu",
+
+      schemeToBoardDone: "Schemat wstawiony do rozkładu",
+
+      schemeToBoardFail: "Rozkład nie jest jeszcze gotowy — otwórz „Rozkład” i spróbuj ponownie",
+
+      schemeToolRect: "Prostokąt (R)",
+
+      schemeToolEllipse: "Elipsa (O)",
+
+      schemeToolShapeLine: "Odcinek (D)",
+
+      schemeToolText: "Tekst (A)",
+
+      schemeToolHint_rect: "Przeciągnij na płótnie — prostokąt (Shift — kwadrat). Klik — rozmiar domyślny",
+
+      schemeToolHint_ellipse: "Przeciągnij na płótnie — elipsa (Shift — koło). Klik — rozmiar domyślny",
+
+      schemeToolHint_shapeline: "Przeciągnij — odcinek (Shift — co 45°). Klik — długość domyślna",
+
+      schemeToolHint_text: "Kliknij płótno, aby dodać napis",
+
+      schemeStaticPubTitle: "Link statyczny (cały schemat w adresie)",
+
+      schemeStStyle_square: "Kwadrat",
+
+      schemeCompressSkipped: "Kompresja pustek nie została zastosowana: schemat zbudowano bez niej. Aby skompresować, naciśnij „Nowy pusty schemat” i zbuduj ponownie.",
+
+      schemeToggleLine: "Pokaż / ukryj linię",
+
+      schemeToggleType: "Pokaż / ukryj wszystkie linie tego typu",
+
+      schemeMergePick: "Zaznacz do scalenia",
+
+      schemeMergeBtn: "Scal zaznaczone",
+
+      schemeUnmergeBtn: "Rozdziel zaznaczone",
+
+      schemeMergeHint: "Zaznacz kilka linii, aby stały się jedną: wspólny kolor (dobierany automatycznie), styl i grubość, jeden pas w wiązce, jeden wiersz legendy. Numer i nazwa zostają przy każdej linii.",
+
+      schemeMergeNeed: "Zaznacz co najmniej dwie linie",
+
+      schemeMerged: "Scalono linii: {n}",
+
+      schemeUnmerged: "Rozdzielono linii: {n}",
+
+      schemeMergedInfo: "Scalona z innymi liniami: {n} w grupie",
+
+      schemeUnmergeOne: "Wyjdź ze scalenia",
+
+      schemeStStyle_diamond: "Romb",
+
+      schemeFieldFill: "Wypełnienie",
+
+      schemeFieldStroke: "Obrys",
+
+      schemeFieldStrokeW: "Grubość obrysu",
+
+      schemeFieldSize: "Rozmiar znacznika",
+
+      schemeFieldText: "Tekst",
+
+      schemeFieldFontSize: "Rozmiar czcionki",
+
+      schemeFieldBold: "Pogrubienie",
+
+      schemeFieldAlign: "Wyrównanie",
+
+      schemeFieldRadius: "Zaokrąglenie",
+
+      schemeFieldOpacity: "Krycie",
+
+      schemeFieldRotation: "Obrót, °",
+
+      schemeFieldLayer: "Warstwa",
+
+      schemeFieldLaneGap: "Odstęp między liniami",
+
+      schemeFieldCorner: "Promień łuków",
+
+      schemeFieldStationScale: "Rozmiar stacji",
+
+      schemeFieldTransferScale: "Grubość przesiadek",
+
+      schemeFieldStationFill: "Wypełnienie stacji",
+
+      schemeFieldStationStroke: "Obrys stacji",
+
+      schemeFieldLabelAuto: "Napisy bez nakładania (auto)",
+
+      schemePropGroup: "Zaznaczono kilka",
+
+      schemePropLook: "Wygląd",
+
+      schemePropShape_rect: "Prostokąt",
+
+      schemePropShape_ellipse: "Elipsa",
+
+      schemePropShape_line: "Odcinek",
+
+      schemePropShape_text: "Tekst",
+
+      schemeCopyStyle: "Kopiuj styl",
+
+      schemePasteStyle: "Wklej styl",
+
+      schemeDeleteGroup: "Usuń zaznaczone",
+
+      schemeToFront: "Na wierzch",
+
+      schemeToBack: "Na spód",
+
+      schemeDuplicate: "Duplikuj",
       schemeToolIcon: "Ikona (I)",
       schemeToolHint_icon: "Kliknij płótno, aby postawić ikonę; kategorię, tło i własny obraz wybierz po prawej",
       schemePropShape_icon: "Ikona",
@@ -2681,13 +3269,209 @@
       schemeTrStyle_bar: "Barra",
       schemeTrStyle_capsule: "Cápsula",
       schemeTrStyle_dumbbell: "Haltere",
+
+      schemeTrStyle_dumbbell2: "Haltere nas linhas (pontos pequenos)",
       schemeTrStyle_curve: "Ligação curva",
       schemeTrStyle_dashed: "Ligação tracejada",
       schemeTrStyle_none: "Sem ligação",
-      schemeTrStyle_london: "Londres (anéis)",
-      schemeTrStyle_moscow: "Moscou (anéis + ponte)",
-      schemeTrStyle_square: "Viena (quadrados)",
+      schemeTrStyle_london: "Anéis brancos",
+      schemeTrStyle_moscow: "Anéis coloridos + ponte",
+      schemeTrStyle_square: "Quadrados",
       schemeTrStyle_hub: "Nó (setores de cor)",
+
+      rtype_train_sbahn: "S-Bahn",
+
+      rtype_train_intercity: "InterCity",
+
+      rtype_train_regional: "Regional",
+
+      schemeNewText: "Texto",
+
+      schemeAskText: "Texto do rótulo",
+
+      schemeAskOk: "OK",
+
+      schemeAskCancel: "Cancelar",
+
+      schemeAskStation: "Nome da estação",
+
+      schemeAskLine: "Nome da linha",
+
+      schemeStyleCopied: "Estilo copiado — selecione outro objeto e clique em «Colar estilo»",
+
+      schemeStyleNoTarget: "Nada a alterar: selecione um objeto do mesmo tipo",
+
+      schemeStylePasted: "Estilo aplicado: {n}",
+
+      schemeReset: "Repor o padrão",
+
+      schemeNone: "Nenhum",
+
+      schemeAlign_start: "Esquerda",
+
+      schemeAlign_middle: "Centro",
+
+      schemeAlign_end: "Direita",
+
+      schemeLayer_back: "Abaixo das linhas",
+
+      schemeLayer_front: "Acima das linhas",
+
+      schemeListLines: "Linhas (nomes)",
+
+      schemeSelectLine: "Selecionar linha",
+
+      schemeListStations: "Estações (nomes)",
+
+      schemeSearchStations: "Encontrar estação…",
+
+      schemeFindStation: "Mostrar no mapa",
+
+      schemeGroupInfo: "Estações: {s}, formas: {f}, cantos: {n}",
+
+      schemeGroupHint: "Arraste qualquer estação selecionada para mover o grupo inteiro. Shift+clique adiciona / remove um objeto.",
+
+      schemePassInfo: "Linhas que passam sem parar: {n}",
+
+      schemeDefaultName: "Mapa {n}",
+
+      schemeAskNewScheme: "Nome do novo mapa",
+
+      schemeAskRenameScheme: "Nome do mapa",
+
+      schemeDeleteConfirm: "Eliminar o mapa «{name}»? Isto não pode ser desfeito.",
+
+      schemeSwitchTitle: "Vários mapas: metro, elétricos, rede inteira…",
+
+      schemeSwitchLabel: "Mapa",
+
+      schemeNewTitle: "Adicionar mapa",
+
+      schemeRenameTitle: "Renomear mapa",
+
+      schemeDupTitle: "Duplicar mapa",
+
+      schemeDelTitle: "Eliminar mapa",
+
+      schemeCompressTitle: "Troços longos sem estações (entre cidades) são encurtados para este número de células — aplica-se às novas estações ao construir",
+
+      schemeCompressLabel: "Comprimir vazios",
+
+      schemeToBoard: "Para o quadro horário",
+
+      schemeToBoardTitle: "Inserir o mapa como imagem no quadro horário",
+
+      schemeToBoardDone: "Mapa inserido no quadro horário",
+
+      schemeToBoardFail: "O quadro horário ainda não está pronto — abra «Quadro horário» e tente novamente",
+
+      schemeToolRect: "Retângulo (R)",
+
+      schemeToolEllipse: "Elipse (O)",
+
+      schemeToolShapeLine: "Segmento (D)",
+
+      schemeToolText: "Texto (A)",
+
+      schemeToolHint_rect: "Arraste na tela para um retângulo (Shift — quadrado). Clique — tamanho padrão",
+
+      schemeToolHint_ellipse: "Arraste na tela para uma elipse (Shift — círculo). Clique — tamanho padrão",
+
+      schemeToolHint_shapeline: "Arraste para um segmento (Shift — passos de 45°). Clique — comprimento padrão",
+
+      schemeToolHint_text: "Clique na tela para adicionar um rótulo",
+
+      schemeStaticPubTitle: "Ligação estática (mapa inteiro no endereço)",
+
+      schemeStStyle_square: "Quadrado",
+
+      schemeCompressSkipped: "A compressão de vazios não foi aplicada: este mapa foi construído sem ela. Para comprimir, clique em «Novo mapa vazio» e construa de novo.",
+
+      schemeToggleLine: "Mostrar / ocultar a linha",
+
+      schemeToggleType: "Mostrar / ocultar todas as linhas deste tipo",
+
+      schemeMergePick: "Marcar para unir",
+
+      schemeMergeBtn: "Unir marcadas",
+
+      schemeUnmergeBtn: "Separar marcadas",
+
+      schemeMergeHint: "Marque várias linhas para as transformar numa só: cor comum (escolhida automaticamente), estilo e espessura, uma faixa no feixe, uma linha da legenda. Cada linha mantém o seu número e nome.",
+
+      schemeMergeNeed: "Marque pelo menos duas linhas",
+
+      schemeMerged: "Linhas unidas: {n}",
+
+      schemeUnmerged: "Linhas separadas: {n}",
+
+      schemeMergedInfo: "Unida a outras linhas: {n} no grupo",
+
+      schemeUnmergeOne: "Sair da união",
+
+      schemeStStyle_diamond: "Losango",
+
+      schemeFieldFill: "Preenchimento",
+
+      schemeFieldStroke: "Contorno",
+
+      schemeFieldStrokeW: "Espessura do contorno",
+
+      schemeFieldSize: "Tamanho do marcador",
+
+      schemeFieldText: "Texto",
+
+      schemeFieldFontSize: "Tamanho da letra",
+
+      schemeFieldBold: "Negrito",
+
+      schemeFieldAlign: "Alinhamento",
+
+      schemeFieldRadius: "Arredondamento",
+
+      schemeFieldOpacity: "Opacidade",
+
+      schemeFieldRotation: "Rotação, °",
+
+      schemeFieldLayer: "Camada",
+
+      schemeFieldLaneGap: "Espaço entre linhas",
+
+      schemeFieldCorner: "Raio das curvas",
+
+      schemeFieldStationScale: "Tamanho das estações",
+
+      schemeFieldTransferScale: "Espessura das ligações",
+
+      schemeFieldStationFill: "Preenchimento das estações",
+
+      schemeFieldStationStroke: "Contorno das estações",
+
+      schemeFieldLabelAuto: "Rótulos sem sobreposição (auto)",
+
+      schemePropGroup: "Vários selecionados",
+
+      schemePropLook: "Aparência",
+
+      schemePropShape_rect: "Retângulo",
+
+      schemePropShape_ellipse: "Elipse",
+
+      schemePropShape_line: "Segmento",
+
+      schemePropShape_text: "Texto",
+
+      schemeCopyStyle: "Copiar estilo",
+
+      schemePasteStyle: "Colar estilo",
+
+      schemeDeleteGroup: "Eliminar seleção",
+
+      schemeToFront: "Para a frente",
+
+      schemeToBack: "Para trás",
+
+      schemeDuplicate: "Duplicar",
       schemeToolIcon: "Ícone (I)",
       schemeToolHint_icon: "Clique na tela para colocar um ícone; escolha categoria, placa e imagem própria à direita",
       schemePropShape_icon: "Ícone",
@@ -3382,13 +4166,209 @@
       schemeTrStyle_bar: "Úsečka",
       schemeTrStyle_capsule: "Kapsle",
       schemeTrStyle_dumbbell: "Činka",
+
+      schemeTrStyle_dumbbell2: "Činka na linkách (malé tečky)",
       schemeTrStyle_curve: "Oblouk",
       schemeTrStyle_dashed: "Čárkovaný přechod",
       schemeTrStyle_none: "Bez spojení",
-      schemeTrStyle_london: "Londýn (kruhy)",
-      schemeTrStyle_moscow: "Moskva (kruhy + můstek)",
-      schemeTrStyle_square: "Vídeň (čtverce)",
+      schemeTrStyle_london: "Bílé kruhy",
+      schemeTrStyle_moscow: "Barevné kruhy + můstek",
+      schemeTrStyle_square: "Čtverce",
       schemeTrStyle_hub: "Uzel (barevné sektory)",
+
+      rtype_train_sbahn: "S-Bahn",
+
+      rtype_train_intercity: "InterCity",
+
+      rtype_train_regional: "Regionální vlak",
+
+      schemeNewText: "Text",
+
+      schemeAskText: "Text popisku",
+
+      schemeAskOk: "OK",
+
+      schemeAskCancel: "Zrušit",
+
+      schemeAskStation: "Název stanice",
+
+      schemeAskLine: "Název linky",
+
+      schemeStyleCopied: "Styl zkopírován — vyberte jiný objekt a stiskněte „Vložit styl“",
+
+      schemeStyleNoTarget: "Není co měnit: vyberte objekt stejného druhu",
+
+      schemeStylePasted: "Styl použit: {n}",
+
+      schemeReset: "Obnovit výchozí",
+
+      schemeNone: "Žádné",
+
+      schemeAlign_start: "Vlevo",
+
+      schemeAlign_middle: "Na střed",
+
+      schemeAlign_end: "Vpravo",
+
+      schemeLayer_back: "Pod linkami",
+
+      schemeLayer_front: "Nad linkami",
+
+      schemeListLines: "Linky (názvy)",
+
+      schemeSelectLine: "Vybrat linku",
+
+      schemeListStations: "Stanice (názvy)",
+
+      schemeSearchStations: "Najít stanici…",
+
+      schemeFindStation: "Ukázat na schématu",
+
+      schemeGroupInfo: "Stanice: {s}, tvary: {f}, rohy: {n}",
+
+      schemeGroupHint: "Táhněte libovolnou vybranou stanici a posune se celá skupina. Shift+klik přidá / odebere objekt.",
+
+      schemePassInfo: "Linky projíždějící bez zastavení: {n}",
+
+      schemeDefaultName: "Schéma {n}",
+
+      schemeAskNewScheme: "Název nového schématu",
+
+      schemeAskRenameScheme: "Název schématu",
+
+      schemeDeleteConfirm: "Smazat schéma „{name}“? Tuto akci nelze vrátit.",
+
+      schemeSwitchTitle: "Více schémat: metro, tramvaje, celá síť…",
+
+      schemeSwitchLabel: "Schéma",
+
+      schemeNewTitle: "Přidat schéma",
+
+      schemeRenameTitle: "Přejmenovat schéma",
+
+      schemeDupTitle: "Duplikovat schéma",
+
+      schemeDelTitle: "Smazat schéma",
+
+      schemeCompressTitle: "Dlouhé úseky bez stanic (mezi městy) se zkracují na tento počet buněk — platí pro nové stanice při sestavení",
+
+      schemeCompressLabel: "Zhustit mezery",
+
+      schemeToBoard: "Do jízdního řádu",
+
+      schemeToBoardTitle: "Vložit schéma jako obrázek do jízdního řádu",
+
+      schemeToBoardDone: "Schéma vloženo do jízdního řádu",
+
+      schemeToBoardFail: "Jízdní řád ještě není připravený — otevřete „Jízdní řád“ a zkuste to znovu",
+
+      schemeToolRect: "Obdélník (R)",
+
+      schemeToolEllipse: "Elipsa (O)",
+
+      schemeToolShapeLine: "Úsečka (D)",
+
+      schemeToolText: "Text (A)",
+
+      schemeToolHint_rect: "Táhněte po plátně — obdélník (Shift — čtverec). Klik — výchozí velikost",
+
+      schemeToolHint_ellipse: "Táhněte po plátně — elipsa (Shift — kruh). Klik — výchozí velikost",
+
+      schemeToolHint_shapeline: "Táhněte — úsečka (Shift — po 45°). Klik — výchozí délka",
+
+      schemeToolHint_text: "Klikněte na plátno a přidejte popisek",
+
+      schemeStaticPubTitle: "Statický odkaz (celé schéma v adrese)",
+
+      schemeStStyle_square: "Čtverec",
+
+      schemeCompressSkipped: "Zhuštění mezer nebylo použito: schéma bylo sestaveno bez něj. Pro zhuštění stiskněte „Nové prázdné schéma“ a sestavte znovu.",
+
+      schemeToggleLine: "Zobrazit / skrýt linku",
+
+      schemeToggleType: "Zobrazit / skrýt všechny linky tohoto typu",
+
+      schemeMergePick: "Označit ke sloučení",
+
+      schemeMergeBtn: "Sloučit označené",
+
+      schemeUnmergeBtn: "Rozdělit označené",
+
+      schemeMergeHint: "Označte několik linek a stanou se jednou linkou: společná barva (vybírá se automaticky), styl a tloušťka, jeden pruh ve svazku, jeden řádek legendy. Číslo a název zůstávají každé lince.",
+
+      schemeMergeNeed: "Označte alespoň dvě linky",
+
+      schemeMerged: "Sloučeno linek: {n}",
+
+      schemeUnmerged: "Rozděleno linek: {n}",
+
+      schemeMergedInfo: "Sloučena s jinými linkami: {n} ve skupině",
+
+      schemeUnmergeOne: "Opustit sloučení",
+
+      schemeStStyle_diamond: "Kosočtverec",
+
+      schemeFieldFill: "Výplň",
+
+      schemeFieldStroke: "Obrys",
+
+      schemeFieldStrokeW: "Tloušťka obrysu",
+
+      schemeFieldSize: "Velikost značky",
+
+      schemeFieldText: "Text",
+
+      schemeFieldFontSize: "Velikost písma",
+
+      schemeFieldBold: "Tučné",
+
+      schemeFieldAlign: "Zarovnání",
+
+      schemeFieldRadius: "Zaoblení",
+
+      schemeFieldOpacity: "Krytí",
+
+      schemeFieldRotation: "Otočení, °",
+
+      schemeFieldLayer: "Vrstva",
+
+      schemeFieldLaneGap: "Mezera mezi linkami",
+
+      schemeFieldCorner: "Poloměr oblouků",
+
+      schemeFieldStationScale: "Velikost stanic",
+
+      schemeFieldTransferScale: "Tloušťka přestupů",
+
+      schemeFieldStationFill: "Výplň stanic",
+
+      schemeFieldStationStroke: "Obrys stanic",
+
+      schemeFieldLabelAuto: "Popisky bez překrývání (auto)",
+
+      schemePropGroup: "Vybráno více",
+
+      schemePropLook: "Vzhled",
+
+      schemePropShape_rect: "Obdélník",
+
+      schemePropShape_ellipse: "Elipsa",
+
+      schemePropShape_line: "Úsečka",
+
+      schemePropShape_text: "Text",
+
+      schemeCopyStyle: "Kopírovat styl",
+
+      schemePasteStyle: "Vložit styl",
+
+      schemeDeleteGroup: "Smazat vybrané",
+
+      schemeToFront: "Dopředu",
+
+      schemeToBack: "Dozadu",
+
+      schemeDuplicate: "Duplikovat",
       schemeToolIcon: "Ikona (I)",
       schemeToolHint_icon: "Kliknutím na plátno vložíte ikonu; kategorii, podklad a vlastní obrázek zvolte vpravo",
       schemePropShape_icon: "Ikona",
