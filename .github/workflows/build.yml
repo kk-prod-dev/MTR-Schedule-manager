@@ -65,34 +65,31 @@ jobs:
             dist/latest-linux.yml
           if-no-files-found: error
 
+  # Обе архитектуры собираются на одном Apple Silicon сборщике: Intel-сборщики
+  # macos-13 GitHub больше не выделяет (задание висело в очереди сутки и
+  # отменялось). Нативных модулей у приложения нет, поэтому x64 собирается
+  # кросс-сборкой. Один запуск даёт и один latest-mac.yml с обоими DMG —
+  # автообновление на Intel и Apple Silicon берёт свой файл
   mac:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - runner: macos-13     # Intel x64
-            arch: x64
-          - runner: macos-latest # Apple Silicon arm64
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
       - run: npm install
-      - name: Build DMG (${{ matrix.arch }})
+      - name: Build DMG (x64 + arm64)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        # artifactName переопределяем с суффиксом архитектуры, иначе x64 и
-        # arm64 DMG получили бы одинаковое имя и перезаписали друг друга
+        # artifactName с суффиксом архитектуры, иначе x64 и arm64 DMG
+        # получили бы одинаковое имя и перезаписали друг друга
         run: >
-          npx electron-builder --mac --${{ matrix.arch }}
+          npx electron-builder --mac --x64 --arm64
           -c.mac.artifactName='MTRScheduleManager-${version}-${arch}.${ext}'
           --publish ${{ startsWith(github.ref, 'refs/tags/') && 'always' || 'never' }}
       - uses: actions/upload-artifact@v4
         with:
-          name: mac-dmg-${{ matrix.arch }}
+          name: mac-dmg
           path: |
             dist/*.dmg
             dist/latest-mac.yml

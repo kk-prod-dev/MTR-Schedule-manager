@@ -348,6 +348,8 @@ npm run build         # alias for dist:win
 3. Commit + push to `main`, then push tag `vX.X.X` — CI (`.github/workflows/build.yml`) builds Windows/macOS/Linux and attaches them to the GitHub Release automatically (release is created as draft — publish manually)
 4. `pending-changelog.json` ships in build — shown once on first launch after update
 
+macOS: ONE job on `macos-latest` builds both `--x64 --arm64` (cross-build, the app has no native modules). Separate Intel jobs on `macos-13` never got a runner (queued 24 h, then cancelled — 1.2.0 shipped arm64 only), and two mac jobs would also overwrite each other's `latest-mac.yml` in the release.
+
 Local Windows build still possible: close running Electron app (releases `app.asar` lock), then `npm run build`. macOS/Linux **cannot** be built on Windows — CI only.
 
 ### Repo hygiene
